@@ -50,6 +50,19 @@ function prepareEvent(taskId, event) {
   return copy;
 }
 
+function prepareCategory(category) {
+  if (category === null || typeof category !== 'object' || Array.isArray(category)) {
+    throw new ValidationError('category 必须是对象');
+  }
+  if (typeof category.id !== 'string' || category.id.length === 0) {
+    throw new ValidationError('category.id 不能为空');
+  }
+  if (typeof category.name !== 'string' || category.name.trim().length === 0) {
+    throw new ValidationError('category.name 不能为空');
+  }
+  return clone({ ...category, name: category.name.trim() });
+}
+
 function matchesCriteria(task, criteria = {}) {
   return Object.entries(criteria).every(([field, value]) => task[field] === value);
 }
@@ -117,6 +130,89 @@ export class TaskRepository {
     const tasks = await requestResult(transaction.objectStore('tasks').getAll());
     await transactionResult(transaction);
     return tasks.filter((task) => matchesCriteria(task, criteria)).map(clone);
+  }
+
+  async createCategory(category) {
+    const categoryToSave = prepareCategory(category);
+    const database = await this.#getDatabase();
+    const transaction = database.transaction('categories', 'readwrite');
+    transaction.objectStore('categories').add(categoryToSave);
+    await transactionResult(transaction);
+    return clone(categoryToSave);
+  }
+
+  async getCategory(id) {
+    const database = await this.#getDatabase();
+    const transaction = database.transaction('categories', 'readonly');
+    const category = await requestResult(transaction.objectStore('categories').get(id));
+    await transactionResult(transaction);
+    return category === undefined ? undefined : clone(category);
+  }
+
+  async listCategories() {
+    const database = await this.#getDatabase();
+    const transaction = database.transaction('categories', 'readonly');
+    const categories = await requestResult(transaction.objectStore('categories').getAll());
+    await transactionResult(transaction);
+    return categories.map(clone);
+  }
+
+  async updateCategory(category) {
+    const categoryToSave = prepareCategory(category);
+    const database = await this.#getDatabase();
+    const transaction = database.transaction('categories', 'readwrite');
+    const categories = transaction.objectStore('categories');
+    const current = await requestResult(categories.get(categoryToSave.id));
+    if (current === undefined) {
+      transaction.abort();
+      try { await transactionResult(transaction); } catch { /* 统一为业务错误 */ }
+      throw new ValidationError(`分类 ${categoryToSave.id} 不存在`);
+    }
+    categories.put(categoryToSave);
+    await transactionResult(transaction);
+    return clone(categoryToSave);
+  }
+
+  async deleteCategoryAndMoveTasks(categoryId, destinationCategoryId, updates) {
+    const database = await this.#getDatabase();
+    const transaction = database.transaction(['tasks', 'categories', 'events'], 'readwrite');
+    const categories = transaction.objectStore('categories');
+    const tasks = transaction.objectStore('tasks');
+    const category = await requestResult(categories.get(categoryId));
+    const destination = destinationCategoryId === null
+      ? null
+      : await requestResult(categories.get(destinationCategoryId));
+
+    if (category === undefined || (destinationCategoryId !== null && destination === undefined)) {
+      transaction.abort();
+      try { await transactionResult(transaction); } catch { /* 统一为业务错误 */ }
+      throw new ValidationError('分类不存在');
+    }
+
+    const preparedUpdates = updates.map(({ task, expectedRevision, event }) => ({
+      task: prepareTask(task), expectedRevision, event: prepareEvent(task.id, event),
+    }));
+    for (const update of preparedUpdates) {
+      assertRevision(update.expectedRevision);
+      const current = await requestResult(tasks.get(update.task.id));
+      if (current === undefined || current.revision !== update.expectedRevision) {
+        transaction.abort();
+        try { await transactionResult(transaction); } catch { /* 统一为业务错误 */ }
+        throw new ConflictError(update.task.id);
+      }
+    }
+
+    for (const update of preparedUpdates) {
+      const taskToSave = { ...update.task, revision: update.expectedRevision + 1 };
+      validateTask(taskToSave);
+      tasks.put(taskToSave);
+      transaction.objectStore('events').add(update.event);
+    }
+    categories.delete(categoryId);
+    await transactionResult(transaction);
+    return clone(preparedUpdates.map(({ task, expectedRevision, event }) => ({
+      task: { ...task, revision: expectedRevision + 1 }, event,
+    })));
   }
 
   async exportAll() {

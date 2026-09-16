@@ -67,6 +67,54 @@ export class InMemoryTaskRepository {
       .map(clone);
   }
 
+  async createCategory(category) {
+    const categoryToSave = clone(category);
+    if (this.#categories.some((item) => item.id === categoryToSave.id)) throw new Error(`分类 ${categoryToSave.id} 已存在`);
+    this.#categories.push(categoryToSave);
+    return clone(categoryToSave);
+  }
+
+  async getCategory(id) {
+    const category = this.#categories.find((item) => item.id === id);
+    return category === undefined ? undefined : clone(category);
+  }
+
+  async listCategories() {
+    return clone(this.#categories);
+  }
+
+  async updateCategory(category) {
+    const index = this.#categories.findIndex((item) => item.id === category.id);
+    if (index === -1) throw new ValidationError(`分类 ${category.id} 不存在`);
+    this.#categories[index] = clone(category);
+    return clone(this.#categories[index]);
+  }
+
+  async deleteCategoryAndMoveTasks(categoryId, destinationCategoryId, updates) {
+    const categoryIndex = this.#categories.findIndex((item) => item.id === categoryId);
+    if (categoryIndex === -1 || (destinationCategoryId !== null && !this.#categories.some((item) => item.id === destinationCategoryId))) {
+      throw new ValidationError('分类不存在');
+    }
+    const prepared = updates.map(({ task, expectedRevision, event }) => ({
+      task: prepareTask(task), expectedRevision, event: prepareEvent(task.id, event),
+    }));
+    for (const update of prepared) {
+      const current = this.#tasks.get(update.task.id);
+      if (current === undefined || current.revision !== update.expectedRevision) throw new ConflictError(update.task.id);
+    }
+    const saved = prepared.map(({ task, expectedRevision, event }) => {
+      const updated = { ...task, revision: expectedRevision + 1 };
+      validateTask(updated);
+      return { task: updated, event };
+    });
+    for (const item of saved) {
+      this.#tasks.set(item.task.id, item.task);
+      this.#events.push(item.event);
+    }
+    this.#categories.splice(categoryIndex, 1);
+    return clone(saved);
+  }
+
   async exportAll() {
     return clone({ tasks: [...this.#tasks.values()], categories: this.#categories, events: this.#events });
   }
