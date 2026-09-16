@@ -86,6 +86,14 @@ test('完成、取消和回收站操作更新相应状态且增加 revision', ()
   assert.equal(untrashed.trashedAt, null);
 });
 
+test('开始任务进入 in_progress 并增加 revision', () => {
+  const started = transitionTask(BASE_TASK, { type: 'START' }, NOW);
+  assert.equal(started.lifecycle, 'in_progress');
+  assert.equal(started.revision, 1);
+  assert.equal(started.updatedAt, NOW);
+  assert.notStrictEqual(started, BASE_TASK);
+});
+
 test('延期必须晚于当前日期，改期可以前后移动', () => {
   assert.throws(
     () => transitionTask(BASE_TASK, { type: 'POSTPONE', date: '2026-09-17' }, NOW),
@@ -93,8 +101,18 @@ test('延期必须晚于当前日期，改期可以前后移动', () => {
   );
   const postponed = transitionTask(BASE_TASK, { type: 'POSTPONE', date: '2026-09-18' }, NOW);
   assert.equal(postponed.scheduledDate, '2026-09-18');
+  assert.equal(postponed.firstScheduledDate, '2026-09-17');
   const rescheduled = transitionTask(BASE_TASK, { type: 'RESCHEDULE', date: '2026-09-16' }, NOW);
   assert.equal(rescheduled.scheduledDate, '2026-09-16');
+  assert.equal(rescheduled.firstScheduledDate, '2026-09-17');
+});
+
+test('收集箱任务不能延期', () => {
+  const inboxTask = createTask({ title: '未安排事项' }, NOW, 'inbox-1');
+  assert.throws(
+    () => transitionTask(inboxTask, { type: 'POSTPONE', date: '2026-09-18' }, NOW),
+    ValidationError,
+  );
 });
 
 test('不支持或不合法的状态迁移被拒绝', () => {
@@ -123,4 +141,26 @@ test('任务事件保留输入数据但不复用 detail 引用', () => {
   });
   assert.deepEqual(event, { id: 'e1', taskId: 't1', type: 'TASK_CREATED', occurredAt: NOW, detail });
   assert.notStrictEqual(event.detail, detail);
+});
+
+test('任务事件拒绝缺失或空白的必填字段', () => {
+  const validEvent = {
+    id: 'e1',
+    taskId: 't1',
+    type: 'TASK_CREATED',
+    occurredAt: NOW,
+  };
+
+  for (const fieldName of ['id', 'taskId', 'type', 'occurredAt']) {
+    assert.throws(
+      () => createTaskEvent({ ...validEvent, [fieldName]: '' }),
+      ValidationError,
+      `${fieldName} 为空时应被拒绝`,
+    );
+    assert.throws(
+      () => createTaskEvent({ ...validEvent, [fieldName]: undefined }),
+      ValidationError,
+      `${fieldName} 缺失时应被拒绝`,
+    );
+  }
 });
