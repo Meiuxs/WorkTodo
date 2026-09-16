@@ -23,6 +23,7 @@ export class InMemoryTaskRepository {
   #tasks;
   #categories;
   #events;
+  #nextCategoryMigrationFailure = null;
 
   constructor(tasks = [], categories = [], events = []) {
     this.#tasks = new Map(tasks.map((task) => [task.id, prepareTask(task)]));
@@ -90,23 +91,32 @@ export class InMemoryTaskRepository {
     return clone(this.#categories[index]);
   }
 
-  async deleteCategoryAndMoveTasks(categoryId, destinationCategoryId, updates) {
+  failNextCategoryMigration(error) {
+    this.#nextCategoryMigrationFailure = error;
+  }
+
+  async deleteCategoryAndMoveTasks(categoryId, destinationCategoryId, { updatedAt, createEvent }) {
     const categoryIndex = this.#categories.findIndex((item) => item.id === categoryId);
     if (categoryIndex === -1 || (destinationCategoryId !== null && !this.#categories.some((item) => item.id === destinationCategoryId))) {
       throw new ValidationError('分类不存在');
     }
-    const prepared = updates.map(({ task, expectedRevision, event }) => ({
-      task: prepareTask(task), expectedRevision, event: prepareEvent(task.id, event),
-    }));
-    for (const update of prepared) {
-      const current = this.#tasks.get(update.task.id);
-      if (current === undefined || current.revision !== update.expectedRevision) throw new ConflictError(update.task.id);
+    if (this.#nextCategoryMigrationFailure !== null) {
+      const error = this.#nextCategoryMigrationFailure;
+      this.#nextCategoryMigrationFailure = null;
+      throw error;
     }
-    const saved = prepared.map(({ task, expectedRevision, event }) => {
-      const updated = { ...task, revision: expectedRevision + 1 };
-      validateTask(updated);
-      return { task: updated, event };
-    });
+    if (typeof createEvent !== 'function') throw new ValidationError('分类迁移需要事件创建函数');
+    const saved = [...this.#tasks.values()]
+      .filter((task) => task.categoryId === categoryId)
+      .map((current) => {
+        const task = prepareTask({
+          ...current,
+          categoryId: destinationCategoryId,
+          updatedAt,
+          revision: current.revision + 1,
+        });
+        return { task, event: prepareEvent(task.id, createEvent(task)) };
+      });
     for (const item of saved) {
       this.#tasks.set(item.task.id, item.task);
       this.#events.push(item.event);

@@ -15,6 +15,7 @@ const BASE_TASK = {
   id: 't1',
   title: '报价',
   priority: 'none',
+  categoryId: null,
   scheduledDate: '2026-09-17',
   firstScheduledDate: '2026-09-17',
   startTime: null,
@@ -69,6 +70,13 @@ test('创建任务会修剪标题并提供稳定默认值', () => {
 test('创建任务拒绝空标题和超过 200 字符的标题', () => {
   assert.throws(() => createTask({ title: '   ' }, NOW, 't1'), ValidationError);
   assert.throws(() => createTask({ title: 'a'.repeat(201) }, NOW, 't1'), ValidationError);
+});
+
+test('任务分类只能是分类 ID 或 null', () => {
+  assert.throws(() => validateTask({ ...BASE_TASK, categoryId: false }), ValidationError);
+  assert.throws(() => validateTask({ ...BASE_TASK, categoryId: { id: 'work' } }), ValidationError);
+  assert.equal(validateTask({ ...BASE_TASK, categoryId: null }), true);
+  assert.equal(validateTask({ ...BASE_TASK, categoryId: 'work' }), true);
 });
 
 test('完成、取消和回收站操作更新相应状态且增加 revision', () => {

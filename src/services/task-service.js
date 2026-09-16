@@ -157,13 +157,16 @@ export class TaskService {
     if (destinationCategoryId !== null && (await this.#repository.getCategory(destinationCategoryId)) === undefined) {
       throw new ValidationError(`分类 ${destinationCategoryId} 不存在`);
     }
-    const tasks = await this.#repository.list({ categoryId: id });
-    const updates = tasks.map((current) => {
-      const task = { ...current, categoryId: destinationCategoryId, updatedAt: this.#now(), revision: current.revision + 1 };
-      validateTask(task);
-      const event = this.#event(task.id, 'EDIT', { fromCategoryId: id, toCategoryId: destinationCategoryId });
-      return { task, expectedRevision: current.revision, event };
+    const now = this.#now();
+    return this.#repository.deleteCategoryAndMoveTasks(id, destinationCategoryId, {
+      updatedAt: now,
+      createEvent: (task) => createTaskEvent({
+        id: this.#generateId(),
+        taskId: task.id,
+        type: 'EDIT',
+        occurredAt: now,
+        detail: { fromCategoryId: id, toCategoryId: destinationCategoryId },
+      }),
     });
-    return this.#repository.deleteCategoryAndMoveTasks(id, destinationCategoryId, updates);
   }
 }

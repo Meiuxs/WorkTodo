@@ -10,6 +10,7 @@ async function run() {
     id,
     title: 'IndexedDB smoke test',
     priority: 'none',
+    categoryId: null,
     scheduledDate: null,
     firstScheduledDate: null,
     startTime: null,

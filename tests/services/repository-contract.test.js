@@ -10,6 +10,7 @@ const BASE_TASK = {
   id: 't1',
   title: '报价',
   priority: 'none',
+  categoryId: null,
   scheduledDate: '2026-09-17',
   firstScheduledDate: '2026-09-17',
   startTime: null,

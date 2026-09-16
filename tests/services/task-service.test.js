@@ -49,6 +49,40 @@ test('删除分类迁移任务但不删除任务', async () => {
   assert.ok(await repo.get('t1'));
 });
 
+test('删除分类在仓库事务内枚举当前任务，不依赖服务层预读取', async () => {
+  class TransactionalCategoryRepository extends InMemoryTaskRepository {
+    async list() {
+      throw new Error('分类迁移不能在事务外列出任务');
+    }
+  }
+  const secondTask = { ...BASE_TASK, id: 't2', title: '事务内新增的任务' };
+  const repo = new TransactionalCategoryRepository(
+    [BASE_TASK, secondTask],
+    [{ id: 'old', name: '旧分类' }, { id: 'new', name: '新分类' }],
+  );
+  const service = new TaskService(repo, { now: () => NOW, generateId: () => 'event-1' });
+
+  await service.deleteCategory('old', 'new');
+  assert.equal((await repo.get('t1')).categoryId, 'new');
+  assert.equal((await repo.get('t2')).categoryId, 'new');
+  assert.equal((await repo.exportAll()).events.length, 2);
+});
+
+test('分类迁移事务失败时不会部分迁移任务、删除分类或写事件', async () => {
+  const secondTask = { ...BASE_TASK, id: 't2', title: '第二项' };
+  const { repo, service } = createService({
+    tasks: [BASE_TASK, secondTask],
+    categories: [{ id: 'old', name: '旧分类' }, { id: 'new', name: '新分类' }],
+  });
+  repo.failNextCategoryMigration(new Error('事务失败'));
+
+  await assert.rejects(() => service.deleteCategory('old', 'new'), /事务失败/);
+  assert.equal((await repo.get('t1')).categoryId, 'old');
+  assert.equal((await repo.get('t2')).categoryId, 'old');
+  assert.ok(await repo.getCategory('old'));
+  assert.equal((await repo.exportAll()).events.length, 0);
+});
+
 test('创建、编辑和开始任务分别写入稳定事件', async () => {
   const { repo, service } = createService({ tasks: [] });
   const created = await service.create({ title: '  新任务  ', categoryId: 'old' });
@@ -120,11 +154,14 @@ test('复制创建新的 todo 任务并清理结束与回收时间', async () =>
   const { repo, service } = createService({ tasks: [source] });
   const copied = await service.copy('t1');
   assert.equal(copied.task.id, 'id-1');
+  assert.notEqual(copied.task.id, source.id);
+  assert.equal(copied.task.revision, 0);
   assert.equal(copied.task.lifecycle, 'todo');
   assert.equal(copied.task.completedAt, null);
   assert.equal(copied.task.cancelledAt, null);
   assert.equal(copied.task.trashedAt, null);
   assert.equal(copied.event.type, 'COPY');
+  assert.deepEqual(copied.event.detail, { sourceTaskId: source.id });
   assert.ok(await repo.get('t1'));
 });
 

@@ -29,6 +29,12 @@ function assertTaskDate(date, fieldName) {
   }
 }
 
+function assertCategoryId(categoryId) {
+  if (categoryId !== null && typeof categoryId !== 'string') {
+    throw new ValidationError('categoryId 必须是字符串或 null');
+  }
+}
+
 function assertActive(task, action) {
   if (task.trashedAt !== null || ['completed', 'cancelled'].includes(task.lifecycle)) {
     throw new TransitionError(`${action} 不能用于当前任务状态`);
@@ -49,6 +55,7 @@ export function validateTask(task) {
   if (!PRIORITIES.has(task.priority)) {
     throw new ValidationError('priority 无效');
   }
+  assertCategoryId(task.categoryId);
   if (!LIFECYCLES.has(task.lifecycle)) {
     throw new ValidationError('lifecycle 无效');
   }
@@ -86,6 +93,7 @@ export function createTask(input, now, id) {
     id,
     title: normalizeTitle(source.title),
     priority: source.priority ?? 'none',
+    categoryId: source.categoryId ?? null,
     scheduledDate,
     firstScheduledDate: scheduledDate,
     startTime,

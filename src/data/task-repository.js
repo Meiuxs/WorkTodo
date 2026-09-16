@@ -173,46 +173,48 @@ export class TaskRepository {
     return clone(categoryToSave);
   }
 
-  async deleteCategoryAndMoveTasks(categoryId, destinationCategoryId, updates) {
+  async deleteCategoryAndMoveTasks(categoryId, destinationCategoryId, { updatedAt, createEvent }) {
     const database = await this.#getDatabase();
     const transaction = database.transaction(['tasks', 'categories', 'events'], 'readwrite');
     const categories = transaction.objectStore('categories');
     const tasks = transaction.objectStore('tasks');
-    const category = await requestResult(categories.get(categoryId));
-    const destination = destinationCategoryId === null
-      ? null
-      : await requestResult(categories.get(destinationCategoryId));
-
-    if (category === undefined || (destinationCategoryId !== null && destination === undefined)) {
-      transaction.abort();
-      try { await transactionResult(transaction); } catch { /* 统一为业务错误 */ }
-      throw new ValidationError('分类不存在');
-    }
-
-    const preparedUpdates = updates.map(({ task, expectedRevision, event }) => ({
-      task: prepareTask(task), expectedRevision, event: prepareEvent(task.id, event),
-    }));
-    for (const update of preparedUpdates) {
-      assertRevision(update.expectedRevision);
-      const current = await requestResult(tasks.get(update.task.id));
-      if (current === undefined || current.revision !== update.expectedRevision) {
-        transaction.abort();
-        try { await transactionResult(transaction); } catch { /* 统一为业务错误 */ }
-        throw new ConflictError(update.task.id);
+    try {
+      const category = await requestResult(categories.get(categoryId));
+      const destination = destinationCategoryId === null
+        ? null
+        : await requestResult(categories.get(destinationCategoryId));
+      if (category === undefined || (destinationCategoryId !== null && destination === undefined)) {
+        throw new ValidationError('分类不存在');
       }
-    }
+      if (typeof createEvent !== 'function') {
+        throw new ValidationError('分类迁移需要事件创建函数');
+      }
 
-    for (const update of preparedUpdates) {
-      const taskToSave = { ...update.task, revision: update.expectedRevision + 1 };
-      validateTask(taskToSave);
-      tasks.put(taskToSave);
-      transaction.objectStore('events').add(update.event);
+      const currentTasks = await requestResult(tasks.index('categoryId').getAll(categoryId));
+      const migrations = currentTasks.map((current) => {
+        const task = prepareTask({
+          ...current,
+          categoryId: destinationCategoryId,
+          updatedAt,
+          revision: current.revision + 1,
+        });
+        return { task, event: prepareEvent(task.id, createEvent(task)) };
+      });
+      for (const { task, event } of migrations) {
+        tasks.put(task);
+        transaction.objectStore('events').add(event);
+      }
+      categories.delete(categoryId);
+      await transactionResult(transaction);
+      return clone(migrations);
+    } catch (error) {
+      try {
+        transaction.abort();
+      } catch {
+        // 已完成或已中止的事务无需重复处理。
+      }
+      throw error;
     }
-    categories.delete(categoryId);
-    await transactionResult(transaction);
-    return clone(preparedUpdates.map(({ task, expectedRevision, event }) => ({
-      task: { ...task, revision: expectedRevision + 1 }, event,
-    })));
   }
 
   async exportAll() {
