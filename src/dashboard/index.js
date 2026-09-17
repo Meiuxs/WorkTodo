@@ -11,6 +11,7 @@ import { BackupService } from '../services/backup-service.js';
 import { DashboardController } from './dashboard-controller.js';
 import { createTaskEditor } from './task-editor.js';
 import { createTodayView } from './views/today-view.js';
+import { createWeekView } from './views/week-view.js';
 import { createInboxView } from './views/inbox-view.js';
 import { createAllTasksView } from './views/all-tasks-view.js';
 import { createCompletedView } from './views/completed-view.js';
@@ -19,6 +20,8 @@ import { createSettingsView } from './views/settings-view.js';
 
 const routeMeta = {
   today: ['今日工作', '现在最需要推进的事项'],
+  tomorrow: ['明天', '提前看清下一日安排'],
+  week: ['本周', '按天查看这一周的计划'],
   inbox: ['收集箱', '先记录，再整理'],
   all: ['全部任务', '查找、筛选和调整工作'],
   completed: ['已完成', '回看已经结束的任务'],
@@ -40,6 +43,7 @@ const toast = document.querySelector('#toast');
 const confirmDialog = document.querySelector('#confirm-dialog');
 let controller;
 let toastTimer;
+let activeRoute = 'today';
 
 function dateOffset(date, days) {
   return toLocalDate(new Date(date.getFullYear(), date.getMonth(), date.getDate() + days));
@@ -142,8 +146,10 @@ async function onEdit(taskId) {
 }
 
 const viewOptions = { root, query, taskService, tagService, statistics, today: () => toLocalDate(new Date()), onAction, onEdit, onError };
-const views = {
+const routeViews = {
   today: createTodayView(viewOptions),
+  tomorrow: createWeekView({ ...viewOptions, singleDate: true }),
+  week: createWeekView(viewOptions),
   inbox: createInboxView(viewOptions),
   all: createAllTasksView(viewOptions),
   completed: createCompletedView(viewOptions),
@@ -155,6 +161,10 @@ const views = {
     backupService,
     onDataChanged: () => controller.refresh(),
   }),
+};
+const views = {
+  ...routeViews,
+  today: { render: () => routeViews[activeRoute].render() },
 };
 controller = new DashboardController({
   views,
@@ -176,12 +186,14 @@ const taskEditor = createTaskEditor({
 });
 
 async function navigate(route) {
-  const [title, subtitle] = routeMeta[route] ?? routeMeta.today;
+  activeRoute = routeViews[route] === undefined ? 'today' : route;
+  const controllerRoute = ['tomorrow', 'week'].includes(activeRoute) ? 'today' : activeRoute;
+  const [title, subtitle] = routeMeta[activeRoute] ?? routeMeta.today;
   document.querySelector('#page-title').textContent = title;
   document.querySelector('#page-subtitle').textContent = subtitle;
-  document.querySelector('#quick-add').hidden = ['history', 'settings'].includes(route);
+  document.querySelector('#quick-add').hidden = ['history', 'settings'].includes(activeRoute);
   document.querySelector('#quick-add-message').textContent = '';
-  await controller.navigate(route);
+  await controller.navigate(controllerRoute);
 }
 
 document.querySelectorAll('[data-route]').forEach((button) => {
