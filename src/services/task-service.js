@@ -80,6 +80,7 @@ export class TaskService {
       ...(Object.hasOwn(input, 'starred') ? { starred: input.starred } : {}),
       ...(Object.hasOwn(input, 'priority') ? { priority: input.priority } : {}),
       ...(Object.hasOwn(input, 'categoryId') ? { categoryId: input.categoryId } : {}),
+      ...(Object.hasOwn(input, 'tagIds') ? { tagIds: input.tagIds } : {}),
       ...(Object.hasOwn(input, 'startTime') ? { startTime: input.startTime } : {}),
       ...(Object.hasOwn(input, 'dueTime') ? { dueTime: input.dueTime } : {}),
     };

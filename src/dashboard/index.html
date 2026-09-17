@@ -64,6 +64,16 @@
             <label class="field">优先级<select name="priority"><option value="none">无</option><option value="low">低</option><option value="medium">中</option><option value="high">高</option></select></label>
           </div>
           <label class="field">分类<select name="categoryId"></select></label>
+          <fieldset class="tag-picker" data-tag-picker>
+            <legend>标签</legend>
+            <div class="tag-picker__options" data-tag-options></div>
+            <div class="tag-picker__create">
+              <label for="new-tag">新标签</label>
+              <input id="new-tag" maxlength="50">
+              <button type="button" data-create-tag>创建标签</button>
+            </div>
+            <p class="form-message" data-tag-message role="alert"></p>
+          </fieldset>
           <label class="check-field"><input name="starred" type="checkbox"> 标记为星标</label>
           <details class="editor-more">
             <summary>更多信息</summary>

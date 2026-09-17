@@ -133,6 +133,16 @@ test('编辑可更新描述、星标并允许任务重新回到收集箱', async
   assert.equal((await repo.get(created.task.id)).scheduledDate, null);
 });
 
+test('编辑可更新标签关联', async () => {
+  const { repo, service } = createService({ tasks: [] });
+  const created = await service.create({ title: '客户报价' });
+
+  const updated = await service.edit(created.task.id, { tagIds: ['customer'] }, 0);
+
+  assert.deepEqual(updated.task.tagIds, ['customer']);
+  assert.deepEqual((await repo.get(created.task.id)).tagIds, ['customer']);
+});
+
 test('完成、恢复、取消、回收与还原使用领域状态迁移并保留 revision 冲突', async () => {
   const { service } = createService();
   const completed = await service.complete('t1', 0);

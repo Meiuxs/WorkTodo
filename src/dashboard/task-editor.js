@@ -1,3 +1,5 @@
+import { escapeHtml } from '../shared/ui.js';
+
 function field(form, name) {
   return form.elements.namedItem(name);
 }
@@ -10,6 +12,8 @@ function valueOrNull(control) {
 export function createTaskEditor({
   dialog,
   getCategories,
+  getTags,
+  onCreateTag,
   onCreate,
   onUpdate,
   onCopy,
@@ -21,6 +25,10 @@ export function createTaskEditor({
   const message = dialog.querySelector('[data-editor-message]');
   const conflict = dialog.querySelector('[data-editor-conflict]');
   const category = field(form, 'categoryId');
+  const tagOptions = dialog.querySelector('[data-tag-options]');
+  const newTag = dialog.querySelector('#new-tag');
+  const tagMessage = dialog.querySelector('[data-tag-message]');
+  let tags = [];
   let currentTask = null;
   let trigger = null;
 
@@ -30,12 +38,29 @@ export function createTaskEditor({
     category.value = selectedId ?? '';
   }
 
+  function populateTags(items, selectedIds = []) {
+    const selected = new Set(selectedIds);
+    tagOptions.innerHTML = items.length === 0
+      ? '<p class="muted">尚未创建标签。</p>'
+      : items.map((tag) => `<label class="tag-option"><input type="checkbox" name="tagIds" value="${escapeHtml(tag.id)}" ${selected.has(tag.id) ? 'checked' : ''}> ${escapeHtml(tag.name)}</label>`).join('');
+  }
+
+  function selectedTagIds() {
+    return [...tagOptions.querySelectorAll('input[name="tagIds"]:checked')].map((input) => input.value);
+  }
+
+  async function loadTags(selectedIds = []) {
+    tags = await getTags();
+    populateTags(tags, selectedIds);
+  }
+
   function readChanges() {
     return {
       title: field(form, 'title').value,
       scheduledDate: valueOrNull(field(form, 'scheduledDate')),
       priority: field(form, 'priority').value,
       categoryId: valueOrNull(category),
+      tagIds: selectedTagIds(),
       description: field(form, 'description').value,
       startTime: valueOrNull(field(form, 'startTime')),
       dueTime: valueOrNull(field(form, 'dueTime')),
@@ -58,6 +83,7 @@ export function createTaskEditor({
     title.textContent = '新增任务';
     form.reset();
     populateCategories(await getCategories(), defaults.categoryId ?? null);
+    await loadTags(defaults.tagIds ?? []);
     field(form, 'title').value = defaults.title ?? '';
     field(form, 'scheduledDate').value = defaults.scheduledDate ?? '';
     field(form, 'priority').value = defaults.priority ?? 'none';
@@ -73,6 +99,7 @@ export function createTaskEditor({
     title.textContent = task.title;
     form.reset();
     populateCategories(await getCategories(), task.categoryId);
+    await loadTags(task.tagIds ?? []);
     field(form, 'title').value = task.title;
     field(form, 'scheduledDate').value = task.scheduledDate ?? '';
     field(form, 'priority').value = task.priority;
@@ -147,6 +174,19 @@ export function createTaskEditor({
     if (currentTask === null) return;
     const latest = await onReload(currentTask.id);
     await openTask(latest, trigger);
+  });
+  dialog.querySelector('[data-create-tag]').addEventListener('click', async () => {
+    const selected = selectedTagIds();
+    tagMessage.textContent = '';
+    try {
+      await onCreateTag(newTag.value);
+      newTag.value = '';
+      await loadTags(selected);
+      newTag.focus();
+    } catch (error) {
+      tagMessage.textContent = error.message;
+      newTag.focus();
+    }
   });
 
   return { openNew, openTask, close };

@@ -1,7 +1,9 @@
 import { toLocalDate } from '../domain/dates.js';
 import { TaskRepository } from '../data/task-repository.js';
+import { TagRepository } from '../data/tag-repository.js';
 import { SettingsRepository } from '../data/settings-repository.js';
 import { TaskService } from '../services/task-service.js';
+import { TagService } from '../services/tag-service.js';
 import { TaskQueryService } from '../services/task-query-service.js';
 import { StatisticsService } from '../services/statistics-service.js';
 import { BackupService } from '../services/backup-service.js';
@@ -141,9 +143,14 @@ controller = new DashboardController({
   taskService,
   sendMessage: (message) => chrome.runtime.sendMessage(message),
 });
+const tagRepository = new TagRepository();
+const tagService = new TagService(tagRepository);
+
 const taskEditor = createTaskEditor({
   dialog: document.querySelector('#task-editor'),
   getCategories: () => taskService.listCategories(),
+  getTags: () => tagService.list(),
+  onCreateTag: (name) => tagService.create(name),
   onCreate: (input) => controller.createTask(input),
   onUpdate: (taskId, changes, revision) => controller.editTask(taskId, changes, revision),
   onCopy: (taskId) => controller.handleTaskAction('copy', taskId),

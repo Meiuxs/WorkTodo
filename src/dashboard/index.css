@@ -247,6 +247,15 @@ input::placeholder { color: var(--muted); }
 button:disabled { cursor: not-allowed; opacity: .55; }
 .form-message { min-height: 21px; margin: 7px 0 0; color: var(--coral); font-size: var(--text-xs); }
 
+.tag-picker { margin: 16px 0 0; border: 0; padding: 0; }
+.tag-picker legend { margin-bottom: 7px; color: var(--muted); font-size: var(--text-xs); }
+.tag-picker__options { display: flex; flex-wrap: wrap; gap: 7px; min-height: 30px; }
+.tag-option { display: flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+.tag-option:has(input:checked) { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
+.tag-option:has(input:checked)::after { content: "✓"; }
+.tag-picker__create { display: flex; gap: 7px; margin-top: 8px; }
+.tag-picker__create input { flex: 1; min-width: 0; }
+
 .filters {
   display: grid;
   grid-template-columns: minmax(180px, 1.4fr) repeat(3, minmax(120px, .7fr));
