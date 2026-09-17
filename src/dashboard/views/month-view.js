@@ -26,11 +26,20 @@ export function createMonthView({
   onError,
 }) {
   let anchor = today();
+  let renderVersion = 0;
 
   return {
     async render(signal) {
-      const calendar = await query.month(anchor);
-      if (signal?.aborted) return;
+      const requestVersion = ++renderVersion;
+      const requestedAnchor = anchor;
+      let calendar;
+      try {
+        calendar = await query.month(requestedAnchor);
+      } catch (error) {
+        if (signal?.aborted || requestVersion !== renderVersion) return;
+        throw error;
+      }
+      if (signal?.aborted || requestVersion !== renderVersion) return;
 
       const label = formatMonth(calendar.startDate);
       root.innerHTML = `<section class="view-section" aria-labelledby="month-heading">
@@ -59,7 +68,7 @@ export function createMonthView({
 
       for (const cell of root.querySelectorAll('[data-date]')) {
         renderTaskList(cell.querySelector('.month-day__tasks'), calendar.byDate[cell.dataset.date] ?? [], {
-          today: anchor,
+          today: requestedAnchor,
           onAction,
           onEdit,
           onError,

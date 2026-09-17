@@ -27,6 +27,84 @@ test('月历展示当前月份任务并支持切换月份', async ({ extension }
   await expect(page.locator('[data-month-label]')).not.toHaveText(currentMonth);
 });
 
+test('月历连续切换月份时旧请求不会覆盖最新月份', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.getByRole('button', { name: '月历', exact: true }).click();
+  await expect(page.getByRole('grid')).toBeVisible();
+
+  const initialMonth = await page.locator('[data-month-label]').textContent();
+  const expectedMonth = await page.evaluate((label) => {
+    const match = label.match(/(\d{4})年(\d{1,2})月/);
+    if (match === null) throw new Error(`无法解析月份: ${label}`);
+    return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long' })
+      .format(new Date(Number(match[1]), Number(match[2]) - 1 + 2, 1));
+  }, initialMonth);
+
+  await page.evaluate(async () => {
+    window.__monthQueryResults = [];
+    const { TaskQueryService } = await import('../services/task-query-service.js');
+    const originalMonth = TaskQueryService.prototype.month;
+    let callCount = 0;
+    TaskQueryService.prototype.month = async function delayedMonth(anchorDate) {
+      const call = ++callCount;
+      const delay = call === 1 ? 500 : call === 2 ? 25 : 0;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      const result = await originalMonth.call(this, anchorDate);
+      window.__monthQueryResults.push({ call, month: anchorDate.slice(0, 7) });
+      return result;
+    };
+  });
+
+  const nextMonth = page.getByRole('button', { name: '下个月', exact: true });
+  await nextMonth.click();
+  await nextMonth.click();
+  await expect.poll(() => page.evaluate(() => window.__monthQueryResults.length)).toBe(2);
+
+  await expect(page.locator('[data-month-label]')).toHaveText(expectedMonth);
+});
+
+test('月历旧月份请求失败时静默丢弃', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.getByRole('button', { name: '月历', exact: true }).click();
+  await expect(page.getByRole('grid')).toBeVisible();
+
+  await page.evaluate(async () => {
+    window.__planningErrors = [];
+    window.__monthQueryState = { failures: 0, successes: 0 };
+    window.addEventListener('unhandledrejection', (event) => {
+      window.__planningErrors.push(event.reason?.message ?? String(event.reason));
+    });
+    const { TaskQueryService } = await import('../services/task-query-service.js');
+    const originalMonth = TaskQueryService.prototype.month;
+    let callCount = 0;
+    TaskQueryService.prototype.month = async function delayedMonth(anchorDate) {
+      const call = ++callCount;
+      await new Promise((resolve) => setTimeout(resolve, call === 1 ? 500 : 25));
+      if (call === 1) {
+        window.__monthQueryState.failures += 1;
+        throw new Error('旧月份查询失败');
+      }
+      const result = await originalMonth.call(this, anchorDate);
+      window.__monthQueryState.successes += 1;
+      return result;
+    };
+  });
+
+  const nextMonth = page.getByRole('button', { name: '下个月', exact: true });
+  await nextMonth.click();
+  await nextMonth.click();
+  await expect.poll(() => page.evaluate(() => (
+    window.__monthQueryState.failures === 1 && window.__monthQueryState.successes === 1
+  ))).toBe(true);
+  await page.waitForTimeout(50);
+
+  expect(pageErrors).toEqual([]);
+  expect(await page.evaluate(() => window.__planningErrors)).toEqual([]);
+  expect(await page.locator('#toast').evaluate((element) => element.hidden)).toBe(true);
+});
+
 test('快速切换路由时旧周视图不会覆盖当前视图', async ({ extension }) => {
   const page = await openDashboard(extension);
   await page.evaluate(async () => {
