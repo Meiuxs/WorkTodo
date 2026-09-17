@@ -9,6 +9,18 @@ function valueOrNull(control) {
   return value.length === 0 ? null : value;
 }
 
+const SUBTASK_STATUS_LABELS = Object.freeze({
+  todo: '待办',
+  in_progress: '进行中',
+  completed: '已完成',
+  cancelled: '已取消',
+});
+
+function subtaskStatus(task) {
+  if (task.trashedAt !== null) return '已删除';
+  return SUBTASK_STATUS_LABELS[task.lifecycle] ?? '待办';
+}
+
 export function createTaskEditor({
   dialog,
   getCategories,
@@ -36,6 +48,7 @@ export function createTaskEditor({
   let tags = [];
   let currentTask = null;
   let trigger = null;
+  let anchorTaskId = null;
 
   function populateCategories(categories, selectedId) {
     category.innerHTML = '<option value="">未分类</option>'
@@ -70,7 +83,10 @@ export function createTaskEditor({
     const items = await subtaskService.list(currentTask.id);
     subtaskList.innerHTML = items.length === 0
       ? '<p class="empty">还没有子任务。</p>'
-      : items.map((task) => `<button type="button" class="subtask-row" data-subtask-id="${escapeHtml(task.id)}">${escapeHtml(task.title)} <span>${task.lifecycle === 'completed' ? '已完成' : '待办'}</span></button>`).join('');
+      : items.map((task) => {
+        const status = subtaskStatus(task);
+        return `<button type="button" class="subtask-row" data-subtask-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)}，${status}">${escapeHtml(task.title)} <span>${status}</span></button>`;
+      }).join('');
   }
 
   function readChanges() {
@@ -98,6 +114,7 @@ export function createTaskEditor({
 
   async function openNew(defaults = {}) {
     currentTask = null;
+    anchorTaskId = null;
     trigger = document.activeElement;
     title.textContent = '新增任务';
     form.reset();
@@ -114,6 +131,7 @@ export function createTaskEditor({
   }
 
   async function openTask(task, sourceElement = document.activeElement) {
+    if (!dialog.open) anchorTaskId = task.id;
     currentTask = task;
     trigger = sourceElement;
     title.textContent = task.title;
@@ -139,8 +157,9 @@ export function createTaskEditor({
     showMessage('');
     conflict.hidden = true;
     const previous = trigger;
-    const taskId = currentTask?.id ?? null;
+    const taskId = anchorTaskId;
     trigger = null;
+    anchorTaskId = null;
     onClose();
     requestAnimationFrame(() => {
       if (previous?.isConnected) {
