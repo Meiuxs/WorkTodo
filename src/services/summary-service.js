@@ -5,21 +5,12 @@ import {
   startOfWeek,
 } from '../domain/dates.js';
 
-const HTML_TAG_PATTERN = /<\/?[A-Za-z][A-Za-z0-9:-]*(?:\s+[^<>]*?)?\s*\/?>/g;
-const URI_SCHEME_PATTERN = /\b(?:[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s]+|(?:mailto|tel|sms|file|data|javascript|geo|urn):[^\s]+|[A-Za-z][A-Za-z0-9+.-]*:(?![0-9]+(?:\.[0-9]+)*\b)[^\s]+)/gi;
-const IPV4_PATTERN = /\b(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}(?::\d{1,5})?(?:[/?#][^\s]*)?\b/g;
-const DOMAIN_PATTERN = /\b(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+(?:com|cn|net|org|io|co|me|app|dev|edu|gov|info|biz|xyz|tech|ai)(?::\d{1,5})?(?:[/?#][^\s]*)?(?![A-Za-z0-9-])/gi;
-
 function rateText(rate) {
   return rate === null ? '暂无计划' : `${Math.round(rate * 100)}%`;
 }
 
 function plainTitle(title) {
   const text = String(title ?? '')
-    .replace(HTML_TAG_PATTERN, ' ')
-    .replace(URI_SCHEME_PATTERN, '[链接已移除]')
-    .replace(IPV4_PATTERN, '[链接已移除]')
-    .replace(DOMAIN_PATTERN, '[链接已移除]')
     .replace(/\s+/g, ' ')
     .trim();
   return text.length === 0 ? '未命名任务' : text;
