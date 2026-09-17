@@ -2,6 +2,7 @@ const ROUTES = new Set([
   'today',
   'tomorrow',
   'week',
+  'month',
   'inbox',
   'all',
   'completed',

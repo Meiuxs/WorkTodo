@@ -157,6 +157,31 @@
 .week-day h3 { margin: 0 0 8px; color: var(--ink); font-size: var(--text-md); }
 .week-day__tasks { border-top: 1px solid var(--line); }
 
+.month-nav { display: flex; gap: 7px; }
+.month-nav button { border: 1px solid var(--line); border-radius: 5px; background: var(--surface-raised); color: var(--ink); padding: 6px 9px; }
+.month-nav button:hover { border-color: var(--teal); color: var(--teal); }
+.month-grid { min-width: 0; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.month-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); min-width: 0; }
+.month-day {
+  min-width: 0;
+  min-height: 112px;
+  overflow-wrap: anywhere;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 8px;
+}
+.month-day--muted { background: var(--canvas); color: var(--muted); }
+.month-day--muted .task__title { color: var(--muted); }
+.month-day h3 { margin: 0 0 5px; color: currentColor; font-size: var(--text-xs); }
+.month-day .task-list { border-top: 0; }
+.month-day .task { grid-template-columns: 22px minmax(0, 1fr) auto; gap: 4px; min-height: 36px; }
+.month-day .task__check { width: 18px; height: 18px; }
+.month-day .task__body { padding: 4px 0; }
+.month-day .task__title { overflow-wrap: anywhere; white-space: normal; }
+.month-day .task__meta { display: none; }
+.month-day .task__more > summary { padding: 3px 4px; }
+.month-day .empty { min-height: 1em; margin: 0; font-size: var(--text-xs); }
+
 .task__more { position: relative; }
 .task__more > summary {
   border: 1px solid transparent;
@@ -400,6 +425,12 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .section-heading > :last-child:not(:first-child) { margin-top: 10px; }
   .today-summary { grid-template-columns: 1fr; }
   .week-grid { grid-template-columns: 1fr; }
+  .month-grid { min-width: 0; }
+  .month-day { min-height: 76px; padding: 4px; }
+  .month-day .task { grid-template-columns: 18px minmax(0, 1fr); gap: 3px; min-height: 30px; }
+  .month-day .task__check { width: 16px; height: 16px; }
+  .month-day .task__more { display: none; }
+  .month-day .task__title { font-size: 10px; }
   .task { grid-template-columns: 30px minmax(0, 1fr) auto; gap: 6px; }
   .task__menu { position: fixed; top: auto; right: 12px; bottom: 12px; left: 12px; max-width: none; }
   .quick-add { grid-template-columns: minmax(0, 1fr) auto; }

@@ -12,6 +12,7 @@ import { DashboardController } from './dashboard-controller.js';
 import { createTaskEditor } from './task-editor.js';
 import { createTodayView } from './views/today-view.js';
 import { createWeekView } from './views/week-view.js';
+import { createMonthView } from './views/month-view.js';
 import { createInboxView } from './views/inbox-view.js';
 import { createAllTasksView } from './views/all-tasks-view.js';
 import { createCompletedView } from './views/completed-view.js';
@@ -22,6 +23,7 @@ const routeMeta = {
   today: ['今日工作', '现在最需要推进的事项'],
   tomorrow: ['明天', '提前看清下一日安排'],
   week: ['本周', '按天查看这一周的计划'],
+  month: ['月历', '按月查看计划和任务分布'],
   inbox: ['收集箱', '先记录，再整理'],
   all: ['全部任务', '查找、筛选和调整工作'],
   completed: ['已完成', '回看已经结束的任务'],
@@ -149,6 +151,7 @@ const views = {
   today: createTodayView(viewOptions),
   tomorrow: createWeekView({ ...viewOptions, singleDate: true }),
   week: createWeekView(viewOptions),
+  month: createMonthView(viewOptions),
   inbox: createInboxView(viewOptions),
   all: createAllTasksView(viewOptions),
   completed: createCompletedView(viewOptions),

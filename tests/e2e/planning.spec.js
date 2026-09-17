@@ -12,6 +12,21 @@ test('本周视图展示今天所在周的计划任务', async ({ extension }) =
   await expect(page.getByRole('button', { name: '本周计划事项' })).toBeVisible();
 });
 
+test('月历展示当前月份任务并支持切换月份', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.getByLabel('记录一个新事项').fill('月历任务');
+  await page.locator('#quick-add-date').selectOption('today');
+  await page.getByRole('button', { name: '添加', exact: true }).click();
+
+  await page.getByRole('button', { name: '月历', exact: true }).click();
+  await expect(page.locator('#page-title')).toHaveText('月历');
+  await expect(page.getByRole('grid')).toBeVisible();
+  await expect(page.getByRole('button', { name: '月历任务', exact: true })).toBeVisible();
+  const currentMonth = await page.locator('[data-month-label]').textContent();
+  await page.getByRole('button', { name: '下个月', exact: true }).click();
+  await expect(page.locator('[data-month-label]')).not.toHaveText(currentMonth);
+});
+
 test('快速切换路由时旧周视图不会覆盖当前视图', async ({ extension }) => {
   const page = await openDashboard(extension);
   await page.evaluate(async () => {
