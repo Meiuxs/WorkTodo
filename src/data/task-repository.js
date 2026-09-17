@@ -234,7 +234,7 @@ export class TaskRepository {
       throw new ValidationError('snapshot 必须是对象');
     }
     const tasks = (snapshot.tasks ?? []).map(prepareTask);
-    const categories = clone(snapshot.categories ?? []);
+    const categories = (snapshot.categories ?? []).map(prepareCategory);
     const events = (snapshot.events ?? []).map((event) => createTaskEvent(event));
     const taskIds = new Set(tasks.map((task) => task.id));
     if (events.some((event) => !taskIds.has(event.taskId))) {

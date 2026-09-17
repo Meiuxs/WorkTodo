@@ -20,27 +20,37 @@ function assertNoTaskArray(value) {
 }
 
 export class SettingsRepository {
+  #storageArea;
+
+  constructor(storageArea = null) {
+    this.#storageArea = storageArea;
+  }
+
+  #localStorageArea() {
+    return this.#storageArea ?? localStorageArea();
+  }
+
   async getSettings() {
-    const { settings } = await localStorageArea().get('settings');
+    const { settings } = await this.#localStorageArea().get('settings');
     return settings === undefined ? undefined : clone(settings);
   }
 
   async saveSettings(settings) {
     const value = clone(settings);
     assertNoTaskArray(value);
-    await localStorageArea().set({ settings: value });
+    await this.#localStorageArea().set({ settings: value });
     return clone(value);
   }
 
   async getMetadata() {
-    const { metadata } = await localStorageArea().get('metadata');
+    const { metadata } = await this.#localStorageArea().get('metadata');
     return metadata === undefined ? undefined : clone(metadata);
   }
 
   async saveMetadata(metadata) {
     const value = clone(metadata);
     assertNoTaskArray(value);
-    await localStorageArea().set({ metadata: value });
+    await this.#localStorageArea().set({ metadata: value });
     return clone(value);
   }
 }
