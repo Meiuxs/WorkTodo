@@ -148,22 +148,21 @@ export function createSettingsView({
         confirmation.addEventListener('close', async () => {
           if (confirmation.returnValue !== 'confirm') return;
           await dataController.confirm(mode);
+          if (dataController.state.kind === 'result') await onDataChanged();
           if (signal?.aborted) return;
           renderDataState(signal);
-          if (dataController.state.kind === 'result') await onDataChanged();
         }, { once: true });
         return;
       }
       await dataController.confirm(mode);
+      if (dataController.state.kind === 'result') await onDataChanged();
       if (signal?.aborted) return;
       renderDataState(signal);
-      if (dataController.state.kind === 'result') await onDataChanged();
     });
   }
 
   async function exportBackup(signal) {
     const backup = await backupService.createBackup();
-    if (signal?.aborted) return;
     const contents = backupService.serializeBackup(backup);
     const url = URL.createObjectURL(new Blob([contents], { type: 'application/json' }));
     const link = document.createElement('a');
@@ -173,7 +172,7 @@ export function createSettingsView({
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    await render(signal);
+    if (!signal?.aborted) await render(signal);
   }
 
   async function render(signal) {
@@ -236,8 +235,8 @@ export function createSettingsView({
       const input = event.currentTarget.elements.namedItem('name');
       try {
         await taskService.createCategory(input.value);
-        if (signal?.aborted) return;
-        await render(signal);
+        await onDataChanged();
+        if (!signal?.aborted) await render(signal);
       } catch (error) {
         if (signal?.aborted) return;
         root.querySelector('#category-message').textContent = error.message;
@@ -252,8 +251,8 @@ export function createSettingsView({
       try {
         const destination = deleteDialog.querySelector('select').value || null;
         await taskService.deleteCategory(categoryId, destination);
-        if (signal?.aborted) return;
-        await render(signal);
+        await onDataChanged();
+        if (!signal?.aborted) await render(signal);
       } catch (error) {
         if (signal?.aborted) return;
         deleteDialog.querySelector('[data-delete-message]').textContent = error.message;
@@ -269,8 +268,8 @@ export function createSettingsView({
       if (button.dataset.categoryAction === 'rename') {
         try {
           await taskService.renameCategory(categoryId, row.querySelector('input').value);
-          if (signal?.aborted) return;
-          await render(signal);
+          await onDataChanged();
+          if (!signal?.aborted) await render(signal);
         } catch (error) {
           if (signal?.aborted) return;
           root.querySelector('#category-message').textContent = error.message;

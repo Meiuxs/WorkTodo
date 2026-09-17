@@ -48,3 +48,14 @@
 - 红灯：新增取消语义单测后，旧 render pending 时最新导航在 100ms 内仍未完成；旧视图没有收到 AbortSignal；取消后的 `AbortError` 直接拒绝调用方。
 - 修复：删除渲染队列和版本号。每次 `navigate/refresh` 创建新的 `AbortController` 并立即 abort 上一个；控制器通过 `Promise.race` 让被取消的旧调用及时返回，最新 render 不等待旧 Promise。所有视图接收 signal，在异步查询后、写 DOM 前检查 `signal.aborted`，内部筛选、历史和设置重渲染继续沿用当前 signal。
 - 验证：`node --test tests/services/dashboard-controller.test.js` 为 `10/10`；完整 `planning.spec.js` 为 `3/3`，其中包含永久 pending 周查询不阻塞最新导航的 E2E；`npm test` 为单元 `118/118`、Chromium E2E `19/19`。
+
+## 第三轮审查修复循环
+
+- 复审发现 P1：初始 render 完成时清空 `#renderAbortController`，导致已加载视图事件监听器持有的 signal 永远不会被后续导航取消。history 延迟按周切换会覆盖今天，settings 延迟操作同样会越过新路由。
+- 复审发现 P2：all-tasks 延迟搜索返回后访问新 root 的 `#filter-count`，产生空节点异常。
+- 复审发现 P2：settings 将旧设置页 DOM 更新和用户副作用混在一起。导航后导出被跳过，导入及分类变更后也未调用 `onDataChanged()`。
+- 红灯：控制器回归中初始 render 后的 signal 在下一次导航时仍为未取消；history 延迟按周切换在导航后重新覆盖正文，今天标题下找不到今天视图。
+- 修复：AbortController 现在表示完整视图生命周期，从 `navigate/refresh` 开始保留到下一次 `navigate/refresh`，单次 render resolve 时不再清空；底层 render promise 增加兜底 catch，取消后迟到的普通 rejection 不会成为未处理异常。
+- 修复：all-tasks 在 signal aborted、列表节点已脱离或计数节点不存在时直接返回，不再接触旧 DOM。
+- 修复：导出即使在导航后也完成下载；导入和分类创建、改名、删除完成后始终调用 `onDataChanged()` 刷新当前路由，仅旧设置页自身重绘受 signal 阻止。
+- 验证：`node --test tests/services/dashboard-controller.test.js` 为 `11/11`；完整 `planning.spec.js` 为 `7/7`，覆盖 history 延迟切换、延迟搜索和导航后导出；`npm test` 为单元 `119/119`、Chromium E2E `23/23`。

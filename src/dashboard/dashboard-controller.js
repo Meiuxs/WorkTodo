@@ -50,6 +50,7 @@ export class DashboardController {
     const render = Promise.resolve().then(() => (
       this.#views[route].render(renderAbortController.signal)
     ));
+    void render.catch(() => {});
     const aborted = new Promise((resolve) => {
       renderAbortController.signal.addEventListener('abort', resolve, { once: true });
     });
@@ -58,10 +59,6 @@ export class DashboardController {
     } catch (error) {
       if (renderAbortController.signal.aborted || error?.name === 'AbortError') return;
       throw error;
-    } finally {
-      if (this.#renderAbortController === renderAbortController) {
-        this.#renderAbortController = null;
-      }
     }
   }
 

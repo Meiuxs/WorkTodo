@@ -124,6 +124,40 @@ test('已取消 render 的 AbortError 不会向调用方传播', async () => {
   await assert.doesNotReject(staleRender);
 });
 
+test('初始 render 完成后 signal 保持到下一次导航', async () => {
+  const rendered = [];
+  let releaseDelayedWrite;
+  let viewSignal;
+  const todayView = {
+    async render(signal) {
+      viewSignal = signal;
+    },
+  };
+  const inboxView = {
+    async render(signal) {
+      if (!signal?.aborted) rendered.push('inbox');
+    },
+  };
+  const controller = new DashboardController({
+    views: { today: todayView, inbox: inboxView },
+  });
+
+  await controller.navigate('today');
+  assert.equal(viewSignal.aborted, false);
+  const delayedWrite = (async () => {
+    await new Promise((resolve) => { releaseDelayedWrite = resolve; });
+    if (!viewSignal.aborted) rendered.push('today-delayed');
+  })();
+  await Promise.resolve();
+
+  await controller.navigate('inbox');
+  assert.equal(viewSignal.aborted, true);
+  releaseDelayedWrite();
+  await delayedWrite;
+
+  assert.deepEqual(rendered, ['inbox']);
+});
+
 test('任务操作调用服务、广播并刷新当前视图', async () => {
   const view = { renderCount: 0, async render() { this.renderCount += 1; } };
   const calls = [];

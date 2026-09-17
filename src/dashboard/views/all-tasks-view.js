@@ -47,10 +47,13 @@ export function createAllTasksView({ root, query, taskService, tagService, today
   let searchTimer;
 
   async function refreshList(signal) {
+    if (signal?.aborted) return;
     const listRoot = root.querySelector('#all-tasks-list');
     if (listRoot === null) return;
     const tasks = await query.search(queryFilters(filters));
-    if (signal?.aborted) return;
+    if (signal?.aborted || !listRoot.isConnected) return;
+    const filterCount = root.querySelector('#filter-count');
+    if (filterCount === null) return;
     renderTaskList(listRoot, tasks, {
       today: today(),
       onAction,
@@ -59,7 +62,7 @@ export function createAllTasksView({ root, query, taskService, tagService, today
       tags,
       emptyMessage: '没有符合当前筛选条件的任务。',
     });
-    root.querySelector('#filter-count').textContent = `显示 ${tasks.length} 项`;
+    filterCount.textContent = `显示 ${tasks.length} 项`;
   }
 
   function readFilters() {
