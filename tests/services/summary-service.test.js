@@ -70,6 +70,65 @@ test('周总结只使用本地统计和已完成任务标题', async () => {
   assert.doesNotMatch(summary.text, /<[^>]+>/);
 });
 
+test('总结清洗常见链接与 HTML 标签但保留比较表达式', async () => {
+  const service = new SummaryService({
+    statistics: {
+      async weekly() {
+        return {
+          completedCount: 9,
+          plannedCount: 9,
+          postponedCount: 0,
+          completionRate: 1,
+        };
+      },
+    },
+    query: {
+      async completed() {
+        return [
+          { title: 'https://example.com/a' },
+          { title: 'www.example.com/private' },
+          { title: 'mailto:foo@example.com' },
+          { title: 'ftp://files.example.com' },
+          { title: 'example.com/path' },
+          { title: 'tel:+86-12345678' },
+          { title: 'tel:110' },
+          { title: 'file:/tmp/private' },
+          { title: '192.168.1.10:8080/private' },
+          { title: '<b>加粗</b>' },
+          { title: '价格 1 < 2 > 0' },
+          { title: '版本:1.2.3 与 1.5' },
+          { title: '提醒: 明天处理' },
+          { title: '文件 example.computer 保留' },
+          { title: '  连续\t空白   折叠  ' },
+          { title: '' },
+          { title: undefined },
+        ];
+      },
+    },
+  });
+
+  const summary = await service.weekly('2026-09-17');
+
+  assert.equal((summary.text.match(/\[链接已移除\]/g) ?? []).length, 9);
+  assert.doesNotMatch(summary.text, /https:\/\/example\.com\/a/);
+  assert.doesNotMatch(summary.text, /www\.example\.com\/private/);
+  assert.doesNotMatch(summary.text, /mailto:foo@example\.com/);
+  assert.doesNotMatch(summary.text, /ftp:\/\/files\.example\.com/);
+  assert.doesNotMatch(summary.text, /example\.com\/path/);
+  assert.doesNotMatch(summary.text, /tel:\+86-12345678/);
+  assert.doesNotMatch(summary.text, /tel:110/);
+  assert.doesNotMatch(summary.text, /file:\/tmp\/private/);
+  assert.doesNotMatch(summary.text, /192\.168\.1\.10:8080\/private/);
+  assert.doesNotMatch(summary.text, /<\/?b>/);
+  assert.match(summary.text, /- 加粗/);
+  assert.match(summary.text, /- 价格 1 < 2 > 0/);
+  assert.match(summary.text, /- 版本:1\.2\.3 与 1\.5/);
+  assert.match(summary.text, /- 提醒: 明天处理/);
+  assert.match(summary.text, /- 文件 example\.computer 保留/);
+  assert.match(summary.text, /- 连续 空白 折叠/);
+  assert.equal((summary.text.match(/- 未命名任务/g) ?? []).length, 2);
+});
+
 test('月总结使用本地整月边界且没有计划时显示暂无计划', async () => {
   const calls = [];
   const service = new SummaryService({
