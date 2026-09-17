@@ -253,16 +253,31 @@ export class TaskRepository {
       ['tasks', 'categories', 'events', 'tags', 'recurringTemplates'],
       'readwrite',
     );
-    for (const storeName of ['tasks', 'categories', 'events', 'tags', 'recurringTemplates']) {
-      transaction.objectStore(storeName).clear();
+    const completion = transactionResult(transaction);
+    try {
+      for (const storeName of ['tasks', 'categories', 'events', 'tags', 'recurringTemplates']) {
+        transaction.objectStore(storeName).clear();
+      }
+      for (const task of tasks) transaction.objectStore('tasks').put(task);
+      for (const category of categories) transaction.objectStore('categories').put(category);
+      for (const event of events) transaction.objectStore('events').put(event);
+      for (const tag of tags) transaction.objectStore('tags').put(tag);
+      for (const template of recurringTemplates) {
+        transaction.objectStore('recurringTemplates').put(template);
+      }
+    } catch (error) {
+      try {
+        transaction.abort();
+      } catch {
+        // 已结束或已中止的事务无需重复中止。
+      }
+      try {
+        await completion;
+      } catch {
+        // 保留同步写入错误作为对外错误。
+      }
+      throw error;
     }
-    for (const task of tasks) transaction.objectStore('tasks').put(task);
-    for (const category of categories) transaction.objectStore('categories').put(category);
-    for (const event of events) transaction.objectStore('events').put(event);
-    for (const tag of tags) transaction.objectStore('tags').put(tag);
-    for (const template of recurringTemplates) {
-      transaction.objectStore('recurringTemplates').put(template);
-    }
-    await transactionResult(transaction);
+    await completion;
   }
 }

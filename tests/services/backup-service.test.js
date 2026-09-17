@@ -224,6 +224,37 @@ test('v1 备份导入时补齐 V1.1 字段并保留原任务、分类、事件�
   }
 });
 
+test('v2 备份在接触仓库前拒绝非法标签、模板和标签引用', async () => {
+  const { backup, repo, restoreChrome } = createBackupService();
+  try {
+    const before = await repo.exportAll();
+    const invalidBackups = [
+      backupFile({ tags: [{}] }),
+      backupFile({ tags: [{ ...TAG, name: '   ' }] }),
+      backupFile({ tags: [{ ...TAG, createdAt: '不是时间' }] }),
+      backupFile({ tags: [{ ...TAG, updatedAt: 123 }] }),
+      backupFile({ tags: [TAG, { ...TAG, name: '重复 ID' }] }),
+      backupFile({ tags: [TAG, { ...TAG, id: OTHER_ID }] }),
+      backupFile({ recurringTemplates: [{}] }),
+      backupFile({ recurringTemplates: [TEMPLATE, { ...TEMPLATE, title: '重复 ID' }] }),
+      backupFile({ tasks: [{ ...OTHER_TASK, tagIds: [TAG_ID] }] }),
+      backupFile({ tasks: [{ ...OTHER_TASK, categoryId: CATEGORY_ID }] }),
+      backupFile({ tasks: [], events: [OTHER_EVENT] }),
+    ];
+
+    for (const invalid of invalidBackups) {
+      const text = JSON.stringify(invalid);
+      assert.throws(() => backup.validateBackup(text), ValidationError);
+      await assert.rejects(() => backup.previewImport(text), ValidationError);
+      await assert.rejects(() => backup.importBackup(text, 'merge'), ValidationError);
+      await assert.rejects(() => backup.importBackup(text, 'replace'), ValidationError);
+      assert.deepEqual(await repo.exportAll(), before);
+    }
+  } finally {
+    restoreChrome();
+  }
+});
+
 test('v1 备份 merge 保留本机标签和模板，replace 将其替换为空数组', async () => {
   const legacy = JSON.stringify({
     schemaVersion: 1,

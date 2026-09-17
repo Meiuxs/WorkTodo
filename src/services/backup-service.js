@@ -104,7 +104,28 @@ function validateCategories(categories) {
   }
 }
 
-function validateTasks(tasks, categoryIds) {
+function validateTags(tags) {
+  assertUniqueUuid(tags, 'tag');
+  const names = new Set();
+  for (const tag of tags) {
+    if (typeof tag.name !== 'string' || tag.name.trim().length === 0) {
+      throw new ValidationError('tag.name 不能为空');
+    }
+    const normalizedName = tag.name.trim();
+    if (names.has(normalizedName)) {
+      throw new ValidationError('tag.name 必须唯一');
+    }
+    names.add(normalizedName);
+    assertIsoString(tag.createdAt, 'tag.createdAt');
+    assertIsoString(tag.updatedAt, 'tag.updatedAt');
+  }
+}
+
+function validateRecurringTemplates(recurringTemplates) {
+  assertUniqueUuid(recurringTemplates, 'recurringTemplate');
+}
+
+function validateTasks(tasks, categoryIds, tagIds) {
   assertUniqueUuid(tasks, 'task');
   for (const task of tasks) {
     for (const field of TASK_RELATIONSHIP_FIELDS) {
@@ -121,6 +142,9 @@ function validateTasks(tasks, categoryIds) {
       if (!categoryIds.has(task.categoryId)) {
         throw new ValidationError('task.categoryId 必须引用备份中的分类');
       }
+    }
+    if (task.tagIds.some((tagId) => !tagIds.has(tagId))) {
+      throw new ValidationError('task.tagIds 必须引用备份中的标签');
     }
   }
 }
@@ -225,9 +249,12 @@ export class BackupService {
     }
     validateTopLevel(backup, backup.schemaVersion);
     const upgraded = upgradeBackup(backup);
-    const categoryIds = new Set(upgraded.categories.map((category) => category.id));
     validateCategories(upgraded.categories);
-    validateTasks(upgraded.tasks, categoryIds);
+    const categoryIds = new Set(upgraded.categories.map((category) => category.id));
+    validateTags(upgraded.tags);
+    const tagIds = new Set(upgraded.tags.map((tag) => tag.id));
+    validateRecurringTemplates(upgraded.recurringTemplates);
+    validateTasks(upgraded.tasks, categoryIds, tagIds);
     const taskIds = new Set(upgraded.tasks.map((task) => task.id));
     validateEvents(upgraded.events, taskIds);
     return clone(upgraded);

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { ConflictError } from '../../src/data/task-repository.js';
+import { ConflictError, TaskRepository } from '../../src/data/task-repository.js';
 import { SettingsRepository } from '../../src/data/settings-repository.js';
 import { InMemoryStorageArea, InMemoryTaskRepository } from '../helpers/fakes.js';
 
@@ -31,6 +31,113 @@ const BASE_TASK = {
 const EVENT = { id: 'e1', taskId: 't1', type: 'TASK_UPDATED', occurredAt: NOW, detail: null };
 const TAG = { id: TAG_ID, name: '客户', createdAt: NOW, updatedAt: NOW };
 const TEMPLATE = { id: TEMPLATE_ID, title: '周报', active: true, updatedAt: NOW };
+
+class SimulatedStore {
+  #transaction;
+  #name;
+
+  constructor(transaction, name) {
+    this.#transaction = transaction;
+    this.#name = name;
+  }
+
+  clear() {
+    this.#transaction.enqueue({ type: 'clear', name: this.#name });
+  }
+
+  put(value) {
+    if (value === null || typeof value !== 'object' || value.id === undefined) {
+      const error = new Error('对象缺少 id');
+      error.name = 'DataError';
+      throw error;
+    }
+    this.#transaction.enqueue({
+      type: 'put',
+      name: this.#name,
+      value: structuredClone(value),
+    });
+  }
+}
+
+class SimulatedTransaction {
+  #stores;
+  #operations = [];
+  #commitScheduled = false;
+
+  constructor(stores) {
+    this.#stores = stores;
+    this.abortCalled = false;
+    this.aborted = false;
+    this.finished = false;
+    this.error = null;
+  }
+
+  objectStore(name) {
+    return new SimulatedStore(this, name);
+  }
+
+  enqueue(operation) {
+    this.#operations.push(operation);
+    if (!this.#commitScheduled) {
+      this.#commitScheduled = true;
+      queueMicrotask(() => this.#commit());
+    }
+  }
+
+  abort() {
+    this.abortCalled = true;
+    if (this.finished) throw new Error('事务已结束');
+    this.aborted = true;
+    this.error ??= new Error('事务已中止');
+    queueMicrotask(() => {
+      if (this.finished) return;
+      this.finished = true;
+      this.onabort?.();
+    });
+  }
+
+  #commit() {
+    if (this.finished || this.aborted) return;
+    for (const operation of this.#operations) {
+      if (operation.type === 'clear') {
+        this.#stores.set(operation.name, []);
+      } else {
+        const values = this.#stores.get(operation.name);
+        const index = values.findIndex((item) => item.id === operation.value.id);
+        if (index === -1) values.push(operation.value);
+        else values[index] = operation.value;
+      }
+    }
+    this.finished = true;
+    this.oncomplete?.();
+  }
+}
+
+class SimulatedIndexedDb {
+  #stores;
+
+  constructor(stores) {
+    this.#stores = new Map(
+      Object.entries(stores).map(([name, values]) => [name, structuredClone(values)]),
+    );
+    this.lastTransaction = null;
+  }
+
+  transaction(storeNames, mode) {
+    if (mode !== 'readwrite') throw new Error('测试仅支持 readwrite 事务');
+    const names = Array.isArray(storeNames) ? storeNames : [storeNames];
+    if (names.some((name) => !this.#stores.has(name))) {
+      throw new Error('store 不存在');
+    }
+    const transaction = new SimulatedTransaction(this.#stores);
+    this.lastTransaction = transaction;
+    return transaction;
+  }
+
+  snapshot() {
+    return structuredClone(Object.fromEntries(this.#stores));
+  }
+}
 
 test('update 在 revision 过期时拒绝静默覆盖', async () => {
   const currentTask = { ...BASE_TASK, revision: 1 };
@@ -103,6 +210,32 @@ test('exportAll 与 replaceAll round-trip 标签和重复模板并返回独立�
   const replaced = await repo.exportAll();
   assert.deepEqual(replaced.tags, [{ ...TAG, name: '重点客户' }]);
   assert.deepEqual(replaced.recurringTemplates, [{ ...TEMPLATE, active: false }]);
+});
+
+test('TaskRepository.replaceAll 同步 put 失败时显式 abort 并保留五个 store', async () => {
+  const database = new SimulatedIndexedDb({
+    tasks: [BASE_TASK],
+    categories: [],
+    events: [EVENT],
+    tags: [TAG],
+    recurringTemplates: [TEMPLATE],
+  });
+  const repository = new TaskRepository(database);
+  const before = database.snapshot();
+
+  await assert.rejects(
+    () => repository.replaceAll({
+      tasks: [],
+      categories: [],
+      events: [],
+      tags: [{}],
+      recurringTemplates: [],
+    }),
+    (error) => error.name === 'DataError',
+  );
+
+  assert.equal(database.lastTransaction.abortCalled, true);
+  assert.deepEqual(database.snapshot(), before);
 });
 
 test('settings 与 metadata 使用隔离键且返回独立快照', async () => {
