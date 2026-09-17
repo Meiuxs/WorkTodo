@@ -102,9 +102,10 @@ export function taskTagLabel(task, tags) {
 }
 
 function taskMarkup(task, today, tags) {
-  const canRestore = task.lifecycle === 'completed' || task.lifecycle === 'cancelled';
-  const checkboxAction = canRestore ? 'restore' : 'complete';
-  const checked = task.lifecycle === 'completed';
+  const trashed = task.trashedAt !== null;
+  const canRestore = trashed || task.lifecycle === 'completed' || task.lifecycle === 'cancelled';
+  const checkboxAction = trashed ? 'untrash' : canRestore ? 'restore' : 'complete';
+  const checked = !trashed && task.lifecycle === 'completed';
   const status = taskStatus(task, today);
   const tagText = taskTagLabel(task, tags);
   const tagMarkup = tagText.length === 0
