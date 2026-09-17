@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { toLocalDate } from '../../src/domain/dates.js';
 import { TaskQueryService } from '../../src/services/task-query-service.js';
 import { InMemoryTaskRepository } from '../helpers/fakes.js';
 
@@ -152,4 +153,35 @@ test('search 日期范围始终按 scheduledDate 过滤 completed 任务', async
   });
 
   assert.deepEqual(result.map((item) => item.id), ['scheduled-in-range']);
+});
+
+test('completed 与 cancelled 支持按实际完成日期和状态读取', async () => {
+  const repository = new InMemoryTaskRepository([
+    task({ id: 'completed-today', lifecycle: 'completed', completedAt: '2026-09-17T10:00:00.000Z' }),
+    task({ id: 'completed-yesterday', lifecycle: 'completed', completedAt: '2026-09-16T10:00:00.000Z' }),
+    task({ id: 'cancelled', lifecycle: 'cancelled', completedAt: null }),
+  ]);
+  const query = new TaskQueryService(repository);
+
+  assert.deepEqual((await query.completed({ completedDate: '2026-09-17' })).map((item) => item.id), ['completed-today']);
+  assert.deepEqual((await query.completed({ completedFrom: '2026-09-16', completedTo: '2026-09-16' })).map((item) => item.id), ['completed-yesterday']);
+  assert.deepEqual((await query.cancelled()).map((item) => item.id), ['cancelled']);
+});
+
+test('完成日期筛选使用系统本地日期而不是 UTC 日期字符串', async () => {
+  const completedAt = '2026-09-16T16:30:00.000Z';
+  const localDate = toLocalDate(new Date(completedAt));
+  assert.notEqual(completedAt.slice(0, 10), localDate);
+  const { query } = createQuery([
+    task({
+      id: 'local-midnight',
+      lifecycle: 'completed',
+      completedAt,
+    }),
+  ]);
+
+  assert.deepEqual(
+    (await query.completed({ completedDate: localDate })).map((item) => item.id),
+    ['local-midnight'],
+  );
 });

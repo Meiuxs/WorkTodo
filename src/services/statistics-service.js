@@ -1,4 +1,4 @@
-import { assertLocalDate } from '../domain/dates.js';
+import { assertLocalDate, toLocalDate } from '../domain/dates.js';
 
 function addDays(date, days) {
   assertLocalDate(date);
@@ -12,7 +12,9 @@ function inRange(date, startDate, endDate) {
 }
 
 function isoLocalDate(value) {
-  return typeof value === 'string' && value.length >= 10 ? value.slice(0, 10) : null;
+  if (typeof value !== 'string') return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : toLocalDate(date);
 }
 
 function completionRate(completedCount, plannedCount, cancelledCount) {

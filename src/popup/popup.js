@@ -87,3 +87,9 @@ document.querySelector('#open-dashboard').addEventListener('click', () => {
 
 input.focus();
 refresh().catch(() => { message.textContent = '任务列表暂时无法加载。请重新打开扩展。'; });
+
+chrome.runtime.onMessage.addListener((runtimeMessage) => {
+  if (runtimeMessage?.type === 'TASK_CHANGED') {
+    refresh().catch(() => { message.textContent = '任务列表暂时无法加载。请重新打开扩展。'; });
+  }
+});

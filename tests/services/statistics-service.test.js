@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { toLocalDate } from '../../src/domain/dates.js';
 import { StatisticsService } from '../../src/services/statistics-service.js';
 import { InMemoryTaskRepository } from '../helpers/fakes.js';
 
@@ -131,4 +132,19 @@ test('weekly 聚合 weekStart 起连续七天', async () => {
   assert.equal(weekly.plannedCount, 2);
   assert.equal(weekly.postponedCount, 1);
   assert.equal(weekly.completionRate, 0.5);
+});
+
+test('完成统计使用系统本地日期而不是 UTC 日期字符串', async () => {
+  const completedAt = '2026-09-16T16:30:00.000Z';
+  const localDate = toLocalDate(new Date(completedAt));
+  assert.notEqual(completedAt.slice(0, 10), localDate);
+  const statistics = createStatistics([
+    task({
+      id: 'local-midnight',
+      lifecycle: 'completed',
+      completedAt,
+    }),
+  ]);
+
+  assert.equal((await statistics.daily(localDate)).completedCount, 1);
 });

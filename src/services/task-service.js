@@ -76,6 +76,8 @@ export class TaskService {
     const next = {
       ...scheduled,
       ...(Object.hasOwn(input, 'title') ? { title: input.title } : {}),
+      ...(Object.hasOwn(input, 'description') ? { description: input.description } : {}),
+      ...(Object.hasOwn(input, 'starred') ? { starred: input.starred } : {}),
       ...(Object.hasOwn(input, 'priority') ? { priority: input.priority } : {}),
       ...(Object.hasOwn(input, 'categoryId') ? { categoryId: input.categoryId } : {}),
       ...(Object.hasOwn(input, 'startTime') ? { startTime: input.startTime } : {}),
@@ -143,6 +145,14 @@ export class TaskService {
   async createCategory(name) {
     const now = this.#now();
     return this.#repository.createCategory({ id: this.#generateId(), name: categoryName(name), createdAt: now, updatedAt: now });
+  }
+
+  async listCategories() {
+    return this.#repository.listCategories();
+  }
+
+  async getTask(id) {
+    return this.#task(id);
   }
 
   async renameCategory(id, name) {

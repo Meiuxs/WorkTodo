@@ -58,6 +58,8 @@ test('已完成任务恢复为 todo 并清空 completedAt', () => {
 test('创建任务会修剪标题并提供稳定默认值', () => {
   const task = createTask({ title: '  跟进客户  ' }, NOW, 't2');
   assert.equal(task.title, '跟进客户');
+  assert.equal(task.description, '');
+  assert.equal(task.starred, false);
   assert.equal(task.lifecycle, 'todo');
   assert.equal(task.priority, 'none');
   assert.equal(task.revision, 0);
@@ -65,6 +67,22 @@ test('创建任务会修剪标题并提供稳定默认值', () => {
   assert.equal(task.firstScheduledDate, null);
   assert.equal(isInboxTask(task), true);
   assert.equal(validateTask(task), true);
+});
+
+test('重新安排回收集箱时保留首次计划日期并清空时间字段', () => {
+  const task = createTask({
+    title: '报价',
+    scheduledDate: '2026-09-17',
+    startTime: '09:00',
+    dueTime: '10:00',
+  }, NOW, 't1');
+
+  const moved = transitionTask(task, { type: 'RESCHEDULE', date: null }, NOW);
+
+  assert.equal(moved.scheduledDate, null);
+  assert.equal(moved.firstScheduledDate, '2026-09-17');
+  assert.equal(moved.startTime, null);
+  assert.equal(moved.dueTime, null);
 });
 
 test('创建任务拒绝空标题和超过 200 字符的标题', () => {

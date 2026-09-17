@@ -35,6 +35,18 @@ function assertCategoryId(categoryId) {
   }
 }
 
+function normalizeDescription(description) {
+  if (description === undefined || description === null) return '';
+  if (typeof description !== 'string') {
+    throw new ValidationError('description 必须是字符串');
+  }
+  const normalized = description.trim();
+  if (normalized.length > 10_000) {
+    throw new ValidationError('description 不能超过 10000 个字符');
+  }
+  return normalized;
+}
+
 function assertActive(task, action) {
   if (task.trashedAt !== null || ['completed', 'cancelled'].includes(task.lifecycle)) {
     throw new TransitionError(`${action} 不能用于当前任务状态`);
@@ -52,6 +64,10 @@ export function validateTask(task) {
 
   assertIdentifier(task.id, 'id');
   normalizeTitle(task.title);
+  if (task.description !== undefined) normalizeDescription(task.description);
+  if (task.starred !== undefined && typeof task.starred !== 'boolean') {
+    throw new ValidationError('starred 必须是布尔值');
+  }
   if (!PRIORITIES.has(task.priority)) {
     throw new ValidationError('priority 无效');
   }
@@ -69,14 +85,14 @@ export function validateTask(task) {
   if (isInboxTask(task) && (task.startTime !== null || task.dueTime !== null)) {
     throw new ValidationError('收集箱任务不能携带时间字段');
   }
-  if (task.firstScheduledDate !== null && task.scheduledDate === null) {
-    throw new ValidationError('firstScheduledDate 需要对应已安排任务');
-  }
   if (task.lifecycle === 'completed' && task.completedAt === null) {
     throw new ValidationError('已完成任务必须有 completedAt');
   }
   if (task.lifecycle !== 'completed' && task.completedAt !== null) {
     throw new ValidationError('未完成任务不能有 completedAt');
+  }
+  if (task.cancelledAt !== undefined && task.cancelledAt !== null && typeof task.cancelledAt !== 'string') {
+    throw new ValidationError('cancelledAt 必须是字符串或 null');
   }
   if (task.trashedAt !== null && typeof task.trashedAt !== 'string') {
     throw new ValidationError('trashedAt 必须是字符串或 null');
@@ -92,6 +108,8 @@ export function createTask(input, now, id) {
   const task = {
     id,
     title: normalizeTitle(source.title),
+    description: normalizeDescription(source.description),
+    starred: source.starred ?? false,
     priority: source.priority ?? 'none',
     categoryId: source.categoryId ?? null,
     scheduledDate,
@@ -103,6 +121,7 @@ export function createTask(input, now, id) {
     createdAt: now,
     updatedAt: now,
     completedAt: null,
+    cancelledAt: null,
     trashedAt: null,
   };
   validateTask(task);
@@ -130,6 +149,7 @@ export function transitionTask(task, action, now) {
     case 'CANCEL':
       assertActive(task, action.type);
       next.lifecycle = 'cancelled';
+      next.cancelledAt = now;
       break;
     case 'RESTORE':
       if (!['completed', 'cancelled'].includes(task.lifecycle)) {
@@ -137,6 +157,7 @@ export function transitionTask(task, action, now) {
       }
       next.lifecycle = 'todo';
       next.completedAt = null;
+      next.cancelledAt = null;
       break;
     case 'TRASH':
       if (task.trashedAt !== null) throw new TransitionError('任务已在回收站');
@@ -148,9 +169,14 @@ export function transitionTask(task, action, now) {
       break;
     case 'RESCHEDULE':
       assertActive(task, action.type);
-      assertLocalDate(action.date, 'date');
+      if (action.date !== null) assertLocalDate(action.date, 'date');
       next.scheduledDate = action.date;
-      if (next.firstScheduledDate === null) next.firstScheduledDate = action.date;
+      if (action.date === null) {
+        next.startTime = null;
+        next.dueTime = null;
+      } else if (next.firstScheduledDate === null) {
+        next.firstScheduledDate = action.date;
+      }
       break;
     case 'POSTPONE':
       assertActive(task, action.type);

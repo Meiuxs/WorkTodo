@@ -1,4 +1,4 @@
-import { assertLocalDate, isOverdueTask } from '../domain/dates.js';
+import { assertLocalDate, isOverdueTask, toLocalDate } from '../domain/dates.js';
 import { isInboxTask } from '../domain/task.js';
 
 const PRIORITY_RANK = {
@@ -66,6 +66,16 @@ function matchesFilters(task, filters = {}) {
   if (filters.categoryId !== undefined && task.categoryId !== filters.categoryId) return false;
   if (filters.priority !== undefined && task.priority !== filters.priority) return false;
   if (filters.starred !== undefined && Boolean(task.starred) !== filters.starred) return false;
+  if (filters.completedDate !== undefined || filters.completedFrom !== undefined || filters.completedTo !== undefined) {
+    if (filters.completedDate !== undefined) assertLocalDate(filters.completedDate, 'completedDate');
+    if (filters.completedFrom !== undefined) assertLocalDate(filters.completedFrom, 'completedFrom');
+    if (filters.completedTo !== undefined) assertLocalDate(filters.completedTo, 'completedTo');
+    if (task.completedAt === null) return false;
+    const completedDate = toLocalDate(new Date(task.completedAt));
+    if (filters.completedDate !== undefined && completedDate !== filters.completedDate) return false;
+    if (filters.completedFrom !== undefined && completedDate < filters.completedFrom) return false;
+    if (filters.completedTo !== undefined && completedDate > filters.completedTo) return false;
+  }
   return matchesDateRange(task, filters);
 }
 
@@ -112,6 +122,15 @@ export class TaskQueryService {
       task.trashedAt === null
       && task.lifecycle === 'completed'
       && matchesFilters(task, { ...filters, lifecycle: 'completed' })
+    ));
+  }
+
+  async cancelled(filters = {}) {
+    const tasks = await this.#tasks();
+    return tasks.filter((task) => (
+      task.trashedAt === null
+      && task.lifecycle === 'cancelled'
+      && matchesFilters(task, { ...filters, lifecycle: 'cancelled' })
     ));
   }
 

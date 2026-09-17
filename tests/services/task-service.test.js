@@ -114,6 +114,25 @@ test('创建、编辑和开始任务分别写入稳定事件', async () => {
   assert.equal((await repo.get(created.task.id)).revision, 2);
 });
 
+test('编辑可更新描述、星标并允许任务重新回到收集箱', async () => {
+  const { repo, service } = createService({ tasks: [], categories: [] });
+  const created = await service.create({ title: '报价', scheduledDate: '2026-09-17' });
+
+  const updated = await service.edit(created.task.id, {
+    title: '客户报价',
+    description: '包含税费',
+    starred: true,
+    scheduledDate: null,
+  }, 0);
+
+  assert.equal(updated.task.title, '客户报价');
+  assert.equal(updated.task.description, '包含税费');
+  assert.equal(updated.task.starred, true);
+  assert.equal(updated.task.scheduledDate, null);
+  assert.equal(updated.task.firstScheduledDate, '2026-09-17');
+  assert.equal((await repo.get(created.task.id)).scheduledDate, null);
+});
+
 test('完成、恢复、取消、回收与还原使用领域状态迁移并保留 revision 冲突', async () => {
   const { service } = createService();
   const completed = await service.complete('t1', 0);

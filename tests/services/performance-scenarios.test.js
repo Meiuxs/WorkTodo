@@ -1,0 +1,67 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { BackupService } from '../../src/services/backup-service.js';
+import { StatisticsService } from '../../src/services/statistics-service.js';
+import { TaskQueryService } from '../../src/services/task-query-service.js';
+import { InMemoryStorageArea, InMemoryTaskRepository } from '../helpers/fakes.js';
+
+const NOW = '2026-09-17T08:30:00.000Z';
+
+function makeTasks(count) {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+    title: `任务 ${index}`,
+    description: index % 25 === 0 ? '重点描述' : '',
+    priority: index % 10 === 0 ? 'high' : 'none',
+    categoryId: null,
+    scheduledDate: index % 3 === 0 ? '2026-09-16' : '2026-09-17',
+    firstScheduledDate: '2026-09-16',
+    startTime: null,
+    dueTime: null,
+    lifecycle: 'todo',
+    revision: 0,
+    createdAt: NOW,
+    updatedAt: NOW,
+    completedAt: null,
+    cancelledAt: null,
+    trashedAt: null,
+  }));
+}
+
+test('10,000 条任务的今日查询不修改输入且返回数组', async () => {
+  const tasks = makeTasks(10_000);
+  const original = structuredClone(tasks);
+  const query = new TaskQueryService(new InMemoryTaskRepository(tasks));
+
+  const result = await query.today('2026-09-17');
+
+  assert.ok(Array.isArray(result));
+  assert.equal(result.length, 10_000);
+  assert.deepEqual(tasks, original);
+});
+
+test('10,000 条任务的搜索、统计与导出保持可用且不修改仓库快照', async () => {
+  const tasks = makeTasks(10_000);
+  const repository = new InMemoryTaskRepository(tasks);
+  const query = new TaskQueryService(repository);
+  const statistics = new StatisticsService(repository);
+  const before = await repository.exportAll();
+
+  const searched = await query.search({ text: '重点描述' });
+  const daily = await statistics.daily('2026-09-17');
+
+  const previousChrome = globalThis.chrome;
+  globalThis.chrome = { storage: { local: new InMemoryStorageArea() } };
+  try {
+    const backup = await new BackupService(repository, { now: () => NOW }).createBackup();
+    assert.equal(backup.tasks.length, 10_000);
+  } finally {
+    if (previousChrome === undefined) delete globalThis.chrome;
+    else globalThis.chrome = previousChrome;
+  }
+
+  assert.equal(searched.length, 400);
+  assert.equal(daily.createdCount, 10_000);
+  assert.deepEqual(await repository.exportAll(), before);
+});

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>WorkTodo Dashboard Preview</title>
+    <script type="module">
+      const dashboardBase = new URL('../../src/dashboard/', import.meta.url);
+      const source = await fetch(new URL('index.html', dashboardBase)).then((response) => response.text());
+      const parsed = new DOMParser().parseFromString(source, 'text/html');
+      parsed.head.insertAdjacentHTML('afterbegin', `<base href="${dashboardBase.href}">`);
+
+      const chromeShim = document.createElement('script');
+      chromeShim.textContent = `
+        const localState = {};
+        window.chrome = {
+          storage: {
+            local: {
+              async get(key) {
+                const keys = Array.isArray(key) ? key : [key];
+                return Object.fromEntries(keys.filter((item) => item in localState).map((item) => [item, structuredClone(localState[item])]));
+              },
+              async set(values) {
+                Object.assign(localState, structuredClone(values));
+              },
+              async clear() {
+                for (const key of Object.keys(localState)) delete localState[key];
+              },
+            },
+          },
+          runtime: {
+            async sendMessage() {},
+            onMessage: { addListener() {} },
+          },
+          tabs: { async create() {} },
+        };
+      `;
+      parsed.head.prepend(chromeShim);
+      document.open();
+      document.write(`<!doctype html>${parsed.documentElement.outerHTML}`);
+      document.close();
+    </script>
+  </head>
+  <body></body>
+</html>

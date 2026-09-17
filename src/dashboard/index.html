@@ -1,5 +1,100 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head><meta charset="utf-8"><title>WorkTodo Dashboard</title></head>
-  <body><main><h1>WorkTodo Dashboard</h1><p>任务总览</p></main><script type="module" src="./index.js"></script></body>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WorkTodo 工作台</title>
+    <link rel="stylesheet" href="./index.css">
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <h1 class="brand">WORKTODO</h1>
+        <nav class="nav" aria-label="工作台导航">
+          <p class="nav__label">任务</p>
+          <button type="button" data-route="today" aria-current="page">今天</button>
+          <button type="button" data-route="inbox">收集箱</button>
+          <button type="button" data-route="all">全部任务</button>
+          <button type="button" data-route="completed">已完成</button>
+          <p class="nav__label">回顾</p>
+          <button type="button" data-route="history">工作记录</button>
+        </nav>
+        <button class="nav__settings" type="button" data-route="settings">设置</button>
+      </aside>
+
+      <main class="content">
+        <header class="workspace-header">
+          <div>
+            <p class="workspace-date" id="workspace-date"></p>
+            <h1 id="page-title">今日工作</h1>
+            <p class="content__subtitle" id="page-subtitle">现在最需要推进的事项</p>
+          </div>
+        </header>
+
+        <section class="view-root" id="view-root" aria-live="polite"></section>
+
+        <form class="quick-add" id="quick-add">
+          <label class="sr-only" for="quick-add-title">记录一个新事项</label>
+          <input id="quick-add-title" maxlength="200" autocomplete="off" placeholder="记录一个新事项，按 Enter 保存……" required>
+          <label class="sr-only" for="quick-add-date">计划日期</label>
+          <select id="quick-add-date">
+            <option value="inbox">收集箱</option>
+            <option value="today">今天</option>
+            <option value="tomorrow">明天</option>
+            <option value="custom">指定日期</option>
+          </select>
+          <input class="quick-add__custom" id="quick-add-custom" type="date" hidden aria-label="指定计划日期">
+          <button type="submit" class="button-primary">添加</button>
+          <button type="button" class="button-secondary" id="quick-add-more">更多字段</button>
+        </form>
+        <p class="form-message" id="quick-add-message" role="alert"></p>
+      </main>
+    </div>
+
+    <dialog class="task-editor" id="task-editor">
+      <form method="dialog">
+        <header class="drawer-header">
+          <div><p class="eyebrow">任务详情</p><h2 data-editor-title>新增任务</h2></div>
+          <button type="button" class="icon-button" data-editor-close aria-label="关闭任务编辑器">×</button>
+        </header>
+        <div class="drawer-body">
+          <label class="field">任务名称<input name="title" maxlength="200" required autofocus></label>
+          <div class="field-grid">
+            <label class="field">计划日期<input name="scheduledDate" type="date"></label>
+            <label class="field">优先级<select name="priority"><option value="none">无</option><option value="low">低</option><option value="medium">中</option><option value="high">高</option></select></label>
+          </div>
+          <label class="field">分类<select name="categoryId"></select></label>
+          <label class="check-field"><input name="starred" type="checkbox"> 标记为星标</label>
+          <details class="editor-more">
+            <summary>更多信息</summary>
+            <label class="field">描述<textarea name="description" rows="4" maxlength="10000"></textarea></label>
+            <div class="field-grid">
+              <label class="field">开始时间<input name="startTime" type="time"></label>
+              <label class="field">截止时间<input name="dueTime" type="time"></label>
+            </div>
+          </details>
+          <p class="form-message" data-editor-message role="alert"></p>
+          <div class="conflict-panel" data-editor-conflict hidden>
+            <p>这个任务刚刚在另一个窗口更新过。你可以保留当前修改为新任务，或载入最新版本。</p>
+            <div class="dialog-actions"><button type="button" data-editor-copy>保留为新任务</button><button type="button" class="button-primary" data-editor-reload>载入最新版本</button></div>
+          </div>
+        </div>
+        <footer class="drawer-actions">
+          <button type="button" data-editor-close>取消</button>
+          <button type="submit" class="button-primary">保存任务</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="confirm-dialog">
+      <form method="dialog">
+        <h2 data-confirm-title>确认操作</h2>
+        <p data-confirm-message></p>
+        <div class="dialog-actions"><button value="cancel">取消</button><button class="button-danger" value="confirm" data-confirm-submit>确认</button></div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" hidden></div>
+    <script type="module" src="./index.js"></script>
+  </body>
 </html>
