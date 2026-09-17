@@ -1,5 +1,72 @@
 import { test, expect, openDashboard } from './fixtures.js';
 
+test('真实 IndexedDB 10,000 条任务可正确搜索和统计', async ({ extension }) => {
+  test.setTimeout(120_000);
+  const page = await openDashboard(extension);
+  const result = await page.evaluate(async () => {
+    const { TaskRepository } = await import('../data/task-repository.js');
+    const { StatisticsService } = await import('../services/statistics-service.js');
+    const localNoon = new Date(2026, 8, 17, 12).toISOString();
+    const tasks = Array.from({ length: 10_000 }, (_, index) => {
+      const id = `bulk-task-${String(index).padStart(5, '0')}`;
+      const completed = index % 20 === 0;
+      return {
+        id,
+        title: `批量任务 ${id}`,
+        description: '',
+        starred: false,
+        priority: 'none',
+        categoryId: null,
+        parentId: null,
+        tagIds: [],
+        seriesId: null,
+        occurrenceKey: null,
+        scheduledDate: '2026-09-17',
+        firstScheduledDate: '2026-09-17',
+        startTime: null,
+        dueTime: null,
+        lifecycle: completed ? 'completed' : 'todo',
+        revision: 0,
+        createdAt: localNoon,
+        updatedAt: localNoon,
+        completedAt: completed ? localNoon : null,
+        cancelledAt: null,
+        trashedAt: null,
+      };
+    });
+    const repository = new TaskRepository();
+    await repository.replaceAll({
+      tasks,
+      categories: [],
+      events: [],
+      tags: [],
+      recurringTemplates: [],
+    });
+
+    const matches = await repository.search('批量任务');
+    const statistics = await new StatisticsService(repository).daily('2026-09-17');
+    return {
+      ids: matches.map(({ id }) => id),
+      completedCount: statistics.completedCount,
+      completionRate: statistics.completionRate,
+      createdCount: statistics.createdCount,
+      plannedCompletedCount: statistics.plannedCompletedCount,
+      plannedCount: statistics.plannedCount,
+    };
+  });
+
+  expect(result.ids).toEqual(
+    Array.from({ length: 10_000 }, (_, index) => `bulk-task-${String(index).padStart(5, '0')}`),
+  );
+  expect(result).toMatchObject({
+    completedCount: 500,
+    completionRate: 0.05,
+    createdCount: 10_000,
+    plannedCompletedCount: 500,
+    plannedCount: 10_000,
+  });
+});
+
 test('本周视图展示今天所在周的计划任务', async ({ extension }) => {
   const page = await openDashboard(extension);
   await page.getByLabel('记录一个新事项').fill('本周计划事项');

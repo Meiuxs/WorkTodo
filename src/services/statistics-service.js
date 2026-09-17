@@ -54,15 +54,16 @@ export class StatisticsService {
         ['POSTPONE', 'RESCHEDULE'],
       ),
     ]);
-    const referencedTaskIds = new Set([
-      ...plannedTasks.map((task) => task.id),
-      ...events.map((event) => event.taskId),
-    ]);
-    const referencedTasks = await this.#repository.getMany([...referencedTaskIds]);
+    const tasksById = new Map(plannedTasks.map((task) => [task.id, task]));
+    const missingTaskIds = [...new Set(events.map((event) => event.taskId))]
+      .filter((taskId) => !tasksById.has(taskId));
+    const eventTasks = missingTaskIds.length === 0
+      ? []
+      : await this.#repository.getMany(missingTaskIds);
+    eventTasks.forEach((task) => tasksById.set(task.id, task));
     const visibleTasksById = new Map(
-      referencedTasks
-        .filter((task) => task.trashedAt === null)
-        .map((task) => [task.id, task]),
+      [...tasksById]
+        .filter(([, task]) => task.trashedAt === null),
     );
     const plannedDatesByTask = new Map();
     const addPlannedDate = (taskId, date) => {

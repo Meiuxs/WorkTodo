@@ -389,10 +389,15 @@ test('统计通过索引范围与批量读取获取数据且不调用 exportAll 
       lifecycle: 'completed',
       completedAt: '2026-09-17T09:00:00.000Z',
     }),
+    task({
+      id: 'event-only',
+      scheduledDate: null,
+      firstScheduledDate: null,
+    }),
   ], [
     event({
       id: 'postpone',
-      taskId: 'planned',
+      taskId: 'event-only',
       type: 'POSTPONE',
       occurredAt: '2026-09-17T03:00:00.000Z',
     }),
@@ -400,7 +405,7 @@ test('统计通过索引范围与批量读取获取数据且不调用 exportAll 
 
   const result = await statistics.daily('2026-09-17');
 
-  assert.equal(result.plannedCount, 1);
+  assert.equal(result.plannedCount, 2);
   assert.equal(result.postponedCount, 1);
   const invoked = calls.map(({ method }) => method);
   assert.ok(invoked.includes('listCreated'));
@@ -410,4 +415,33 @@ test('统计通过索引范围与批量读取获取数据且不调用 exportAll 
   assert.ok(invoked.includes('getMany'));
   assert.equal(invoked.includes('list'), false);
   assert.equal(invoked.includes('exportAll'), false);
+});
+
+test('plannedTasks 不重复批量读取，仅补读计划事件引用的区间外任务', async () => {
+  const { statistics, calls } = createRecordingStatistics([
+    task({
+      id: 'planned',
+      scheduledDate: '2026-09-17',
+      firstScheduledDate: '2026-09-17',
+    }),
+    task({
+      id: 'event-target',
+      scheduledDate: null,
+      firstScheduledDate: null,
+    }),
+  ], [
+    event({
+      id: 'event-target-postpone',
+      taskId: 'event-target',
+      type: 'POSTPONE',
+      occurredAt: '2026-09-17T03:00:00.000Z',
+    }),
+  ]);
+
+  const result = await statistics.daily('2026-09-17');
+  const getManyCalls = calls.filter(({ method }) => method === 'getMany');
+
+  assert.equal(result.plannedCount, 2);
+  assert.equal(getManyCalls.length, 1);
+  assert.deepEqual(getManyCalls[0].args, [['event-target']]);
 });
