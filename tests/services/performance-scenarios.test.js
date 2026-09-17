@@ -15,6 +15,10 @@ function makeTasks(count) {
     description: index % 25 === 0 ? '重点描述' : '',
     priority: index % 10 === 0 ? 'high' : 'none',
     categoryId: null,
+    parentId: null,
+    tagIds: [],
+    seriesId: null,
+    occurrenceKey: null,
     scheduledDate: index % 3 === 0 ? '2026-09-16' : '2026-09-17',
     firstScheduledDate: '2026-09-16',
     startTime: null,
@@ -63,5 +67,24 @@ test('10,000 条任务的搜索、统计与导出保持可用且不修改仓库�
 
   assert.equal(searched.length, 400);
   assert.equal(daily.createdCount, 10_000);
+  assert.deepEqual(await repository.exportAll(), before);
+});
+
+test('10,000 条任务的本周和月历范围查询保持确定性', async () => {
+  const tasks = makeTasks(10_000);
+  const repository = new InMemoryTaskRepository(tasks);
+  const query = new TaskQueryService(repository);
+  const before = await repository.exportAll();
+
+  const week = await query.week('2026-09-17');
+  const month = await query.month('2026-09-17');
+  const renderedDates = month.weeks.flat();
+
+  assert.equal(week.days.length, 7);
+  assert.ok(month.gridStart <= '2026-09-01');
+  assert.ok(month.gridEnd >= '2026-09-30');
+  assert.ok(month.weeks.every((weekDates) => weekDates.length === 7));
+  assert.deepEqual(Object.keys(week.byDate), week.days);
+  assert.deepEqual(Object.keys(month.byDate), renderedDates);
   assert.deepEqual(await repository.exportAll(), before);
 });

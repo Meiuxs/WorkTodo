@@ -444,6 +444,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .month-day .task__check { width: 16px; height: 16px; }
   .month-day .task__more { display: none; }
   .month-day .task__title { font-size: 10px; }
+  .month-day .task__meta { display: block; font-size: 9px; }
   .task { grid-template-columns: 30px minmax(0, 1fr) auto; gap: 6px; }
   .task__menu { position: fixed; top: auto; right: 12px; bottom: 12px; left: 12px; max-width: none; }
   .quick-add { grid-template-columns: minmax(0, 1fr) auto; }

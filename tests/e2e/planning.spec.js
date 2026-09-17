@@ -27,6 +27,38 @@ test('月历展示当前月份任务并支持切换月份', async ({ extension }
   await expect(page.locator('[data-month-label]')).not.toHaveText(currentMonth);
 });
 
+test('月历在 390px 下可键盘打开任务且没有横向溢出', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByLabel('记录一个新事项').fill('键盘月历任务');
+  await page.locator('#quick-add-date').selectOption('today');
+  await page.getByRole('button', { name: '添加', exact: true }).click();
+
+  await page.getByRole('button', { name: '月历', exact: true }).click();
+  await expect(page.locator('[data-month-label]')).toBeVisible();
+  await expect(page.locator('.month-day .task__status')).toBeVisible();
+
+  const taskButton = page.getByRole('button', { name: '键盘月历任务', exact: true });
+  await taskButton.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#task-editor')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(taskButton).toBeFocused();
+
+  const layout = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.month-week')];
+    return {
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      cellCounts: rows.map((row) => row.children.length),
+      columnCounts: rows.map((row) => getComputedStyle(row).gridTemplateColumns.split(' ').length),
+    };
+  });
+  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+  expect(layout.cellCounts.every((count) => count === 7)).toBe(true);
+  expect(layout.columnCounts.every((count) => count === 7)).toBe(true);
+});
+
 test('月历连续切换月份时旧请求不会覆盖最新月份', async ({ extension }) => {
   const page = await openDashboard(extension);
   await page.getByRole('button', { name: '月历', exact: true }).click();
