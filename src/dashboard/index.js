@@ -159,6 +159,7 @@ const views = {
     settingsRepository,
     backupService,
     onDataChanged: () => controller.refresh(),
+    onError,
   }),
 };
 controller = new DashboardController({

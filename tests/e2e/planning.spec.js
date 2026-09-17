@@ -68,6 +68,33 @@ test('工作记录延迟切换不会覆盖最新导航', async ({ extension }) =
   await expect(page.locator('#history-heading')).toHaveCount(0);
 });
 
+test('工作记录迟到的普通错误不会形成未处理 rejection', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.evaluate(async () => {
+    window.__planningErrors = [];
+    window.addEventListener('unhandledrejection', (event) => {
+      window.__planningErrors.push(event.reason?.message ?? String(event.reason));
+    });
+    const { StatisticsService } = await import('../services/statistics-service.js');
+    StatisticsService.prototype.weekly = async function lateFailure() {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      throw new Error('late history failure');
+    };
+  });
+
+  await page.getByRole('button', { name: '工作记录', exact: true }).click();
+  await expect(page.locator('#history-heading')).toBeVisible();
+  await page.getByRole('button', { name: '按周', exact: true }).click();
+  await page.getByRole('button', { name: '今天', exact: true }).click();
+  await page.waitForTimeout(450);
+
+  await expect(page.locator('#today-tasks-heading')).toBeVisible();
+  expect(pageErrors).toEqual([]);
+  expect(await page.evaluate(() => window.__planningErrors)).toEqual([]);
+});
+
 test('延迟搜索返回后不会写入已离开的全部任务视图', async ({ extension }) => {
   const page = await openDashboard(extension);
   const pageErrors = [];
@@ -87,6 +114,32 @@ test('延迟搜索返回后不会写入已离开的全部任务视图', async ({
 
   await page.getByRole('button', { name: '全部任务', exact: true }).click();
   await page.getByLabel('搜索').fill('延迟搜索');
+  await page.getByRole('button', { name: '今天', exact: true }).click();
+  await page.waitForTimeout(400);
+
+  await expect(page.locator('#today-tasks-heading')).toBeVisible();
+  expect(pageErrors).toEqual([]);
+  expect(await page.evaluate(() => window.__planningErrors)).toEqual([]);
+});
+
+test('全部任务 timer 的迟到普通错误不会形成未处理 rejection', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.evaluate(async () => {
+    window.__planningErrors = [];
+    window.addEventListener('unhandledrejection', (event) => {
+      window.__planningErrors.push(event.reason?.message ?? String(event.reason));
+    });
+    const { TaskQueryService } = await import('../services/task-query-service.js');
+    TaskQueryService.prototype.search = async function lateFailure() {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      throw new Error('late search failure');
+    };
+  });
+
+  await page.getByRole('button', { name: '全部任务', exact: true }).click();
+  await page.getByLabel('搜索').fill('迟到错误');
   await page.getByRole('button', { name: '今天', exact: true }).click();
   await page.waitForTimeout(400);
 

@@ -1,4 +1,4 @@
-import { escapeHtml } from '../../shared/ui.js';
+import { escapeHtml, runViewAction } from '../../shared/ui.js';
 
 const INITIAL_STATE = Object.freeze({
   kind: 'idle',
@@ -118,6 +118,7 @@ export function createSettingsView({
   settingsRepository,
   backupService,
   onDataChanged = async () => {},
+  onError = () => {},
 }) {
   const dataController = new DataManagementController({ backupService });
   let categories = [];
@@ -140,24 +141,28 @@ export function createSettingsView({
     const region = root.querySelector('#data-state');
     if (region === null) return;
     region.innerHTML = dataStateMarkup(dataController.state);
-    region.querySelector('#confirm-import')?.addEventListener('click', async () => {
+    region.querySelector('#confirm-import')?.addEventListener('click', () => {
       const mode = root.querySelector('input[name="import-mode"]:checked')?.value ?? 'merge';
       if (mode === 'replace') {
         const confirmation = root.querySelector('#replace-import-confirm');
         confirmation.showModal();
-        confirmation.addEventListener('close', async () => {
+        confirmation.addEventListener('close', () => {
           if (confirmation.returnValue !== 'confirm') return;
-          await dataController.confirm(mode);
-          if (dataController.state.kind === 'result') await onDataChanged();
-          if (signal?.aborted) return;
-          renderDataState(signal);
+          runViewAction(async () => {
+            await dataController.confirm(mode);
+            if (dataController.state.kind === 'result') await onDataChanged();
+            if (signal?.aborted) return;
+            renderDataState(signal);
+          }, { signal, onError });
         }, { once: true });
         return;
       }
-      await dataController.confirm(mode);
-      if (dataController.state.kind === 'result') await onDataChanged();
-      if (signal?.aborted) return;
-      renderDataState(signal);
+      runViewAction(async () => {
+        await dataController.confirm(mode);
+        if (dataController.state.kind === 'result') await onDataChanged();
+        if (signal?.aborted) return;
+        renderDataState(signal);
+      }, { signal, onError });
     });
   }
 
@@ -221,60 +226,70 @@ export function createSettingsView({
     </section>`;
 
     renderDataState(signal);
-    root.querySelector('#export-backup').addEventListener('click', () => exportBackup(signal));
-    root.querySelector('#import-file').addEventListener('change', async (event) => {
+    root.querySelector('#export-backup').addEventListener('click', () => {
+      runViewAction(() => exportBackup(signal), { signal, onError });
+    });
+    root.querySelector('#import-file').addEventListener('change', (event) => {
       const file = event.target.files?.[0];
       if (file === undefined) return;
-      await dataController.selectFile(file);
-      if (signal?.aborted) return;
-      renderDataState(signal);
-      event.target.value = '';
+      runViewAction(async () => {
+        await dataController.selectFile(file);
+        if (signal?.aborted) return;
+        renderDataState(signal);
+        event.target.value = '';
+      }, { signal, onError });
     });
-    root.querySelector('#create-category').addEventListener('submit', async (event) => {
+    root.querySelector('#create-category').addEventListener('submit', (event) => {
       event.preventDefault();
       const input = event.currentTarget.elements.namedItem('name');
-      try {
-        await taskService.createCategory(input.value);
-        await onDataChanged();
-        if (!signal?.aborted) await render(signal);
-      } catch (error) {
-        if (signal?.aborted) return;
-        root.querySelector('#category-message').textContent = error.message;
-        input.focus();
-      }
-    });
-
-    const deleteDialog = root.querySelector('#delete-category-dialog');
-    deleteDialog.addEventListener('close', async () => {
-      if (deleteDialog.returnValue !== 'confirm') return;
-      const categoryId = deleteDialog.dataset.categoryId;
-      try {
-        const destination = deleteDialog.querySelector('select').value || null;
-        await taskService.deleteCategory(categoryId, destination);
-        await onDataChanged();
-        if (!signal?.aborted) await render(signal);
-      } catch (error) {
-        if (signal?.aborted) return;
-        deleteDialog.querySelector('[data-delete-message]').textContent = error.message;
-        requestAnimationFrame(() => deleteDialog.showModal());
-      }
-    });
-
-    root.querySelector('.category-list').addEventListener('click', async (event) => {
-      const button = event.target.closest('[data-category-action]');
-      if (button === null) return;
-      const row = button.closest('[data-category-id]');
-      const categoryId = row.dataset.categoryId;
-      if (button.dataset.categoryAction === 'rename') {
+      runViewAction(async () => {
         try {
-          await taskService.renameCategory(categoryId, row.querySelector('input').value);
+          await taskService.createCategory(input.value);
           await onDataChanged();
           if (!signal?.aborted) await render(signal);
         } catch (error) {
           if (signal?.aborted) return;
           root.querySelector('#category-message').textContent = error.message;
-          row.querySelector('input').focus();
+          input.focus();
         }
+      }, { signal, onError });
+    });
+
+    const deleteDialog = root.querySelector('#delete-category-dialog');
+    deleteDialog.addEventListener('close', () => {
+      if (deleteDialog.returnValue !== 'confirm') return;
+      const categoryId = deleteDialog.dataset.categoryId;
+      runViewAction(async () => {
+        try {
+          const destination = deleteDialog.querySelector('select').value || null;
+          await taskService.deleteCategory(categoryId, destination);
+          await onDataChanged();
+          if (!signal?.aborted) await render(signal);
+        } catch (error) {
+          if (signal?.aborted) return;
+          deleteDialog.querySelector('[data-delete-message]').textContent = error.message;
+          requestAnimationFrame(() => deleteDialog.showModal());
+        }
+      }, { signal, onError });
+    });
+
+    root.querySelector('.category-list').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-category-action]');
+      if (button === null) return;
+      const row = button.closest('[data-category-id]');
+      const categoryId = row.dataset.categoryId;
+      if (button.dataset.categoryAction === 'rename') {
+        runViewAction(async () => {
+          try {
+            await taskService.renameCategory(categoryId, row.querySelector('input').value);
+            await onDataChanged();
+            if (!signal?.aborted) await render(signal);
+          } catch (error) {
+            if (signal?.aborted) return;
+            root.querySelector('#category-message').textContent = error.message;
+            row.querySelector('input').focus();
+          }
+        }, { signal, onError });
         return;
       }
       deleteDialog.dataset.categoryId = categoryId;

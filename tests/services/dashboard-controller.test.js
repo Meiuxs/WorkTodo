@@ -4,6 +4,7 @@ import test from 'node:test';
 import { DashboardController } from '../../src/dashboard/dashboard-controller.js';
 import { DataManagementController } from '../../src/dashboard/views/settings-view.js';
 import { ValidationError } from '../../src/domain/errors.js';
+import { runViewAction } from '../../src/shared/ui.js';
 
 test('接到 TASK_CHANGED 后刷新当前视图', async () => {
   const view = { renderCount: 0, async render() { this.renderCount += 1; } };
@@ -35,6 +36,53 @@ test('tomorrow 和 week 是正式识别路由', async () => {
   assert.equal(await controller.navigate('tomorrow'), 'tomorrow');
   assert.equal(await controller.navigate('week'), 'week');
   assert.deepEqual(rendered, ['tomorrow', 'week']);
+});
+
+test('runViewAction 将未取消错误交给 onError', async () => {
+  const errors = [];
+
+  await runViewAction(async () => {
+    throw new Error('visible failure');
+  }, {
+    signal: new AbortController().signal,
+    onError: (error) => errors.push(error.message),
+  });
+
+  assert.deepEqual(errors, ['visible failure']);
+});
+
+test('runViewAction 吞掉取消后的迟到错误', async () => {
+  const abortController = new AbortController();
+  const errors = [];
+  let rejectAction;
+  const action = runViewAction(() => new Promise((resolve, reject) => {
+    rejectAction = reject;
+  }), {
+    signal: abortController.signal,
+    onError: (error) => errors.push(error.message),
+  });
+
+  await Promise.resolve();
+  abortController.abort();
+  rejectAction(new Error('late failure'));
+
+  await assert.doesNotReject(action);
+  assert.deepEqual(errors, []);
+});
+
+test('控制器对未取消的 render 错误保留 rejection 语义', async () => {
+  const failure = new Error('render failed');
+  const controller = new DashboardController({
+    views: {
+      today: {
+        async render() {
+          throw failure;
+        },
+      },
+    },
+  });
+
+  await assert.rejects(controller.navigate('today'), failure);
 });
 
 test('新导航不会等待永不结束的旧 render', async () => {

@@ -1,4 +1,5 @@
 import { renderTaskList } from '../task-list.js';
+import { runViewAction } from '../../shared/ui.js';
 
 function addDays(date, days) {
   const value = new Date(`${date}T00:00:00`);
@@ -54,15 +55,15 @@ export function createHistoryView({ root, query, statistics, today, onAction, on
         <div id="history-list"></div>
       </section>`;
       root.querySelectorAll('[data-history-mode]').forEach((button) => {
-        button.addEventListener('click', async () => {
+        button.addEventListener('click', () => {
           mode = button.dataset.historyMode;
-          await this.render(signal);
+          runViewAction(() => this.render(signal), { signal, onError });
         });
       });
-      root.querySelector('#history-date').addEventListener('change', async (event) => {
+      root.querySelector('#history-date').addEventListener('change', (event) => {
         if (event.target.value.length === 0) return;
         anchor = event.target.value;
-        await this.render(signal);
+        runViewAction(() => this.render(signal), { signal, onError });
       });
       renderTaskList(root.querySelector('#history-list'), completed, {
         today: today(),

@@ -59,3 +59,11 @@
 - 修复：all-tasks 在 signal aborted、列表节点已脱离或计数节点不存在时直接返回，不再接触旧 DOM。
 - 修复：导出即使在导航后也完成下载；导入和分类创建、改名、删除完成后始终调用 `onDataChanged()` 刷新当前路由，仅旧设置页自身重绘受 signal 阻止。
 - 验证：`node --test tests/services/dashboard-controller.test.js` 为 `11/11`；完整 `planning.spec.js` 为 `7/7`，覆盖 history 延迟切换、延迟搜索和导航后导出；`npm test` 为单元 `119/119`、Chromium E2E `23/23`。
+
+## 第四轮审查修复循环
+
+- 复审发现 P2：history、all-tasks timer/change handler、settings 内部异步操作由视图事件启动，控制器无法 await；导航后迟到的普通错误会成为未处理 rejection。
+- 红灯：真实 E2E 中，延迟 history 查询在导航后抛出 `Error('late history failure')`，页面记录到 `unhandledrejection`；延迟 all-tasks 搜索抛出 `Error('late search failure')` 时同样产生未处理 rejection。
+- 修复：在共享 UI helper 中增加 `runViewAction()`。signal 已取消时吞掉迟到结果和异常；未取消时调用当前视图的 `onError`；包装器自身始终不拒绝。history 的模式切换和日期变更、all-tasks 的 timer/change/清空筛选、settings 的导入、导出及分类操作均统一经过该包装器。
+- 保持语义：settings 继续使用既有表单反馈处理可预期错误；控制器正常 await 的 render 仍向调用方抛出未取消错误，不经过包装器吞错。
+- 验证：`node --test tests/services/dashboard-controller.test.js` 为 `14/14`；完整 `planning.spec.js` 为 `9/9`，覆盖 history 与 all-tasks 迟到普通错误无 `unhandledrejection`；`npm test` 为单元 `122/122`、Chromium E2E `25/25`。

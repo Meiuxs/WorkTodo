@@ -1,4 +1,4 @@
-import { escapeHtml } from '../../shared/ui.js';
+import { escapeHtml, runViewAction } from '../../shared/ui.js';
 import { renderTaskList } from '../task-list.js';
 
 const EMPTY_FILTERS = Object.freeze({
@@ -103,15 +103,17 @@ export function createAllTasksView({ root, query, taskService, tagService, today
       form.addEventListener('input', (event) => {
         readFilters();
         clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => refreshList(signal), event.target.type === 'search' ? 150 : 0);
+        searchTimer = setTimeout(() => {
+          runViewAction(() => refreshList(signal), { signal, onError });
+        }, event.target.type === 'search' ? 150 : 0);
       });
       form.addEventListener('change', () => {
         readFilters();
-        refreshList(signal);
+        runViewAction(() => refreshList(signal), { signal, onError });
       });
       root.querySelector('#clear-filters').addEventListener('click', () => {
         filters = { ...EMPTY_FILTERS };
-        return this.render(signal);
+        runViewAction(() => this.render(signal), { signal, onError });
       });
       await refreshList(signal);
     },
