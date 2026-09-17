@@ -19,10 +19,51 @@ function createStore(name, options) {
     createIndex(indexName, keyPath, indexOptions) {
       indexes.push({ name: indexName, keyPath, options: indexOptions });
     },
+    openCursor() {
+      const request = { result: null };
+      queueMicrotask(() => request.onsuccess?.());
+      return request;
+    },
     get createdIndexes() {
       return indexes;
     },
   };
+}
+
+function createCursorStore(name, initialRecords = []) {
+  const store = createStore(name);
+  const records = new Map(initialRecords.map((record) => [record.id, structuredClone(record)]));
+
+  store.openCursor = () => {
+    const request = {};
+    let index = 0;
+
+    const advance = () => {
+      if (index >= records.size) {
+        request.result = null;
+        request.onsuccess?.();
+        return;
+      }
+
+      const [id, value] = [...records.entries()][index];
+      request.result = {
+        value: structuredClone(value),
+        update(nextValue) {
+          records.set(id, structuredClone(nextValue));
+        },
+        continue() {
+          index += 1;
+          queueMicrotask(advance);
+        },
+      };
+      request.onsuccess?.();
+    };
+
+    queueMicrotask(advance);
+    return request;
+  };
+  store.snapshot = () => structuredClone([...records.values()]);
+  return store;
 }
 
 test('ensureIndexes 仅补建缺失索引', () => {
@@ -167,4 +208,52 @@ test('schema v2 复用现有 store 并补建缺失索引', () => {
       'tagIds',
     ],
   );
+});
+
+test('schema v2 游标迁移幂等补齐旧任务关系字段且保留已有字段', async () => {
+  const legacyTask = {
+    id: 'legacy',
+    title: '旧任务',
+    extra: '保留',
+  };
+  const explicitTask = {
+    id: 'explicit',
+    title: '已有关系字段',
+    parentId: null,
+    tagIds: ['tag-1'],
+    seriesId: 'series-1',
+    occurrenceKey: 'occurrence-1',
+  };
+  const tasks = createCursorStore('tasks', [legacyTask, explicitTask]);
+  const stores = new Map([
+    ['tasks', tasks],
+    ['categories', createStore('categories')],
+    ['events', createStore('events')],
+  ]);
+  const database = {
+    objectStoreNames: {
+      contains: (name) => stores.has(name),
+    },
+    createObjectStore: (name, options) => {
+      const store = createStore(name, options);
+      stores.set(name, store);
+      return store;
+    },
+    transaction: {
+      objectStore: (name) => stores.get(name),
+    },
+  };
+
+  upgradeDatabase(database);
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const migrated = new Map(tasks.snapshot().map((task) => [task.id, task]));
+  assert.deepEqual(migrated.get('legacy'), {
+    ...legacyTask,
+    parentId: null,
+    tagIds: [],
+    seriesId: null,
+    occurrenceKey: null,
+  });
+  assert.deepEqual(migrated.get('explicit'), explicitTask);
 });

@@ -11,7 +11,7 @@ export class SubtaskService {
 
   async createSubtask(parentId, input) {
     const parent = await this.#taskService.getTask(parentId);
-    if (parent.parentId !== null) {
+    if (parent.parentId !== null && parent.parentId !== undefined) {
       throw new ValidationError('子任务不能再创建子任务');
     }
     return this.#taskService.create({ ...input, parentId });

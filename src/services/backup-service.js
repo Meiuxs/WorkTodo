@@ -107,6 +107,7 @@ function validateCategories(categories) {
 function validateTags(tags) {
   assertUniqueUuid(tags, 'tag');
   const names = new Set();
+  const normalizedTags = [];
   for (const tag of tags) {
     if (typeof tag.name !== 'string' || tag.name.trim().length === 0) {
       throw new ValidationError('tag.name 不能为空');
@@ -118,7 +119,9 @@ function validateTags(tags) {
     names.add(normalizedName);
     assertIsoString(tag.createdAt, 'tag.createdAt');
     assertIsoString(tag.updatedAt, 'tag.updatedAt');
+    normalizedTags.push({ ...tag, name: normalizedName });
   }
+  return normalizedTags;
 }
 
 function validateRecurringTemplates(recurringTemplates) {
@@ -127,6 +130,7 @@ function validateRecurringTemplates(recurringTemplates) {
 
 function validateTasks(tasks, categoryIds, tagIds) {
   assertUniqueUuid(tasks, 'task');
+  const tasksById = new Map(tasks.map((task) => [task.id, task]));
   for (const task of tasks) {
     for (const field of TASK_RELATIONSHIP_FIELDS) {
       if (!Object.hasOwn(task, field)) {
@@ -145,6 +149,19 @@ function validateTasks(tasks, categoryIds, tagIds) {
     }
     if (task.tagIds.some((tagId) => !tagIds.has(tagId))) {
       throw new ValidationError('task.tagIds 必须引用备份中的标签');
+    }
+    if (task.parentId !== null) {
+      assertUuid(task.parentId, 'task.parentId');
+      const parent = tasksById.get(task.parentId);
+      if (parent === undefined) {
+        throw new ValidationError('task.parentId 必须引用备份中的任务');
+      }
+      if (parent.id === task.id) {
+        throw new ValidationError('task.parentId 不能引用任务自身');
+      }
+      if (parent.parentId !== null) {
+        throw new ValidationError('父任务自身不能是子任务');
+      }
     }
   }
 }
@@ -251,7 +268,7 @@ export class BackupService {
     const upgraded = upgradeBackup(backup);
     validateCategories(upgraded.categories);
     const categoryIds = new Set(upgraded.categories.map((category) => category.id));
-    validateTags(upgraded.tags);
+    upgraded.tags = validateTags(upgraded.tags);
     const tagIds = new Set(upgraded.tags.map((tag) => tag.id));
     validateRecurringTemplates(upgraded.recurringTemplates);
     validateTasks(upgraded.tasks, categoryIds, tagIds);

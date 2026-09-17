@@ -68,6 +68,16 @@ test('创建子任务保留父任务不存在的错误语义', async () => {
   );
 });
 
+test('undefined parentId 视为旧父任务而不是子任务', async () => {
+  const legacyParent = taskFixture();
+  delete legacyParent.parentId;
+  const { service } = makeSubtaskService({ tasks: [legacyParent] });
+
+  const child = await service.createSubtask('parent-1', { title: '整理材料' });
+
+  assert.equal(child.task.parentId, 'parent-1');
+});
+
 test('列表只返回指定父任务的直接子任务', async () => {
   const secondParent = taskFixture({ id: 'parent-2', title: '另一个父任务' });
   const { service } = makeSubtaskService({ tasks: [taskFixture(), secondParent] });

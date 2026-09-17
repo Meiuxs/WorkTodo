@@ -3,9 +3,11 @@ import test from 'node:test';
 
 import { ConflictError, TaskRepository } from '../../src/data/task-repository.js';
 import { SettingsRepository } from '../../src/data/settings-repository.js';
+import { BackupService } from '../../src/services/backup-service.js';
 import { InMemoryStorageArea, InMemoryTaskRepository } from '../helpers/fakes.js';
 
 const NOW = '2026-09-17T08:30:00.000Z';
+const TASK_ID = '11111111-1111-4111-8111-111111111111';
 const TAG_ID = '66666666-6666-4666-8666-666666666666';
 const TEMPLATE_ID = '77777777-7777-4777-8777-777777777777';
 const BASE_TASK = {
@@ -139,6 +141,38 @@ class SimulatedIndexedDb {
   }
 }
 
+function createReadOnlyIndexedDb(tasks) {
+  const values = {
+    tasks: structuredClone(tasks),
+    categories: [],
+    events: [],
+    tags: [],
+    recurringTemplates: [],
+  };
+
+  function requestResultFor(result) {
+    const request = { result: structuredClone(result) };
+    queueMicrotask(() => request.onsuccess?.());
+    return request;
+  }
+
+  return {
+    transaction() {
+      const transaction = {};
+      setTimeout(() => transaction.oncomplete?.(), 0);
+      transaction.objectStore = (name) => ({
+        get(id) {
+          return requestResultFor(values[name].find((item) => item.id === id));
+        },
+        getAll() {
+          return requestResultFor(values[name]);
+        },
+      });
+      return transaction;
+    },
+  };
+}
+
 test('update 在 revision 过期时拒绝静默覆盖', async () => {
   const currentTask = { ...BASE_TASK, revision: 1 };
   const repo = new InMemoryTaskRepository([currentTask]);
@@ -236,6 +270,44 @@ test('TaskRepository.replaceAll 同步 put 失败时显式 abort 并保留五个
 
   assert.equal(database.lastTransaction.abortCalled, true);
   assert.deepEqual(database.snapshot(), before);
+});
+
+test('TaskRepository 读取、列表和导出边界补齐旧任务关系字段并可生成合法 v2 备份', async () => {
+  const legacyTask = {
+    ...BASE_TASK,
+    id: TASK_ID,
+    categoryId: null,
+  };
+  delete legacyTask.parentId;
+  delete legacyTask.tagIds;
+  delete legacyTask.seriesId;
+  delete legacyTask.occurrenceKey;
+
+  const repository = new TaskRepository(createReadOnlyIndexedDb([legacyTask]));
+  const backup = new BackupService(repository, {
+    settingsRepository: new SettingsRepository(new InMemoryStorageArea()),
+    now: () => NOW,
+    appVersion: '0.1.0',
+  });
+  const expectedRelationships = {
+    parentId: null,
+    tagIds: [],
+    seriesId: null,
+    occurrenceKey: null,
+  };
+
+  const fetched = await repository.get(TASK_ID);
+  const listed = await repository.list();
+  const snapshot = await repository.exportAll();
+  for (const task of [fetched, listed[0], snapshot.tasks[0]]) {
+    assert.deepEqual(
+      Object.fromEntries(Object.keys(expectedRelationships).map((field) => [field, task[field]])),
+      expectedRelationships,
+    );
+  }
+
+  const file = await backup.createBackup();
+  assert.doesNotThrow(() => backup.validateBackup(JSON.stringify(file)));
 });
 
 test('settings 与 metadata 使用隔离键且返回独立快照', async () => {

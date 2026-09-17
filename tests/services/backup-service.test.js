@@ -14,6 +14,8 @@ const EVENT_ID = '44444444-4444-4444-8444-444444444444';
 const OTHER_EVENT_ID = '55555555-5555-4555-8555-555555555555';
 const TAG_ID = '66666666-6666-4666-8666-666666666666';
 const TEMPLATE_ID = '77777777-7777-4777-8777-777777777777';
+const CHILD_ID = '88888888-8888-4888-8888-888888888888';
+const GRANDCHILD_ID = '99999999-9999-4999-8999-999999999999';
 
 const BASE_TASK = {
   id: SAME_ID,
@@ -191,6 +193,38 @@ test('严格校验顶层字段、schema 版本、UUID 唯一性和任务必需�
   }
 });
 
+test('v2 备份拒绝孤儿、自引用和多级父子链，合法单层子任务通过', async () => {
+  const { backup, restoreChrome } = createBackupService();
+  try {
+    const parent = { ...BASE_TASK, parentId: null };
+    const child = { ...OTHER_TASK, parentId: SAME_ID };
+    const valid = backup.validateBackup(JSON.stringify(backupFile({
+      tasks: [parent, child],
+      categories: [CATEGORY],
+      events: [EVENT, OTHER_EVENT],
+    })));
+    assert.equal(valid.tasks.find((task) => task.id === OTHER_ID).parentId, SAME_ID);
+
+    const invalidTasks = [
+      [{ ...OTHER_TASK, parentId: SAME_ID }],
+      [{ ...OTHER_TASK, parentId: OTHER_ID }],
+      [
+        { ...BASE_TASK, parentId: null },
+        { ...OTHER_TASK, id: CHILD_ID, parentId: SAME_ID },
+        { ...OTHER_TASK, id: GRANDCHILD_ID, parentId: CHILD_ID },
+      ],
+    ];
+    for (const tasks of invalidTasks) {
+      assert.throws(
+        () => backup.validateBackup(JSON.stringify(backupFile({ tasks, events: [] }))),
+        ValidationError,
+      );
+    }
+  } finally {
+    restoreChrome();
+  }
+});
+
 test('v1 备份导入时补齐 V1.1 字段并保留原任务、分类、事件和设置', async () => {
   const legacy = JSON.stringify({
     schemaVersion: 1,
@@ -228,6 +262,12 @@ test('v2 备份在接触仓库前拒绝非法标签、模板和标签引用', as
   const { backup, repo, restoreChrome } = createBackupService();
   try {
     const before = await repo.exportAll();
+    let exportAllCalls = 0;
+    const originalExportAll = repo.exportAll.bind(repo);
+    repo.exportAll = async () => {
+      exportAllCalls += 1;
+      return originalExportAll();
+    };
     const invalidBackups = [
       backupFile({ tags: [{}] }),
       backupFile({ tags: [{ ...TAG, name: '   ' }] }),
@@ -240,6 +280,16 @@ test('v2 备份在接触仓库前拒绝非法标签、模板和标签引用', as
       backupFile({ tasks: [{ ...OTHER_TASK, tagIds: [TAG_ID] }] }),
       backupFile({ tasks: [{ ...OTHER_TASK, categoryId: CATEGORY_ID }] }),
       backupFile({ tasks: [], events: [OTHER_EVENT] }),
+      backupFile({ tasks: [{ ...OTHER_TASK, parentId: SAME_ID }], events: [] }),
+      backupFile({ tasks: [{ ...OTHER_TASK, parentId: OTHER_ID }], events: [] }),
+      backupFile({
+        tasks: [
+          { ...BASE_TASK, parentId: null },
+          { ...OTHER_TASK, id: CHILD_ID, parentId: SAME_ID },
+          { ...OTHER_TASK, id: GRANDCHILD_ID, parentId: CHILD_ID },
+        ],
+        events: [],
+      }),
     ];
 
     for (const invalid of invalidBackups) {
@@ -248,7 +298,38 @@ test('v2 备份在接触仓库前拒绝非法标签、模板和标签引用', as
       await assert.rejects(() => backup.previewImport(text), ValidationError);
       await assert.rejects(() => backup.importBackup(text, 'merge'), ValidationError);
       await assert.rejects(() => backup.importBackup(text, 'replace'), ValidationError);
-      assert.deepEqual(await repo.exportAll(), before);
+      assert.deepEqual(await originalExportAll(), before);
+    }
+    assert.equal(exportAllCalls, 0);
+  } finally {
+    restoreChrome();
+  }
+});
+
+test('标签名称在导入校验和写入边界统一 trim，并拒绝 trim 后重名', async () => {
+  const paddedTag = { ...TAG, name: ' 客户 ' };
+  const normalized = backupFile({
+    tasks: [{ ...OTHER_TASK, tagIds: [TAG_ID] }],
+    tags: [paddedTag],
+  });
+  const duplicate = backupFile({
+    tags: [paddedTag, { ...TAG, id: OTHER_ID, name: '客户' }],
+  });
+  const { backup, restoreChrome } = createBackupService();
+  try {
+    const validated = backup.validateBackup(JSON.stringify(normalized));
+    assert.equal(validated.tags[0].name, '客户');
+    assert.throws(() => backup.validateBackup(JSON.stringify(duplicate)), ValidationError);
+    await assert.rejects(() => backup.previewImport(JSON.stringify(duplicate)), ValidationError);
+
+    for (const mode of ['merge', 'replace']) {
+      const { backup: writer, repo, restoreChrome: restoreWriter } = createBackupService();
+      try {
+        await writer.importBackup(JSON.stringify(normalized), mode);
+        assert.equal((await repo.exportAll()).tags[0].name, '客户');
+      } finally {
+        restoreWriter();
+      }
     }
   } finally {
     restoreChrome();

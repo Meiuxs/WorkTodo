@@ -1,7 +1,7 @@
 import { createTaskEvent } from '../domain/task-event.js';
 import { DomainError, ValidationError } from '../domain/errors.js';
 import { validateTask } from '../domain/task.js';
-import { openWorkTodoDatabase } from './database.js';
+import { materializeTaskRelationships, openWorkTodoDatabase } from './database.js';
 
 export class ConflictError extends DomainError {
   constructor(taskId) {
@@ -94,7 +94,7 @@ export class TaskRepository {
     const transaction = database.transaction('tasks', 'readonly');
     const task = await requestResult(transaction.objectStore('tasks').get(id));
     await transactionResult(transaction);
-    return task === undefined ? undefined : clone(task);
+    return task === undefined ? undefined : clone(materializeTaskRelationships(task));
   }
 
   async update(task, expectedRevision, event) {
@@ -129,7 +129,10 @@ export class TaskRepository {
     const transaction = database.transaction('tasks', 'readonly');
     const tasks = await requestResult(transaction.objectStore('tasks').getAll());
     await transactionResult(transaction);
-    return tasks.filter((task) => matchesCriteria(task, criteria)).map(clone);
+    return tasks
+      .map(materializeTaskRelationships)
+      .filter((task) => matchesCriteria(task, criteria))
+      .map(clone);
   }
 
   async createCategory(category) {
@@ -231,7 +234,13 @@ export class TaskRepository {
       requestResult(transaction.objectStore('recurringTemplates').getAll()),
     ]);
     await transactionResult(transaction);
-    return clone({ tasks, categories, events, tags, recurringTemplates });
+    return clone({
+      tasks: tasks.map(materializeTaskRelationships),
+      categories,
+      events,
+      tags,
+      recurringTemplates,
+    });
   }
 
   async replaceAll(snapshot) {

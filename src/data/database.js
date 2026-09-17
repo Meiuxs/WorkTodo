@@ -1,5 +1,6 @@
 export const DATABASE_NAME = 'worktodo';
 export const DATABASE_VERSION = 2;
+const TASK_RELATIONSHIP_FIELDS = ['parentId', 'tagIds', 'seriesId', 'occurrenceKey'];
 
 const TASK_INDEXES = [
   ['scheduledDate', 'scheduledDate'],
@@ -27,11 +28,34 @@ export function ensureIndexes(store, indexes) {
   }
 }
 
+export function materializeTaskRelationships(task) {
+  const materialized = { ...task };
+  for (const field of TASK_RELATIONSHIP_FIELDS) {
+    if (materialized[field] === undefined) {
+      materialized[field] = field === 'tagIds' ? [] : null;
+    }
+  }
+  return materialized;
+}
+
+function materializeTaskStore(store) {
+  const request = store.openCursor();
+  request.onsuccess = () => {
+    const cursor = request.result;
+    if (cursor === null) return;
+    if (TASK_RELATIONSHIP_FIELDS.some((field) => cursor.value[field] === undefined)) {
+      cursor.update(materializeTaskRelationships(cursor.value));
+    }
+    cursor.continue();
+  };
+}
+
 export function upgradeDatabase(database, transaction = database.transaction) {
   const tasks = database.objectStoreNames.contains('tasks')
     ? transaction.objectStore('tasks')
     : database.createObjectStore('tasks', { keyPath: 'id' });
   ensureIndexes(tasks, TASK_INDEXES);
+  materializeTaskStore(tasks);
 
   if (!database.objectStoreNames.contains('categories')) {
     database.createObjectStore('categories', { keyPath: 'id' });
