@@ -1,4 +1,13 @@
-const ROUTES = new Set(['today', 'inbox', 'all', 'completed', 'history', 'settings']);
+const ROUTES = new Set([
+  'today',
+  'tomorrow',
+  'week',
+  'inbox',
+  'all',
+  'completed',
+  'history',
+  'settings',
+]);
 
 export class DashboardController {
   #views;
@@ -6,6 +15,8 @@ export class DashboardController {
   #subtaskService;
   #sendMessage;
   #route = 'today';
+  #renderVersion = 0;
+  #renderQueue = Promise.resolve();
 
   constructor({ views, taskService = null, subtaskService = null, sendMessage = async () => {} }) {
     this.#views = views;
@@ -19,13 +30,26 @@ export class DashboardController {
   }
 
   async navigate(route) {
-    this.#route = ROUTES.has(route) && this.#views[route] !== undefined ? route : 'today';
-    await this.refresh();
-    return this.#route;
+    const nextRoute = ROUTES.has(route) && this.#views[route] !== undefined ? route : 'today';
+    this.#route = nextRoute;
+    await this.#render(nextRoute);
+    return nextRoute;
   }
 
   async refresh() {
-    await this.#views[this.#route].render();
+    await this.#render(this.#route);
+  }
+
+  #render(route) {
+    const version = ++this.#renderVersion;
+    const view = this.#views[route];
+    const run = async () => {
+      if (version !== this.#renderVersion) return;
+      await view.render();
+    };
+    const render = this.#renderQueue.then(run, run);
+    this.#renderQueue = render.catch(() => {});
+    return render;
   }
 
   async onMessage(message) {

@@ -22,6 +22,49 @@ test('未知路由回退到 today', async () => {
   assert.equal(await controller.navigate('unknown'), 'today');
 });
 
+test('tomorrow 和 week 是正式识别路由', async () => {
+  const rendered = [];
+  const controller = new DashboardController({
+    views: {
+      today: { async render() { rendered.push('today'); } },
+      tomorrow: { async render() { rendered.push('tomorrow'); } },
+      week: { async render() { rendered.push('week'); } },
+    },
+  });
+
+  assert.equal(await controller.navigate('tomorrow'), 'tomorrow');
+  assert.equal(await controller.navigate('week'), 'week');
+  assert.deepEqual(rendered, ['tomorrow', 'week']);
+});
+
+test('较慢的旧 render 不会覆盖最新导航视图', async () => {
+  const rendered = [];
+  let releaseToday;
+  const todayView = {
+    async render() {
+      await new Promise((resolve) => { releaseToday = resolve; });
+      rendered.push('today');
+    },
+  };
+  const inboxView = {
+    async render() {
+      rendered.push('inbox');
+    },
+  };
+  const controller = new DashboardController({
+    views: { today: todayView, inbox: inboxView },
+  });
+
+  const staleRender = controller.refresh();
+  await Promise.resolve();
+  const latestNavigation = controller.navigate('inbox');
+  releaseToday();
+  await Promise.all([staleRender, latestNavigation]);
+
+  assert.equal(controller.route, 'inbox');
+  assert.deepEqual(rendered, ['today', 'inbox']);
+});
+
 test('任务操作调用服务、广播并刷新当前视图', async () => {
   const view = { renderCount: 0, async render() { this.renderCount += 1; } };
   const calls = [];

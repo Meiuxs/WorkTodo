@@ -43,7 +43,6 @@ const toast = document.querySelector('#toast');
 const confirmDialog = document.querySelector('#confirm-dialog');
 let controller;
 let toastTimer;
-let activeRoute = 'today';
 
 function dateOffset(date, days) {
   return toLocalDate(new Date(date.getFullYear(), date.getMonth(), date.getDate() + days));
@@ -146,7 +145,7 @@ async function onEdit(taskId) {
 }
 
 const viewOptions = { root, query, taskService, tagService, statistics, today: () => toLocalDate(new Date()), onAction, onEdit, onError };
-const routeViews = {
+const views = {
   today: createTodayView(viewOptions),
   tomorrow: createWeekView({ ...viewOptions, singleDate: true }),
   week: createWeekView(viewOptions),
@@ -161,10 +160,6 @@ const routeViews = {
     backupService,
     onDataChanged: () => controller.refresh(),
   }),
-};
-const views = {
-  ...routeViews,
-  today: { render: () => routeViews[activeRoute].render() },
 };
 controller = new DashboardController({
   views,
@@ -186,14 +181,13 @@ const taskEditor = createTaskEditor({
 });
 
 async function navigate(route) {
-  activeRoute = routeViews[route] === undefined ? 'today' : route;
-  const controllerRoute = ['tomorrow', 'week'].includes(activeRoute) ? 'today' : activeRoute;
-  const [title, subtitle] = routeMeta[activeRoute] ?? routeMeta.today;
+  const nextRoute = routeMeta[route] === undefined ? 'today' : route;
+  const [title, subtitle] = routeMeta[nextRoute];
   document.querySelector('#page-title').textContent = title;
   document.querySelector('#page-subtitle').textContent = subtitle;
-  document.querySelector('#quick-add').hidden = ['history', 'settings'].includes(activeRoute);
+  document.querySelector('#quick-add').hidden = ['history', 'settings'].includes(nextRoute);
   document.querySelector('#quick-add-message').textContent = '';
-  await controller.navigate(controllerRoute);
+  await controller.navigate(nextRoute);
 }
 
 document.querySelectorAll('[data-route]').forEach((button) => {
