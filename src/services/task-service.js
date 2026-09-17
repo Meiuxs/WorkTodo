@@ -134,6 +134,10 @@ export class TaskService {
       completedAt: null,
       cancelledAt: null,
       trashedAt: null,
+      parentId: null,
+      tagIds: source.tagIds ?? [],
+      seriesId: null,
+      occurrenceKey: null,
     };
     validateTask(task);
     const event = createTaskEvent({

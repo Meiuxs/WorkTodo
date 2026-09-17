@@ -69,6 +69,39 @@ test('创建任务会修剪标题并提供稳定默认值', () => {
   assert.equal(validateTask(task), true);
 });
 
+test('V1.1 任务关系字段有稳定默认值并拒绝非法 tagIds', () => {
+  const task = createTask({ title: '报价' }, NOW, 't1');
+  assert.equal(task.parentId, null);
+  assert.deepEqual(task.tagIds, []);
+  assert.equal(task.seriesId, null);
+  assert.equal(task.occurrenceKey, null);
+
+  assert.throws(
+    () => createTask({ title: '报价', tagIds: ['tag-1', 'tag-1'] }, NOW, 't2'),
+    ValidationError,
+  );
+});
+
+test('V1.1 任务关系字段兼容旧数据并严格校验已提供值', () => {
+  assert.equal(validateTask(BASE_TASK), true);
+  assert.equal(validateTask({
+    ...BASE_TASK,
+    parentId: 'parent-1',
+    tagIds: ['tag-1'],
+    seriesId: 'series-1',
+    occurrenceKey: '2026-09-17',
+  }), true);
+
+  assert.throws(() => createTask({ title: '报价', tagIds: 'tag-1' }, NOW, 't2'), ValidationError);
+  assert.throws(() => createTask({ title: '报价', tagIds: [''] }, NOW, 't2'), ValidationError);
+  assert.throws(() => validateTask({ ...BASE_TASK, tagIds: ['tag-1', 'tag-1'] }), ValidationError);
+  assert.throws(() => validateTask({ ...BASE_TASK, tagIds: ['tag-1', false] }), ValidationError);
+
+  for (const fieldName of ['parentId', 'seriesId', 'occurrenceKey']) {
+    assert.throws(() => validateTask({ ...BASE_TASK, [fieldName]: false }), ValidationError);
+  }
+});
+
 test('重新安排回收集箱时保留首次计划日期并清空时间字段', () => {
   const task = createTask({
     title: '报价',

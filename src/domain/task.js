@@ -35,6 +35,23 @@ function assertCategoryId(categoryId) {
   }
 }
 
+function assertNullableIdentifier(value, fieldName) {
+  if (value !== null) assertIdentifier(value, fieldName);
+}
+
+function normalizeTagIds(tagIds) {
+  if (tagIds === undefined) return [];
+  if (!Array.isArray(tagIds)) throw new ValidationError('tagIds 必须是数组');
+  const normalized = tagIds.map((id) => {
+    assertIdentifier(id, 'tagId');
+    return id;
+  });
+  if (new Set(normalized).size !== normalized.length) {
+    throw new ValidationError('tagIds 不能重复');
+  }
+  return normalized;
+}
+
 function normalizeDescription(description) {
   if (description === undefined || description === null) return '';
   if (typeof description !== 'string') {
@@ -72,6 +89,12 @@ export function validateTask(task) {
     throw new ValidationError('priority 无效');
   }
   assertCategoryId(task.categoryId);
+  if (task.parentId !== undefined) assertNullableIdentifier(task.parentId, 'parentId');
+  normalizeTagIds(task.tagIds);
+  if (task.seriesId !== undefined) assertNullableIdentifier(task.seriesId, 'seriesId');
+  if (task.occurrenceKey !== undefined) {
+    assertNullableIdentifier(task.occurrenceKey, 'occurrenceKey');
+  }
   if (!LIFECYCLES.has(task.lifecycle)) {
     throw new ValidationError('lifecycle 无效');
   }
@@ -112,6 +135,10 @@ export function createTask(input, now, id) {
     starred: source.starred ?? false,
     priority: source.priority ?? 'none',
     categoryId: source.categoryId ?? null,
+    parentId: source.parentId ?? null,
+    tagIds: normalizeTagIds(source.tagIds),
+    seriesId: source.seriesId ?? null,
+    occurrenceKey: source.occurrenceKey ?? null,
     scheduledDate,
     firstScheduledDate: scheduledDate,
     startTime,

@@ -182,6 +182,10 @@ test('复制创建新的 todo 任务并清理结束与回收时间', async () =>
     completedAt: NOW,
     cancelledAt: NOW,
     trashedAt: NOW,
+    parentId: 'parent-1',
+    tagIds: ['tag-1', 'tag-2'],
+    seriesId: 'series-1',
+    occurrenceKey: '2026-09-17',
   };
   const { repo, service } = createService({ tasks: [source] });
   const copied = await service.copy('t1');
@@ -192,6 +196,10 @@ test('复制创建新的 todo 任务并清理结束与回收时间', async () =>
   assert.equal(copied.task.completedAt, null);
   assert.equal(copied.task.cancelledAt, null);
   assert.equal(copied.task.trashedAt, null);
+  assert.equal(copied.task.parentId, null);
+  assert.deepEqual(copied.task.tagIds, ['tag-1', 'tag-2']);
+  assert.equal(copied.task.seriesId, null);
+  assert.equal(copied.task.occurrenceKey, null);
   assert.equal(copied.event.type, 'COPY');
   assert.deepEqual(copied.event.detail, { sourceTaskId: source.id });
   assert.ok(await repo.get('t1'));
