@@ -405,4 +405,9 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .metrics div:nth-child(even) { border-right: 0; }
   .category-row { grid-template-columns: 1fr; }
   .field-grid { grid-template-columns: 1fr; }
+  .tag-picker__create { grid-template-columns: 1fr; display: grid; }
+  .tag-picker__options { align-items: stretch; }
+  .tag-option { flex: 1 1 calc(50% - 7px); min-width: 0; }
+  .subtask-create { grid-template-columns: 1fr; }
+  .subtask-create button { width: 100%; }
 }

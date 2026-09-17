@@ -98,3 +98,29 @@ test('父任务有未完成子任务时先确认且不自动完成子任务', as
   await page.getByRole('button', { name: '发布版本' }).click();
   await expect(editor.getByRole('button', { name: '执行回归测试' })).toContainText('待办');
 });
+
+test('标签和子任务在键盘与 390px 视口下不溢出并恢复焦点', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByLabel('记录一个新事项').fill('窄屏组织任务');
+  await page.locator('#quick-add-date').selectOption('today');
+  await page.getByRole('button', { name: '添加', exact: true }).click();
+  await page.getByRole('button', { name: '窄屏组织任务' }).focus();
+  await page.keyboard.press('Enter');
+
+  const editor = page.locator('#task-editor');
+  await expect(editor.getByLabel('任务名称')).toBeFocused();
+  await editor.getByLabel('新标签').fill('行政');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Enter');
+  await editor.getByLabel('添加子任务').fill('检查附件');
+  await editor.getByRole('button', { name: '添加子任务', exact: true }).click();
+  await page.keyboard.press('Escape');
+
+  await expect(page.getByRole('button', { name: '窄屏组织任务' })).toBeFocused();
+  const overflow = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
+});
