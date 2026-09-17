@@ -126,16 +126,20 @@ test('search 对标题和描述做大小写无关匹配并支持 filters', async
   assert.deepEqual(result.map((item) => item.id), ['match-title', 'match-description']);
 });
 
-test('search 按 tagId 过滤且保留多标签交集规则', async () => {
+test('search 按 tagId 过滤并与其他筛选条件取交集', async () => {
   const { query } = createQuery([
-    task({ id: 'both', tagIds: ['customer', 'quote'] }),
-    task({ id: 'customer-only', tagIds: ['customer'] }),
-    task({ id: 'none', tagIds: [] }),
+    task({ id: 'both', tagIds: ['customer', 'quote'], priority: 'high' }),
+    task({ id: 'customer-only', tagIds: ['customer'], priority: 'low' }),
+    task({ id: 'none', tagIds: [], priority: 'high' }),
   ]);
 
   const result = await query.search({ tagId: 'customer' });
 
   assert.deepEqual(result.map((item) => item.id), ['both', 'customer-only']);
+
+  const combined = await query.search({ tagId: 'customer', priority: 'high' });
+
+  assert.deepEqual(combined.map((item) => item.id), ['both']);
 });
 
 test('search 日期范围始终按 scheduledDate 过滤 completed 任务', async () => {

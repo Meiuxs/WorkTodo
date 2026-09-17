@@ -29,8 +29,13 @@ test('全部任务可以按标签筛选并显示标签文字', async ({ extensio
   await editor.getByRole('checkbox', { name: '客户' }).check();
   await editor.getByRole('button', { name: '保存任务' }).click();
 
+  await page.getByLabel('记录一个新事项').fill('无标签事项');
+  await page.locator('#quick-add-date').selectOption('today');
+  await page.getByRole('button', { name: '添加', exact: true }).click();
+
   await page.getByRole('button', { name: '全部任务' }).click();
   await page.getByLabel('标签', { exact: true }).selectOption({ label: '客户' });
   await expect(page.getByRole('button', { name: '客户甲报价' })).toBeVisible();
   await expect(page.getByText('#客户', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '无标签事项' })).not.toBeVisible();
 });
