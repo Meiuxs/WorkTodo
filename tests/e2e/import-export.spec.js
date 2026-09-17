@@ -12,7 +12,9 @@ test('导出包含版本信息，导入经过预览后可合并', async ({ exten
   const download = await downloadPromise;
   const filePath = await download.path();
   const backup = JSON.parse(await readFile(filePath, 'utf8'));
-  expect(backup.schemaVersion).toBe(1);
+  expect(backup.schemaVersion).toBe(2);
+  expect(backup.tags).toEqual([]);
+  expect(backup.recurringTemplates).toEqual([]);
   expect(backup.tasks).toHaveLength(1);
 
   await dashboard.locator('#import-file').setInputFiles(filePath);
