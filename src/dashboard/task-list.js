@@ -91,11 +91,24 @@ function taskActions(task) {
   return actions.join('');
 }
 
-function taskMarkup(task, today) {
+export function taskTagLabel(task, tags) {
+  const names = new Map(tags.map((tag) => [tag.id, tag.name]));
+  return (task.tagIds ?? [])
+    .map((id) => names.get(id))
+    .filter(Boolean)
+    .map((name) => `#${name}`)
+    .join(' ');
+}
+
+function taskMarkup(task, today, tags) {
   const canRestore = task.lifecycle === 'completed' || task.lifecycle === 'cancelled';
   const checkboxAction = canRestore ? 'restore' : 'complete';
   const checked = task.lifecycle === 'completed';
   const status = taskStatus(task, today);
+  const tagText = taskTagLabel(task, tags);
+  const tagMarkup = tagText.length === 0
+    ? ''
+    : ` · <span class="task__tags">${escapeHtml(tagText)}</span>`;
   const overdue = task.scheduledDate !== null
     && task.scheduledDate < today
     && ACTIVE_LIFECYCLES.has(task.lifecycle);
@@ -103,7 +116,7 @@ function taskMarkup(task, today) {
     <button class="task__check" type="button" role="checkbox" aria-checked="${checked}" data-action="${checkboxAction}" aria-label="${canRestore ? '恢复任务' : '完成任务'}">${checked ? '✓' : ''}</button>
     <div class="task__body">
       <button class="task__title" type="button" data-action="edit">${escapeHtml(task.title)}</button>
-      <span class="task__meta"><span class="task__status">${status}</span> · ${escapeHtml(taskMeta(task, today))}${task.starred ? ' · 已星标' : ''}</span>
+      <span class="task__meta"><span class="task__status">${status}</span> · ${escapeHtml(taskMeta(task, today))}${task.starred ? ' · 已星标' : ''}${tagMarkup}</span>
     </div>
     <details class="task__more">
       <summary aria-label="更多任务操作">更多</summary>
@@ -121,6 +134,7 @@ export function renderTaskList(container, tasks, {
   onEdit,
   onError = () => {},
   emptyMessage = '这里暂时没有任务。',
+  tags = [],
 } = {}) {
   if (!Array.isArray(tasks) || tasks.length === 0) {
     container.innerHTML = `<p class="empty">${escapeHtml(emptyMessage)}</p>`;
@@ -128,7 +142,7 @@ export function renderTaskList(container, tasks, {
     return;
   }
 
-  container.innerHTML = `<div class="task-list" role="list">${tasks.map((task) => taskMarkup(task, today)).join('')}</div>`;
+  container.innerHTML = `<div class="task-list" role="list">${tasks.map((task) => taskMarkup(task, today, tags)).join('')}</div>`;
   container.onclick = async (event) => {
     const button = event.target.closest('button[data-action]');
     if (button === null) return;

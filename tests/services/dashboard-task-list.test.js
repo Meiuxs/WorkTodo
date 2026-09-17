@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { taskMeta } from '../../src/dashboard/task-list.js';
+import { taskMeta, taskTagLabel } from '../../src/dashboard/task-list.js';
 
 function task(overrides = {}) {
   return {
@@ -31,4 +31,10 @@ test('已完成任务只显示完成时间，不重复“已完成”状态文�
 
   assert.match(meta, /16:30$/);
   assert.doesNotMatch(meta, /已完成|完成于/);
+});
+
+test('任务行标签使用文本表达而不是只靠颜色', () => {
+  const tags = [{ id: 'customer', name: '客户' }, { id: 'quote', name: '报价' }];
+  assert.equal(taskTagLabel({ tagIds: ['customer', 'missing'] }, tags), '#客户');
+  assert.equal(taskTagLabel({ tagIds: [] }, tags), '');
 });

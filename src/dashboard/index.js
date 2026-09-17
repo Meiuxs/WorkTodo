@@ -31,6 +31,8 @@ const taskService = new TaskService(repository);
 const query = new TaskQueryService(repository);
 const statistics = new StatisticsService(repository);
 const backupService = new BackupService(repository, { settingsRepository });
+const tagRepository = new TagRepository();
+const tagService = new TagService(tagRepository);
 const root = document.querySelector('#view-root');
 const toast = document.querySelector('#toast');
 const confirmDialog = document.querySelector('#confirm-dialog');
@@ -123,7 +125,7 @@ async function onEdit(taskId) {
   await taskEditor.openTask(task, document.activeElement);
 }
 
-const viewOptions = { root, query, taskService, statistics, today: () => toLocalDate(new Date()), onAction, onEdit, onError };
+const viewOptions = { root, query, taskService, tagService, statistics, today: () => toLocalDate(new Date()), onAction, onEdit, onError };
 const views = {
   today: createTodayView(viewOptions),
   inbox: createInboxView(viewOptions),
@@ -143,8 +145,6 @@ controller = new DashboardController({
   taskService,
   sendMessage: (message) => chrome.runtime.sendMessage(message),
 });
-const tagRepository = new TagRepository();
-const tagService = new TagService(tagRepository);
 
 const taskEditor = createTaskEditor({
   dialog: document.querySelector('#task-editor'),

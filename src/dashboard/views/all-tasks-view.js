@@ -7,6 +7,7 @@ const EMPTY_FILTERS = Object.freeze({
   fromDate: '',
   toDate: '',
   categoryId: '',
+  tagId: '',
   priority: '',
   starred: '',
 });
@@ -19,6 +20,13 @@ function categoryOptions(categories, selected) {
   ].join('');
 }
 
+function tagOptions(tags, selected) {
+  return [
+    `<option value="" ${selected === '' ? 'selected' : ''}>全部标签</option>`,
+    ...tags.map((tag) => `<option value="${escapeHtml(tag.id)}" ${selected === tag.id ? 'selected' : ''}>${escapeHtml(tag.name)}</option>`),
+  ].join('');
+}
+
 function queryFilters(filters) {
   return {
     text: filters.text,
@@ -26,14 +34,16 @@ function queryFilters(filters) {
     ...(filters.fromDate === '' ? {} : { fromDate: filters.fromDate }),
     ...(filters.toDate === '' ? {} : { toDate: filters.toDate }),
     ...(filters.categoryId === '' ? {} : { categoryId: filters.categoryId === '__none' ? null : filters.categoryId }),
+    ...(filters.tagId === '' ? {} : { tagId: filters.tagId }),
     ...(filters.priority === '' ? {} : { priority: filters.priority }),
     ...(filters.starred === '' ? {} : { starred: filters.starred === 'true' }),
   };
 }
 
-export function createAllTasksView({ root, query, taskService, today, onAction, onEdit, onError }) {
+export function createAllTasksView({ root, query, taskService, tagService, today, onAction, onEdit, onError }) {
   let filters = { ...EMPTY_FILTERS };
   let categories = [];
+  let tags = [];
   let searchTimer;
 
   async function refreshList() {
@@ -45,6 +55,7 @@ export function createAllTasksView({ root, query, taskService, today, onAction, 
       onAction,
       onEdit,
       onError,
+      tags,
       emptyMessage: '没有符合当前筛选条件的任务。',
     });
     root.querySelector('#filter-count').textContent = `显示 ${tasks.length} 项`;
@@ -57,7 +68,10 @@ export function createAllTasksView({ root, query, taskService, today, onAction, 
 
   return {
     async render() {
-      categories = await taskService.listCategories();
+      [categories, tags] = await Promise.all([
+        taskService.listCategories(),
+        tagService.list(),
+      ]);
       root.innerHTML = `<section class="view-section" aria-labelledby="all-tasks-heading">
         <div class="section-heading">
           <div><h2 id="all-tasks-heading">全部任务</h2><p>筛选条件始终可见，可单独清除，也可一次清空。</p></div>
@@ -71,6 +85,7 @@ export function createAllTasksView({ root, query, taskService, today, onAction, 
           <label>从<input type="date" name="fromDate" value="${filters.fromDate}"></label>
           <label>到<input type="date" name="toDate" value="${filters.toDate}"></label>
           <label>分类<select name="categoryId">${categoryOptions(categories, filters.categoryId)}</select></label>
+          <label>标签<select name="tagId" aria-label="标签">${tagOptions(tags, filters.tagId)}</select></label>
           <label>优先级<select name="priority">
             <option value="">全部</option><option value="high" ${filters.priority === 'high' ? 'selected' : ''}>高</option><option value="medium" ${filters.priority === 'medium' ? 'selected' : ''}>中</option><option value="low" ${filters.priority === 'low' ? 'selected' : ''}>低</option><option value="none" ${filters.priority === 'none' ? 'selected' : ''}>无</option>
           </select></label>

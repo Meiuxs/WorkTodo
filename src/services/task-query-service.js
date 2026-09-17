@@ -64,6 +64,7 @@ function matchesDateRange(task, filters) {
 function matchesFilters(task, filters = {}) {
   if (filters.lifecycle !== undefined && task.lifecycle !== filters.lifecycle) return false;
   if (filters.categoryId !== undefined && task.categoryId !== filters.categoryId) return false;
+  if (filters.tagId !== undefined && !(task.tagIds ?? []).includes(filters.tagId)) return false;
   if (filters.priority !== undefined && task.priority !== filters.priority) return false;
   if (filters.starred !== undefined && Boolean(task.starred) !== filters.starred) return false;
   if (filters.completedDate !== undefined || filters.completedFrom !== undefined || filters.completedTo !== undefined) {

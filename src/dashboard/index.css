@@ -147,6 +147,7 @@
 .task__title:hover { color: var(--teal); text-decoration: underline; }
 .task__meta { display: block; overflow: hidden; color: var(--muted); font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
 .task__status { color: var(--ink); font-weight: 700; }
+.task__tags { color: var(--teal); font-weight: 700; }
 .task--overdue .task__status { color: var(--coral); }
 .task--completed .task__title { color: var(--muted); text-decoration: line-through; }
 .task--cancelled .task__title { color: var(--muted); }
@@ -258,7 +259,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 
 .filters {
   display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) repeat(3, minmax(120px, .7fr));
+  grid-template-columns: minmax(180px, 1.4fr) repeat(4, minmax(120px, .7fr));
   gap: 10px;
   margin: 18px 0 22px;
 }
