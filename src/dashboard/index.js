@@ -87,6 +87,25 @@ async function onError(error) {
 }
 
 async function onAction(action, taskId, revision, value) {
+  if (action === 'complete') {
+    const count = await subtaskService.activeCount(taskId);
+    let force = false;
+    if (count > 0) {
+      force = await confirmAction({
+        title: '仍有未完成子任务',
+        message: `还有 ${count} 个子任务未完成。确认只会完成父任务，不会自动完成这些子任务。`,
+        confirmLabel: '仍然完成',
+      });
+      if (!force) return null;
+    }
+    const result = await controller.handleTaskAction('complete', taskId, revision, { force });
+    showToast('已完成任务', {
+      actionLabel: '撤销',
+      onAction: () => controller.handleTaskAction('restore', taskId, result.task.revision).catch(onError),
+    });
+    return result;
+  }
+
   if (action === 'trash') {
     const confirmed = await confirmAction({
       title: '移入回收站？',
@@ -97,12 +116,7 @@ async function onAction(action, taskId, revision, value) {
   }
 
   const result = await controller.handleTaskAction(action, taskId, revision, value);
-  if (action === 'complete') {
-    showToast('已完成任务', {
-      actionLabel: '撤销',
-      onAction: () => controller.handleTaskAction('restore', taskId, result.task.revision).catch(onError),
-    });
-  } else if (action === 'cancel') {
+  if (action === 'cancel') {
     showToast('已取消任务', {
       actionLabel: '撤销',
       onAction: () => controller.handleTaskAction('restore', taskId, result.task.revision).catch(onError),
@@ -145,6 +159,7 @@ const views = {
 controller = new DashboardController({
   views,
   taskService,
+  subtaskService,
   sendMessage: (message) => chrome.runtime.sendMessage(message),
 });
 

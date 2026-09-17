@@ -3,12 +3,14 @@ const ROUTES = new Set(['today', 'inbox', 'all', 'completed', 'history', 'settin
 export class DashboardController {
   #views;
   #taskService;
+  #subtaskService;
   #sendMessage;
   #route = 'today';
 
-  constructor({ views, taskService = null, sendMessage = async () => {} }) {
+  constructor({ views, taskService = null, subtaskService = null, sendMessage = async () => {} }) {
     this.#views = views;
     this.#taskService = taskService;
+    this.#subtaskService = subtaskService;
     this.#sendMessage = sendMessage;
   }
 
@@ -49,7 +51,10 @@ export class DashboardController {
       start: 'start', complete: 'complete', restore: 'restore', cancel: 'cancel', trash: 'trash', untrash: 'untrash', copy: 'copy',
     };
     let result;
-    if (action === 'postpone' || action === 'reschedule') {
+    if (action === 'complete' && this.#subtaskService !== null) {
+      const force = value?.force === true;
+      result = await this.#subtaskService.completeParent(taskId, revision, { force });
+    } else if (action === 'postpone' || action === 'reschedule') {
       result = await this.#taskService[action](taskId, value, revision);
     } else if (methods[action] === 'copy') {
       result = await this.#taskService.copy(taskId);

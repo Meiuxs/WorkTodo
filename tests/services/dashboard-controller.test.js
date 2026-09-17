@@ -40,6 +40,25 @@ test('任务操作调用服务、广播并刷新当前视图', async () => {
   assert.equal(view.renderCount, 2);
 });
 
+test('完成父任务时通过 SubtaskService 并传递确认结果', async () => {
+  const calls = [];
+  const view = { async render() {} };
+  const controller = new DashboardController({
+    views: { today: view },
+    taskService: {},
+    subtaskService: {
+      async completeParent(id, revision, options) {
+        calls.push([id, revision, options]);
+        return { task: { id, revision: revision + 1 } };
+      },
+    },
+  });
+
+  await controller.handleTaskAction('complete', 'parent-1', 4, { force: true });
+
+  assert.deepEqual(calls, [['parent-1', 4, { force: true }]]);
+});
+
 test('导入验证失败停在 error 且不能确认', async () => {
   const controller = new DataManagementController({
     backupService: {
