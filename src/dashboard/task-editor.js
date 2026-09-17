@@ -45,10 +45,12 @@ export function createTaskEditor({
   const subtaskList = dialog.querySelector('[data-subtask-list]');
   const subtaskTitle = dialog.querySelector('#subtask-title');
   const subtaskMessage = dialog.querySelector('[data-subtask-message]');
+  const subtaskCreate = dialog.querySelector('[data-subtask-create]');
   let tags = [];
   let currentTask = null;
   let trigger = null;
   let anchorTaskId = null;
+  let subtaskBusy = false;
 
   function populateCategories(categories, selectedId) {
     category.innerHTML = '<option value="">未分类</option>'
@@ -112,7 +114,13 @@ export function createTaskEditor({
     message.textContent = text;
   }
 
+  function clearSectionMessages() {
+    tagMessage.textContent = '';
+    subtaskMessage.textContent = '';
+  }
+
   async function openNew(defaults = {}) {
+    clearSectionMessages();
     currentTask = null;
     anchorTaskId = null;
     trigger = document.activeElement;
@@ -131,6 +139,7 @@ export function createTaskEditor({
   }
 
   async function openTask(task, sourceElement = document.activeElement) {
+    clearSectionMessages();
     if (!dialog.open) anchorTaskId = task.id;
     currentTask = task;
     trigger = sourceElement;
@@ -153,6 +162,7 @@ export function createTaskEditor({
   }
 
   function close() {
+    clearSectionMessages();
     if (dialog.open) dialog.close();
     showMessage('');
     conflict.hidden = true;
@@ -194,6 +204,40 @@ export function createTaskEditor({
     }
   }
 
+  async function createTag() {
+    const selected = selectedTagIds();
+    tagMessage.textContent = '';
+    try {
+      await onCreateTag(newTag.value);
+      newTag.value = '';
+      await loadTags(selected);
+      newTag.focus();
+    } catch (error) {
+      tagMessage.textContent = error.message;
+      newTag.focus();
+    }
+  }
+
+  async function createSubtask() {
+    if (currentTask === null || subtaskBusy) return;
+    const taskId = currentTask.id;
+    subtaskBusy = true;
+    subtaskCreate.disabled = true;
+    subtaskMessage.textContent = '';
+    try {
+      await subtaskService.createSubtask(taskId, { title: subtaskTitle.value });
+      subtaskTitle.value = '';
+      await renderSubtasks();
+      subtaskTitle.focus();
+    } catch (error) {
+      subtaskMessage.textContent = error.message;
+      subtaskTitle.focus();
+    } finally {
+      subtaskBusy = false;
+      subtaskCreate.disabled = false;
+    }
+  }
+
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     save();
@@ -215,31 +259,17 @@ export function createTaskEditor({
     const latest = await onReload(currentTask.id);
     await openTask(latest, trigger);
   });
-  dialog.querySelector('[data-create-tag]').addEventListener('click', async () => {
-    const selected = selectedTagIds();
-    tagMessage.textContent = '';
-    try {
-      await onCreateTag(newTag.value);
-      newTag.value = '';
-      await loadTags(selected);
-      newTag.focus();
-    } catch (error) {
-      tagMessage.textContent = error.message;
-      newTag.focus();
-    }
+  dialog.querySelector('[data-create-tag]').addEventListener('click', createTag);
+  newTag.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    createTag();
   });
-  dialog.querySelector('[data-subtask-create]').addEventListener('click', async () => {
-    if (currentTask === null) return;
-    subtaskMessage.textContent = '';
-    try {
-      await subtaskService.createSubtask(currentTask.id, { title: subtaskTitle.value });
-      subtaskTitle.value = '';
-      await renderSubtasks();
-      subtaskTitle.focus();
-    } catch (error) {
-      subtaskMessage.textContent = error.message;
-      subtaskTitle.focus();
-    }
+  subtaskCreate.addEventListener('click', createSubtask);
+  subtaskTitle.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    createSubtask();
   });
   subtaskList.addEventListener('click', async (event) => {
     const row = event.target.closest('[data-subtask-id]');
