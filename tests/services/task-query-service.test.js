@@ -124,3 +124,32 @@ test('search 对标题和描述做大小写无关匹配并支持 filters', async
 
   assert.deepEqual(result.map((item) => item.id), ['match-title', 'match-description']);
 });
+
+test('search 日期范围始终按 scheduledDate 过滤 completed 任务', async () => {
+  const { query } = createQuery([
+    task({
+      id: 'scheduled-in-range',
+      title: 'Alice planned',
+      scheduledDate: '2026-09-17',
+      lifecycle: 'completed',
+      completedAt: '2026-09-20T09:00:00.000Z',
+    }),
+    task({
+      id: 'completed-in-range-only',
+      title: 'Alice completed',
+      scheduledDate: '2026-09-20',
+      firstScheduledDate: '2026-09-20',
+      lifecycle: 'completed',
+      completedAt: '2026-09-17T09:00:00.000Z',
+    }),
+  ]);
+
+  const result = await query.search({
+    text: 'alice',
+    lifecycle: 'completed',
+    fromDate: '2026-09-17',
+    toDate: '2026-09-17',
+  });
+
+  assert.deepEqual(result.map((item) => item.id), ['scheduled-in-range']);
+});

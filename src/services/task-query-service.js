@@ -47,12 +47,6 @@ function stableSort(tasks, compare) {
     .map(({ task }) => task);
 }
 
-function dateValueFor(task) {
-  return task.lifecycle === 'completed' && task.completedAt !== null
-    ? task.completedAt.slice(0, 10)
-    : task.scheduledDate;
-}
-
 function matchesDateRange(task, filters) {
   const fromDate = filters.fromDate ?? filters.dateFrom ?? null;
   const toDate = filters.toDate ?? filters.dateTo ?? null;
@@ -61,10 +55,9 @@ function matchesDateRange(task, filters) {
   if (fromDate !== null) assertLocalDate(fromDate, 'fromDate');
   if (toDate !== null) assertLocalDate(toDate, 'toDate');
 
-  const value = dateValueFor(task);
-  if (value === null) return false;
-  if (fromDate !== null && value < fromDate) return false;
-  if (toDate !== null && value > toDate) return false;
+  if (task.scheduledDate === null) return false;
+  if (fromDate !== null && task.scheduledDate < fromDate) return false;
+  if (toDate !== null && task.scheduledDate > toDate) return false;
   return true;
 }
 
