@@ -217,3 +217,24 @@ test('range 返回闭区间内未删除任务并按计划顺序排序', async ()
   assert.deepEqual(result.map((item) => item.id), ['early', 'late']);
   await assert.rejects(query.range('2026-09-18', '2026-09-17'), ValidationError);
 });
+
+test('tomorrow、week 和 month 使用本地边界并分组任务', async () => {
+  const { query } = createQuery([
+    task({ id: 'wed', scheduledDate: '2026-09-16' }),
+    task({ id: 'thu', scheduledDate: '2026-09-17' }),
+    task({ id: 'next-month', scheduledDate: '2026-10-01' }),
+  ]);
+
+  assert.deepEqual((await query.tomorrow('2026-09-16')).map((item) => item.id), ['thu']);
+  const week = await query.week('2026-09-17');
+  assert.deepEqual(week.days, [
+    '2026-09-14', '2026-09-15', '2026-09-16', '2026-09-17',
+    '2026-09-18', '2026-09-19', '2026-09-20',
+  ]);
+  assert.deepEqual(week.byDate['2026-09-16'].map((item) => item.id), ['wed']);
+
+  const month = await query.month('2026-09-17');
+  assert.equal(month.gridStart, '2026-08-31');
+  assert.equal(month.gridEnd, '2026-10-04');
+  assert.deepEqual(month.byDate['2026-10-01'].map((item) => item.id), ['next-month']);
+});

@@ -1,4 +1,14 @@
-import { assertLocalDate, isOverdueTask, toLocalDate } from '../domain/dates.js';
+import {
+  addLocalDays,
+  assertLocalDate,
+  eachLocalDate,
+  endOfMonth,
+  endOfWeek,
+  isOverdueTask,
+  startOfMonth,
+  startOfWeek,
+  toLocalDate,
+} from '../domain/dates.js';
 import { ValidationError } from '../domain/errors.js';
 import { isInboxTask } from '../domain/task.js';
 
@@ -60,6 +70,16 @@ function stableSort(tasks, compare) {
     .map((task, index) => ({ task, index }))
     .sort(compare)
     .map(({ task }) => task);
+}
+
+function groupTasksByDate(tasks, dates) {
+  const byDate = Object.fromEntries(dates.map((date) => [date, []]));
+  for (const task of tasks) {
+    if (task.scheduledDate !== null && byDate[task.scheduledDate] !== undefined) {
+      byDate[task.scheduledDate].push(task);
+    }
+  }
+  return byDate;
 }
 
 function matchesDateRange(task, filters) {
@@ -147,6 +167,38 @@ export class TaskQueryService {
       )),
       compareForRange(),
     );
+  }
+
+  async tomorrow(anchorDate) {
+    const date = addLocalDays(anchorDate, 1);
+    return this.range(date, date);
+  }
+
+  async week(anchorDate) {
+    const startDate = startOfWeek(anchorDate);
+    const endDate = endOfWeek(anchorDate);
+    const days = eachLocalDate(startDate, endDate);
+    const tasks = await this.range(startDate, endDate);
+    return { startDate, endDate, days, tasks, byDate: groupTasksByDate(tasks, days) };
+  }
+
+  async month(anchorDate) {
+    const startDate = startOfMonth(anchorDate);
+    const endDate = endOfMonth(anchorDate);
+    const gridStart = startOfWeek(startDate);
+    const gridEnd = endOfWeek(endDate);
+    const allDates = eachLocalDate(gridStart, gridEnd);
+    const tasks = await this.range(gridStart, gridEnd);
+    return {
+      month: anchorDate.slice(0, 7),
+      startDate,
+      endDate,
+      gridStart,
+      gridEnd,
+      weeks: Array.from({ length: allDates.length / 7 }, (_, index) => allDates.slice(index * 7, index * 7 + 7)),
+      tasks,
+      byDate: groupTasksByDate(tasks, allDates),
+    };
   }
 
   async completed(filters = {}) {
