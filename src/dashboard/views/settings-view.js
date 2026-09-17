@@ -115,6 +115,9 @@ function categoryRows(categories) {
 export function createSettingsView({
   root,
   taskService,
+  tagService,
+  query,
+  csvService,
   settingsRepository,
   backupService,
   onDataChanged = async () => {},
@@ -180,6 +183,17 @@ export function createSettingsView({
     if (!signal?.aborted) await render(signal);
   }
 
+  async function exportCsv() {
+    const [categories, tags, tasks] = await Promise.all([
+      taskService.listCategories(),
+      tagService.list(),
+      query.all(),
+    ]);
+    const contents = csvService.createCsv({ tasks, categories, tags });
+    const filename = `worktodo-tasks-${new Date().toISOString().slice(0, 10)}.csv`;
+    csvService.exportDownload(contents, filename);
+  }
+
   async function render(signal) {
     categories = await taskService.listCategories();
     if (signal?.aborted) return;
@@ -192,6 +206,7 @@ export function createSettingsView({
       </div>
       <div class="data-actions" id="data-management">
         <button type="button" id="export-backup" class="button-primary">导出 JSON 备份</button>
+        <button type="button" id="export-csv" class="button-secondary">导出 CSV</button>
         <label class="button-secondary file-picker">选择导入文件<input id="import-file" type="file" accept="application/json,.json"></label>
       </div>
       <div id="data-state"></div>
@@ -228,6 +243,9 @@ export function createSettingsView({
     renderDataState(signal);
     root.querySelector('#export-backup').addEventListener('click', () => {
       runViewAction(() => exportBackup(signal), { signal, onError });
+    });
+    root.querySelector('#export-csv').addEventListener('click', () => {
+      runViewAction(() => exportCsv(), { signal, onError });
     });
     root.querySelector('#import-file').addEventListener('change', (event) => {
       const file = event.target.files?.[0];

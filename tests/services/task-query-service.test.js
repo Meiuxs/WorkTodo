@@ -326,3 +326,12 @@ test('completed 无完成日期过滤时使用 lifecycle 索引', async () => {
   assert.deepEqual(calls.map(({ method }) => method), ['listByLifecycle']);
   assert.deepEqual(calls[0].args, ['completed', { trashedAt: null }]);
 });
+
+test('all 返回全部任务快照并包含回收站任务', async () => {
+  const { query } = createQuery([
+    task({ id: 'active' }),
+    task({ id: 'trashed', trashedAt: NOW }),
+  ]);
+
+  assert.deepEqual((await query.all()).map((item) => item.id).sort(), ['active', 'trashed']);
+});

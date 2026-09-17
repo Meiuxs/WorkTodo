@@ -301,6 +301,10 @@ export class TaskQueryService {
       .sort((left, right) => right.trashedAt.localeCompare(left.trashedAt));
   }
 
+  async all() {
+    return this.#repository.list();
+  }
+
   async search(filters = {}) {
     const text = filters.text ?? filters.query ?? '';
     const tasks = await this.#repository.search(text);

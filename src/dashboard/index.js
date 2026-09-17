@@ -9,6 +9,7 @@ import { TaskQueryService } from '../services/task-query-service.js';
 import { StatisticsService } from '../services/statistics-service.js';
 import { SummaryService } from '../services/summary-service.js';
 import { BackupService } from '../services/backup-service.js';
+import { CsvExportService } from '../services/csv-service.js';
 import { DashboardController } from './dashboard-controller.js';
 import { UndoController } from './undo-controller.js';
 import { createTaskEditor } from './task-editor.js';
@@ -43,6 +44,7 @@ const query = new TaskQueryService(repository);
 const statistics = new StatisticsService(repository);
 const summaryService = new SummaryService({ statistics, query });
 const backupService = new BackupService(repository, { settingsRepository });
+const csvService = new CsvExportService();
 const tagRepository = new TagRepository();
 const tagService = new TagService(tagRepository);
 const root = document.querySelector('#view-root');
@@ -200,6 +202,9 @@ const views = {
   settings: createSettingsView({
     root,
     taskService,
+    tagService,
+    query,
+    csvService,
     settingsRepository,
     backupService,
     onDataChanged: () => controller.refresh(),

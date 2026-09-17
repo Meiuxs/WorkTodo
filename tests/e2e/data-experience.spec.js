@@ -165,3 +165,12 @@ test('回收站主复选框恢复四种状态并只清空 trashedAt', async ({ e
     trashedAt: null,
   });
 });
+
+test('设置页可以下载 CSV 文件而不申请 downloads 权限', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.getByRole('button', { name: '设置' }).click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: '导出 CSV' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^worktodo-tasks-.*\.csv$/);
+});
