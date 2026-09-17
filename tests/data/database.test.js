@@ -9,6 +9,8 @@ import {
 
 function createStore(name, options) {
   const indexes = [];
+  const records = new Map();
+  const keyPath = options?.keyPath ?? 'id';
 
   return {
     name,
@@ -23,6 +25,15 @@ function createStore(name, options) {
       const request = { result: null };
       queueMicrotask(() => request.onsuccess?.());
       return request;
+    },
+    put(record) {
+      records.set(record[keyPath], structuredClone(record));
+    },
+    clear() {
+      records.clear();
+    },
+    snapshot() {
+      return structuredClone([...records.values()]);
     },
     get createdIndexes() {
       return indexes;
@@ -107,7 +118,7 @@ test('ensureIndexes 透传索引选项', () => {
   ]);
 });
 
-test('schema v2 创建标签与重复模板 store 和关系索引', () => {
+test('schema v3 创建搜索索引、创建时间索引、标签与重复模板 store', () => {
   const stores = new Map([
     ['tasks', createStore('tasks')],
     ['categories', createStore('categories')],
@@ -129,7 +140,9 @@ test('schema v2 创建标签与重复模板 store 和关系索引', () => {
 
   upgradeDatabase(database);
 
-  assert.equal(DATABASE_VERSION, 2);
+  assert.equal(DATABASE_VERSION, 3);
+  assert.ok(database.objectStoreNames.contains('searchIndex'));
+  assert.deepEqual(stores.get('searchIndex').options, { keyPath: 'taskId' });
   assert.ok(database.objectStoreNames.contains('tags'));
   assert.ok(database.objectStoreNames.contains('recurringTemplates'));
   assert.deepEqual(stores.get('tags').options, { keyPath: 'id' });
@@ -146,6 +159,7 @@ test('schema v2 创建标签与重复模板 store 和关系索引', () => {
       { name: 'scheduledDate', keyPath: 'scheduledDate', options: undefined },
       { name: 'lifecycle', keyPath: 'lifecycle', options: undefined },
       { name: 'completedAt', keyPath: 'completedAt', options: undefined },
+      { name: 'createdAt', keyPath: 'createdAt', options: undefined },
       { name: 'categoryId', keyPath: 'categoryId', options: undefined },
       { name: 'trashedAt', keyPath: 'trashedAt', options: undefined },
       { name: 'parentId', keyPath: 'parentId', options: undefined },
@@ -162,6 +176,13 @@ test('schema v2 创建标签与重复模板 store 和关系索引', () => {
       },
     ],
   );
+  assert.deepEqual(stores.get('searchIndex').createdIndexes, [
+    {
+      name: 'grams',
+      keyPath: 'grams',
+      options: { multiEntry: true },
+    },
+  ]);
   assert.deepEqual(stores.get('tags').createdIndexes, [
     { name: 'name', keyPath: 'name', options: { unique: true } },
   ]);
@@ -170,13 +191,14 @@ test('schema v2 创建标签与重复模板 store 和关系索引', () => {
   ]);
 });
 
-test('schema v2 复用现有 store 并补建缺失索引', () => {
+test('schema v3 复用现有 store 并补建缺失索引', () => {
   const tasks = createStore('tasks');
   tasks.createIndex('scheduledDate', 'scheduledDate');
   const stores = new Map([
     ['tasks', tasks],
     ['categories', createStore('categories')],
     ['events', createStore('events')],
+    ['searchIndex', createStore('searchIndex', { keyPath: 'taskId' })],
     ['tags', createStore('tags')],
     ['recurringTemplates', createStore('recurringTemplates')],
   ]);
@@ -200,6 +222,7 @@ test('schema v2 复用现有 store 并补建缺失索引', () => {
     [
       'lifecycle',
       'completedAt',
+      'createdAt',
       'categoryId',
       'trashedAt',
       'parentId',
@@ -210,7 +233,7 @@ test('schema v2 复用现有 store 并补建缺失索引', () => {
   );
 });
 
-test('schema v2 游标迁移幂等补齐旧任务关系字段且保留已有字段', async () => {
+test('schema v3 游标迁移幂等补齐关系字段、保留旧字段并重建搜索索引', async () => {
   const legacyTask = {
     id: 'legacy',
     title: '旧任务',
@@ -245,6 +268,7 @@ test('schema v2 游标迁移幂等补齐旧任务关系字段且保留已有字�
   };
 
   upgradeDatabase(database);
+  upgradeDatabase(database);
   await new Promise((resolve) => setImmediate(resolve));
 
   const migrated = new Map(tasks.snapshot().map((task) => [task.id, task]));
@@ -256,4 +280,45 @@ test('schema v2 游标迁移幂等补齐旧任务关系字段且保留已有字�
     occurrenceKey: null,
   });
   assert.deepEqual(migrated.get('explicit'), explicitTask);
+  assert.deepEqual(
+    stores.get('searchIndex').snapshot().map(({ taskId, grams, revision }) => ({
+      taskId,
+      grams,
+      revision,
+    })),
+    [
+      {
+        taskId: 'legacy',
+        grams: [
+          '旧',
+          '旧任',
+          '任',
+          '任务',
+          '务',
+          '务\n',
+          '\n',
+        ],
+        revision: null,
+      },
+      {
+        taskId: 'explicit',
+        grams: [
+          '已',
+          '已有',
+          '有',
+          '有关',
+          '关',
+          '关系',
+          '系',
+          '系字',
+          '字',
+          '字段',
+          '段',
+          '段\n',
+          '\n',
+        ],
+        revision: null,
+      },
+    ],
+  );
 });

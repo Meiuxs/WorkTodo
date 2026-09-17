@@ -53,7 +53,9 @@ test('10,000 条任务的搜索、统计与导出保持可用且不修改仓库�
   const before = await repository.exportAll();
 
   const searched = await query.search({ text: '重点描述' });
+  const searchedAgain = await query.search({ text: '重点描述' });
   const daily = await statistics.daily('2026-09-17');
+  const dailyAgain = await statistics.daily('2026-09-17');
 
   const previousChrome = globalThis.chrome;
   globalThis.chrome = { storage: { local: new InMemoryStorageArea() } };
@@ -66,7 +68,12 @@ test('10,000 条任务的搜索、统计与导出保持可用且不修改仓库�
   }
 
   assert.equal(searched.length, 400);
+  assert.deepEqual(
+    searchedAgain.map(({ id }) => id),
+    searched.map(({ id }) => id),
+  );
   assert.equal(daily.createdCount, 10_000);
+  assert.deepEqual(dailyAgain, daily);
   assert.deepEqual(await repository.exportAll(), before);
 });
 
@@ -77,7 +84,9 @@ test('10,000 条任务的本周和月历范围查询保持确定性', async () =
   const before = await repository.exportAll();
 
   const week = await query.week('2026-09-17');
+  const weekAgain = await query.week('2026-09-17');
   const month = await query.month('2026-09-17');
+  const monthAgain = await query.month('2026-09-17');
   const renderedDates = month.weeks.flat();
 
   assert.equal(week.days.length, 7);
@@ -86,5 +95,7 @@ test('10,000 条任务的本周和月历范围查询保持确定性', async () =
   assert.ok(month.weeks.every((weekDates) => weekDates.length === 7));
   assert.deepEqual(Object.keys(week.byDate), week.days);
   assert.deepEqual(Object.keys(month.byDate), renderedDates);
+  assert.deepEqual(weekAgain, week);
+  assert.deepEqual(monthAgain, month);
   assert.deepEqual(await repository.exportAll(), before);
 });

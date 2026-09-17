@@ -37,6 +37,22 @@ function createQuery(tasks) {
   return { query: new TaskQueryService(repository), repository };
 }
 
+function createRecordingQuery(tasks) {
+  const repository = new InMemoryTaskRepository(tasks);
+  const calls = [];
+  const recordingRepository = new Proxy(repository, {
+    get(target, property) {
+      const value = Reflect.get(target, property, target);
+      if (typeof value !== 'function') return value;
+      return (...args) => {
+        calls.push({ method: property, args });
+        return value.apply(target, args);
+      };
+    },
+  });
+  return { query: new TaskQueryService(recordingRepository), calls };
+}
+
 test('today 先返回逾期，再按星标、优先级、开始时间和创建时间排序', async () => {
   const tasks = [
     task({ id: 'newer', createdAt: '2026-09-17T08:05:00.000Z' }),
@@ -237,4 +253,45 @@ test('tomorrow、week 和 month 使用本地边界并分组任务', async () => 
   assert.equal(month.gridStart, '2026-08-31');
   assert.equal(month.gridEnd, '2026-10-04');
   assert.deepEqual(month.byDate['2026-10-01'].map((item) => item.id), ['next-month']);
+});
+
+test('核心查询通过索引仓库方法读取而不是无条件 list 全表', async () => {
+  const { query, calls } = createRecordingQuery([
+    task({ id: 'overdue', scheduledDate: '2026-09-16', firstScheduledDate: '2026-09-16' }),
+    task({ id: 'today' }),
+    task({
+      id: 'done',
+      lifecycle: 'completed',
+      completedAt: '2026-09-17T09:00:00.000Z',
+    }),
+    task({ id: 'cancelled', lifecycle: 'cancelled', completedAt: null }),
+  ]);
+
+  await query.today('2026-09-17');
+  await query.range('2026-09-14', '2026-09-20');
+  await query.completed({ completedDate: '2026-09-17' });
+  await query.cancelled();
+  await query.search({ text: '今天', priority: 'none' });
+
+  const invoked = calls.map(({ method }) => method);
+  assert.ok(invoked.includes('listScheduled'));
+  assert.ok(invoked.includes('listCompleted'));
+  assert.ok(invoked.includes('listByLifecycle'));
+  assert.ok(invoked.includes('search'));
+  assert.equal(invoked.includes('list'), false);
+  assert.equal(invoked.includes('exportAll'), false);
+});
+
+test('completed 无完成日期过滤时使用 lifecycle 索引', async () => {
+  const { query, calls } = createRecordingQuery([
+    task({
+      id: 'done',
+      lifecycle: 'completed',
+      completedAt: '2026-09-17T09:00:00.000Z',
+    }),
+  ]);
+
+  assert.deepEqual((await query.completed()).map((item) => item.id), ['done']);
+  assert.deepEqual(calls.map(({ method }) => method), ['listByLifecycle']);
+  assert.deepEqual(calls[0].args, ['completed', { trashedAt: null }]);
 });

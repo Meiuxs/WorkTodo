@@ -18,9 +18,36 @@ const PRIORITY_RANK = {
   low: 1,
   none: 0,
 };
+const ACTIVE_LIFECYCLES = ['todo', 'in_progress'];
+const MIN_LOCAL_DATE = '0001-01-01';
+const MAX_LOCAL_DATE = '9999-12-31';
 
 function isActiveTask(task) {
   return task.trashedAt === null && !['completed', 'cancelled'].includes(task.lifecycle);
+}
+
+function repositoryCriteria(filters = {}) {
+  const criteria = { trashedAt: null };
+  if (filters.lifecycle !== undefined) criteria.lifecycle = filters.lifecycle;
+  if (filters.categoryId !== undefined) criteria.categoryId = filters.categoryId;
+  return criteria;
+}
+
+function localDateBoundaryIso(date, dayOffset = 0) {
+  const boundaryDate = dayOffset === 0 ? date : addLocalDays(date, dayOffset);
+  const [year, month, day] = boundaryDate.split('-').map(Number);
+  const boundary = new Date(0);
+  boundary.setHours(0, 0, 0, 0);
+  boundary.setFullYear(year, month - 1, day);
+  return boundary.toISOString();
+}
+
+function mergeUniqueTasks(...groups) {
+  const byId = new Map();
+  for (const task of groups.flat()) {
+    if (!byId.has(task.id)) byId.set(task.id, task);
+  }
+  return [...byId.values()];
 }
 
 function compareNullableText(left, right) {
@@ -122,12 +149,13 @@ export class TaskQueryService {
     this.#repository = repository;
   }
 
-  async #tasks() {
-    return this.#repository.list();
-  }
-
   async inbox() {
-    const tasks = await this.#tasks();
+    const tasks = mergeUniqueTasks(...await Promise.all(
+      ACTIVE_LIFECYCLES.map((lifecycle) => this.#repository.listByLifecycle(lifecycle, {
+        scheduledDate: null,
+        trashedAt: null,
+      })),
+    ));
     return stableSort(
       tasks.filter((task) => isActiveTask(task) && isInboxTask(task)),
       compareForWorkList('9999-12-31'),
@@ -136,7 +164,14 @@ export class TaskQueryService {
 
   async today(date) {
     assertLocalDate(date);
-    const tasks = await this.#tasks();
+    const previousDate = date === MIN_LOCAL_DATE ? null : addLocalDays(date, -1);
+    const [overdueTasks, todayTasks] = await Promise.all([
+      previousDate === null
+        ? Promise.resolve([])
+        : this.#repository.listScheduled(MIN_LOCAL_DATE, previousDate, { trashedAt: null }),
+      this.#repository.listScheduled(date, date, { trashedAt: null }),
+    ]);
+    const tasks = mergeUniqueTasks(overdueTasks, todayTasks);
     return stableSort(
       tasks.filter((task) => isActiveTask(task) && (isOverdueTask(task, date) || task.scheduledDate === date)),
       compareForWorkList(date),
@@ -145,7 +180,12 @@ export class TaskQueryService {
 
   async overdue(date) {
     assertLocalDate(date);
-    const tasks = await this.#tasks();
+    if (date === MIN_LOCAL_DATE) return [];
+    const tasks = await this.#repository.listScheduled(
+      MIN_LOCAL_DATE,
+      addLocalDays(date, -1),
+      { trashedAt: null },
+    );
     return stableSort(
       tasks.filter((task) => isOverdueTask(task, date)),
       compareForWorkList(date),
@@ -156,13 +196,14 @@ export class TaskQueryService {
     assertLocalDate(fromDate, 'fromDate');
     assertLocalDate(toDate, 'toDate');
     if (fromDate > toDate) throw new ValidationError('fromDate 不能晚于 toDate');
-    const tasks = await this.#tasks();
+    const tasks = await this.#repository.listScheduled(
+      fromDate,
+      toDate,
+      repositoryCriteria(filters),
+    );
     return stableSort(
       tasks.filter((task) => (
         task.trashedAt === null
-        && task.scheduledDate !== null
-        && task.scheduledDate >= fromDate
-        && task.scheduledDate <= toDate
         && matchesFilters(task, filters)
       )),
       compareForRange(),
@@ -202,7 +243,32 @@ export class TaskQueryService {
   }
 
   async completed(filters = {}) {
-    const tasks = await this.#tasks();
+    if (filters.completedDate !== undefined) assertLocalDate(filters.completedDate, 'completedDate');
+    if (filters.completedFrom !== undefined) assertLocalDate(filters.completedFrom, 'completedFrom');
+    if (filters.completedTo !== undefined) assertLocalDate(filters.completedTo, 'completedTo');
+
+    const hasCompletedRange = filters.completedDate !== undefined
+      || filters.completedFrom !== undefined
+      || filters.completedTo !== undefined;
+    let tasks;
+    if (hasCompletedRange) {
+      let fromDate = filters.completedFrom ?? MIN_LOCAL_DATE;
+      let toDate = filters.completedTo ?? MAX_LOCAL_DATE;
+      if (filters.completedDate !== undefined) {
+        fromDate = fromDate === null
+          ? filters.completedDate
+          : [fromDate, filters.completedDate].sort().at(-1);
+        toDate = [toDate, filters.completedDate].sort()[0];
+      }
+      if (fromDate > toDate) return [];
+      tasks = await this.#repository.listCompleted(
+        localDateBoundaryIso(fromDate),
+        localDateBoundaryIso(toDate, 1),
+        { lifecycle: 'completed', trashedAt: null },
+      );
+    } else {
+      tasks = await this.#repository.listByLifecycle('completed', { trashedAt: null });
+    }
     return tasks.filter((task) => (
       task.trashedAt === null
       && task.lifecycle === 'completed'
@@ -211,7 +277,10 @@ export class TaskQueryService {
   }
 
   async cancelled(filters = {}) {
-    const tasks = await this.#tasks();
+    const tasks = await this.#repository.listByLifecycle('cancelled', {
+      ...repositoryCriteria(filters),
+      lifecycle: 'cancelled',
+    });
     return tasks.filter((task) => (
       task.trashedAt === null
       && task.lifecycle === 'cancelled'
@@ -220,14 +289,12 @@ export class TaskQueryService {
   }
 
   async search(filters = {}) {
-    const tasks = await this.#tasks();
-    const text = (filters.text ?? filters.query ?? '').trim().toLocaleLowerCase();
+    const text = filters.text ?? filters.query ?? '';
+    const tasks = await this.#repository.search(text);
     return tasks.filter((task) => {
       if (task.trashedAt !== null) return false;
       if (!matchesFilters(task, filters)) return false;
-      if (text.length === 0) return true;
-      const haystack = `${task.title ?? ''}\n${task.description ?? ''}`.toLocaleLowerCase();
-      return haystack.includes(text);
+      return true;
     });
   }
 }

@@ -1,11 +1,14 @@
+import { createSearchIndexRecord } from './search-index.js';
+
 export const DATABASE_NAME = 'worktodo';
-export const DATABASE_VERSION = 2;
+export const DATABASE_VERSION = 3;
 const TASK_RELATIONSHIP_FIELDS = ['parentId', 'tagIds', 'seriesId', 'occurrenceKey'];
 
 const TASK_INDEXES = [
   ['scheduledDate', 'scheduledDate'],
   ['lifecycle', 'lifecycle'],
   ['completedAt', 'completedAt'],
+  ['createdAt', 'createdAt'],
   ['categoryId', 'categoryId'],
   ['trashedAt', 'trashedAt'],
   ['parentId', 'parentId'],
@@ -19,6 +22,9 @@ const EVENT_INDEXES = [
 ];
 const TAG_INDEXES = [['name', 'name', { unique: true }]];
 const TEMPLATE_INDEXES = [['active', 'active']];
+const SEARCH_INDEX_INDEXES = [
+  ['grams', 'grams', { multiEntry: true }],
+];
 
 export function ensureIndexes(store, indexes) {
   for (const [name, keyPath, options] of indexes) {
@@ -38,14 +44,19 @@ export function materializeTaskRelationships(task) {
   return materialized;
 }
 
-function materializeTaskStore(store) {
+function migrateTaskStore(store, searchIndex) {
+  searchIndex.clear();
   const request = store.openCursor();
   request.onsuccess = () => {
     const cursor = request.result;
     if (cursor === null) return;
-    if (TASK_RELATIONSHIP_FIELDS.some((field) => cursor.value[field] === undefined)) {
-      cursor.update(materializeTaskRelationships(cursor.value));
+    const task = TASK_RELATIONSHIP_FIELDS.some((field) => cursor.value[field] === undefined)
+      ? materializeTaskRelationships(cursor.value)
+      : cursor.value;
+    if (task !== cursor.value) {
+      cursor.update(task);
     }
+    searchIndex.put(createSearchIndexRecord(task));
     cursor.continue();
   };
 }
@@ -55,7 +66,12 @@ export function upgradeDatabase(database, transaction = database.transaction) {
     ? transaction.objectStore('tasks')
     : database.createObjectStore('tasks', { keyPath: 'id' });
   ensureIndexes(tasks, TASK_INDEXES);
-  materializeTaskStore(tasks);
+
+  const searchIndex = database.objectStoreNames.contains('searchIndex')
+    ? transaction.objectStore('searchIndex')
+    : database.createObjectStore('searchIndex', { keyPath: 'taskId' });
+  ensureIndexes(searchIndex, SEARCH_INDEX_INDEXES);
+  migrateTaskStore(tasks, searchIndex);
 
   if (!database.objectStoreNames.contains('categories')) {
     database.createObjectStore('categories', { keyPath: 'id' });

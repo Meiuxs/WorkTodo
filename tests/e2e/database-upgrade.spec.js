@@ -28,7 +28,7 @@ const LEGACY_TASKS = [
   },
 ];
 
-test('Chromium 中 v1 实库升级会物化旧任务关系字段', async ({ extension }) => {
+test('Chromium 中 v1 实库升级到 v3 会物化关系字段并重建可搜索索引', async ({ extension }) => {
   const runner = await openExtensionPage(extension.context, extension.extensionId, 'manifest.json');
   await runner.evaluate(async (legacyTasks) => {
     await new Promise((resolve, reject) => {
@@ -66,24 +66,56 @@ test('Chromium 中 v1 实库升级会物化旧任务关系字段', async ({ exte
 
   const dashboard = await openDashboard(extension);
   await expect(dashboard.getByRole('heading', { name: '今日工作' })).toBeVisible();
-  const tasks = await dashboard.evaluate(async () => {
+  const upgraded = await dashboard.evaluate(async () => {
     const database = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('worktodo', 2);
+      const request = indexedDB.open('worktodo', 3);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-    const transaction = database.transaction('tasks', 'readonly');
-    const stored = await new Promise((resolve, reject) => {
-      const request = transaction.objectStore('tasks').getAll();
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+    const transaction = database.transaction(['tasks', 'searchIndex'], 'readonly');
+    const [stored, searchRecords] = await Promise.all([
+      new Promise((resolve, reject) => {
+        const request = transaction.objectStore('tasks').getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      }),
+      new Promise((resolve, reject) => {
+        const request = transaction.objectStore('searchIndex').getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      }),
+    ]);
+    const hasSearchIndex = database.objectStoreNames.contains('searchIndex');
+    const searchStore = transaction.objectStore('searchIndex');
+    const hasGramsIndex = searchStore.indexNames.contains('grams');
+    const version = database.version;
     database.close();
-    return stored;
+
+    const { TaskRepository } = await import('../data/task-repository.js');
+    const repository = new TaskRepository();
+    const matches = await repository.search('旧任务');
+    return {
+      hasGramsIndex,
+      hasSearchIndex,
+      matches: matches.map(({ id }) => id),
+      searchRecords,
+      stored,
+      version,
+    };
   });
 
-  expect(tasks).toHaveLength(2);
-  for (const task of tasks) {
+  expect(upgraded.version).toBe(3);
+  expect(upgraded.hasSearchIndex).toBe(true);
+  expect(upgraded.hasGramsIndex).toBe(true);
+  expect(upgraded.stored).toHaveLength(2);
+  expect(upgraded.searchRecords).toHaveLength(2);
+  for (const record of upgraded.searchRecords) {
+    expect(record).toEqual(expect.objectContaining({
+      taskId: expect.any(String),
+      grams: expect.arrayContaining(['旧', '任', '务', '旧任', '任务']),
+    }));
+  }
+  for (const task of upgraded.stored) {
     expect(task).toMatchObject({
       parentId: null,
       tagIds: [],
@@ -91,4 +123,5 @@ test('Chromium 中 v1 实库升级会物化旧任务关系字段', async ({ exte
       occurrenceKey: null,
     });
   }
+  expect(upgraded.matches).toEqual(LEGACY_TASKS.map(({ id }) => id).sort());
 });

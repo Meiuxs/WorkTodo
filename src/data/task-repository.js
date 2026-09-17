@@ -2,6 +2,12 @@ import { createTaskEvent } from '../domain/task-event.js';
 import { DomainError, ValidationError } from '../domain/errors.js';
 import { validateTask } from '../domain/task.js';
 import { materializeTaskRelationships, openWorkTodoDatabase } from './database.js';
+import {
+  createSearchIndexRecord,
+  normalizeSearchQuery,
+  normalizeSearchText,
+  querySearchGrams,
+} from './search-index.js';
 
 export class ConflictError extends DomainError {
   constructor(taskId) {
@@ -67,6 +73,13 @@ function matchesCriteria(task, criteria = {}) {
   return Object.entries(criteria).every(([field, value]) => task[field] === value);
 }
 
+function matchingTasks(tasks, criteria = {}) {
+  return tasks
+    .map(materializeTaskRelationships)
+    .filter((task) => matchesCriteria(task, criteria))
+    .map(clone);
+}
+
 export class TaskRepository {
   #database;
 
@@ -82,9 +95,10 @@ export class TaskRepository {
     const taskToSave = prepareTask(task);
     const eventToSave = prepareEvent(taskToSave.id, event);
     const database = await this.#getDatabase();
-    const transaction = database.transaction(['tasks', 'events'], 'readwrite');
+    const transaction = database.transaction(['tasks', 'events', 'searchIndex'], 'readwrite');
     transaction.objectStore('tasks').add(taskToSave);
     transaction.objectStore('events').add(eventToSave);
+    transaction.objectStore('searchIndex').put(createSearchIndexRecord(taskToSave));
     await transactionResult(transaction);
     return clone(taskToSave);
   }
@@ -102,7 +116,7 @@ export class TaskRepository {
     const requestedTask = prepareTask(task);
     const eventToSave = prepareEvent(requestedTask.id, event);
     const database = await this.#getDatabase();
-    const transaction = database.transaction(['tasks', 'events'], 'readwrite');
+    const transaction = database.transaction(['tasks', 'events', 'searchIndex'], 'readwrite');
     const tasks = transaction.objectStore('tasks');
     const currentTask = await requestResult(tasks.get(requestedTask.id));
 
@@ -120,6 +134,7 @@ export class TaskRepository {
     validateTask(taskToSave);
     tasks.put(taskToSave);
     transaction.objectStore('events').add(eventToSave);
+    transaction.objectStore('searchIndex').put(createSearchIndexRecord(taskToSave));
     await transactionResult(transaction);
     return clone(taskToSave);
   }
@@ -132,6 +147,116 @@ export class TaskRepository {
     return tasks
       .map(materializeTaskRelationships)
       .filter((task) => matchesCriteria(task, criteria))
+      .map(clone);
+  }
+
+  async #listTaskIndex(indexName, range, criteria = {}) {
+    const database = await this.#getDatabase();
+    const transaction = database.transaction('tasks', 'readonly');
+    const tasks = await requestResult(transaction.objectStore('tasks').index(indexName).getAll(range));
+    await transactionResult(transaction);
+    return matchingTasks(tasks, criteria);
+  }
+
+  async listScheduled(fromDate, toDate, criteria = {}) {
+    return this.#listTaskIndex(
+      'scheduledDate',
+      IDBKeyRange.bound(fromDate, toDate),
+      criteria,
+    );
+  }
+
+  async listCompleted(fromIso, toIso, criteria = {}) {
+    return this.#listTaskIndex(
+      'completedAt',
+      IDBKeyRange.bound(fromIso, toIso, false, true),
+      criteria,
+    );
+  }
+
+  async listCreated(fromIso, toIso, criteria = {}) {
+    return this.#listTaskIndex(
+      'createdAt',
+      IDBKeyRange.bound(fromIso, toIso, false, true),
+      criteria,
+    );
+  }
+
+  async listByLifecycle(lifecycle, criteria = {}) {
+    return this.#listTaskIndex('lifecycle', IDBKeyRange.only(lifecycle), criteria);
+  }
+
+  async listEventsByOccurredAt(fromIso, toIso, types = null) {
+    const database = await this.#getDatabase();
+    const transaction = database.transaction('events', 'readonly');
+    const events = await requestResult(
+      transaction.objectStore('events')
+        .index('occurredAt')
+        .getAll(IDBKeyRange.bound(fromIso, toIso, false, true)),
+    );
+    await transactionResult(transaction);
+    const acceptedTypes = types === null ? null : new Set(types);
+    return events
+      .filter((event) => acceptedTypes === null || acceptedTypes.has(event.type))
+      .map(clone);
+  }
+
+  async getMany(ids) {
+    if (!Array.isArray(ids)) {
+      throw new ValidationError('ids 必须是数组');
+    }
+    if (ids.length === 0) return [];
+
+    const database = await this.#getDatabase();
+    const transaction = database.transaction('tasks', 'readonly');
+    const tasks = await Promise.all(
+      ids.map((id) => requestResult(transaction.objectStore('tasks').get(id))),
+    );
+    await transactionResult(transaction);
+    return tasks
+      .filter((task) => task !== undefined)
+      .map(materializeTaskRelationships)
+      .map(clone);
+  }
+
+  async search(text) {
+    const query = normalizeSearchQuery(text);
+    const database = await this.#getDatabase();
+    const transaction = database.transaction(['tasks', 'searchIndex'], 'readonly');
+    const tasks = transaction.objectStore('tasks');
+
+    if (query.length === 0) {
+      const records = await requestResult(tasks.getAll());
+      await transactionResult(transaction);
+      return matchingTasks(records, { trashedAt: null });
+    }
+
+    const searchIndex = transaction.objectStore('searchIndex').index('grams');
+    let candidateIds = null;
+    for (const gram of querySearchGrams(query)) {
+      const keys = await requestResult(searchIndex.getAllKeys(IDBKeyRange.only(gram)));
+      const gramIds = new Set(keys);
+      if (candidateIds === null) {
+        candidateIds = gramIds;
+      } else {
+        candidateIds = new Set([...candidateIds].filter((id) => gramIds.has(id)));
+      }
+      if (candidateIds.size === 0) break;
+    }
+
+    const records = await Promise.all(
+      [...(candidateIds ?? [])]
+        .sort()
+        .map((id) => requestResult(tasks.get(id))),
+    );
+    await transactionResult(transaction);
+    return records
+      .filter((task) => (
+        task !== undefined
+        && task.trashedAt === null
+        && normalizeSearchText(task.title, task.description).includes(query)
+      ))
+      .map(materializeTaskRelationships)
       .map(clone);
   }
 
@@ -178,9 +303,13 @@ export class TaskRepository {
 
   async deleteCategoryAndMoveTasks(categoryId, destinationCategoryId, { updatedAt, createEvent }) {
     const database = await this.#getDatabase();
-    const transaction = database.transaction(['tasks', 'categories', 'events'], 'readwrite');
+    const transaction = database.transaction(
+      ['tasks', 'categories', 'events', 'searchIndex'],
+      'readwrite',
+    );
     const categories = transaction.objectStore('categories');
     const tasks = transaction.objectStore('tasks');
+    const searchIndex = transaction.objectStore('searchIndex');
     try {
       const category = await requestResult(categories.get(categoryId));
       const destination = destinationCategoryId === null
@@ -206,6 +335,7 @@ export class TaskRepository {
       for (const { task, event } of migrations) {
         tasks.put(task);
         transaction.objectStore('events').add(event);
+        searchIndex.put(createSearchIndexRecord(task));
       }
       categories.delete(categoryId);
       await transactionResult(transaction);
@@ -259,15 +389,25 @@ export class TaskRepository {
 
     const database = await this.#getDatabase();
     const transaction = database.transaction(
-      ['tasks', 'categories', 'events', 'tags', 'recurringTemplates'],
+      ['tasks', 'categories', 'events', 'tags', 'recurringTemplates', 'searchIndex'],
       'readwrite',
     );
     const completion = transactionResult(transaction);
     try {
-      for (const storeName of ['tasks', 'categories', 'events', 'tags', 'recurringTemplates']) {
+      for (const storeName of [
+        'tasks',
+        'categories',
+        'events',
+        'tags',
+        'recurringTemplates',
+        'searchIndex',
+      ]) {
         transaction.objectStore(storeName).clear();
       }
-      for (const task of tasks) transaction.objectStore('tasks').put(task);
+      for (const task of tasks) {
+        transaction.objectStore('tasks').put(task);
+        transaction.objectStore('searchIndex').put(createSearchIndexRecord(task));
+      }
       for (const category of categories) transaction.objectStore('categories').put(category);
       for (const event of events) transaction.objectStore('events').put(event);
       for (const tag of tags) transaction.objectStore('tags').put(tag);

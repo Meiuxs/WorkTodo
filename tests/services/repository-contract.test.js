@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { ConflictError, TaskRepository } from '../../src/data/task-repository.js';
+import { createSearchIndexRecord } from '../../src/data/search-index.js';
 import { SettingsRepository } from '../../src/data/settings-repository.js';
 import { BackupService } from '../../src/services/backup-service.js';
 import { InMemoryStorageArea, InMemoryTaskRepository } from '../helpers/fakes.js';
@@ -34,6 +35,155 @@ const EVENT = { id: 'e1', taskId: 't1', type: 'TASK_UPDATED', occurredAt: NOW, d
 const TAG = { id: TAG_ID, name: '客户', createdAt: NOW, updatedAt: NOW };
 const TEMPLATE = { id: TEMPLATE_ID, title: '周报', active: true, updatedAt: NOW };
 
+globalThis.IDBKeyRange = {
+  only: (value) => ({ includes: (key) => key === value }),
+  bound: (lower, upper, lowerOpen = false, upperOpen = false) => ({
+    includes: (key) => (
+      (lowerOpen ? key > lower : key >= lower)
+      && (upperOpen ? key < upper : key <= upper)
+    ),
+  }),
+};
+
+function asyncRequest(result) {
+  const request = { result: structuredClone(result) };
+  queueMicrotask(() => request.onsuccess?.());
+  return request;
+}
+
+function keysFor(record, keyPath, multiEntry) {
+  const value = record[keyPath];
+  if (value === null || value === undefined) return [];
+  if (multiEntry && Array.isArray(value)) return value;
+  return [value];
+}
+
+class IndexedDbFake {
+  #stores;
+
+  constructor({ tasks = [], events = [] } = {}) {
+    this.indexReads = [];
+    this.transactionLog = [];
+    this.#stores = new Map([
+      ['tasks', new Map(tasks.map((task) => [task.id, structuredClone(task)]))],
+      ['categories', new Map()],
+      ['events', new Map(events.map((event) => [event.id, structuredClone(event)]))],
+      ['tags', new Map()],
+      ['recurringTemplates', new Map()],
+      [
+        'searchIndex',
+        new Map(tasks.map((task) => {
+          const record = createSearchIndexRecord(task);
+          return [record.taskId, record];
+        })),
+      ],
+    ]);
+  }
+
+  transaction(names, mode = 'readonly') {
+    const storeNames = Array.isArray(names) ? [...names] : [names];
+    for (const name of storeNames) {
+      if (!this.#stores.has(name)) throw new Error(`store 不存在: ${name}`);
+    }
+    this.transactionLog.push({ storeNames, mode });
+    const transaction = {};
+    setTimeout(() => transaction.oncomplete?.(), 0);
+    transaction.objectStore = (name) => this.#store(name);
+    return transaction;
+  }
+
+  #store(name) {
+    const database = this;
+    const records = this.#stores.get(name);
+    const keyPath = name === 'searchIndex' ? 'taskId' : 'id';
+    const indexes = name === 'searchIndex'
+      ? { grams: { keyPath: 'grams', multiEntry: true } }
+      : {
+          scheduledDate: { keyPath: 'scheduledDate' },
+          lifecycle: { keyPath: 'lifecycle' },
+          completedAt: { keyPath: 'completedAt' },
+          createdAt: { keyPath: 'createdAt' },
+          categoryId: { keyPath: 'categoryId' },
+          trashedAt: { keyPath: 'trashedAt' },
+          tagIds: { keyPath: 'tagIds', multiEntry: true },
+          taskId: { keyPath: 'taskId' },
+          occurredAt: { keyPath: 'occurredAt' },
+        };
+    const getRecords = (range) => [...records.values()]
+      .filter((record) => range === undefined || range.includes(record[keyPath]))
+      .map((record) => structuredClone(record));
+
+    return {
+      get(key) {
+        const record = records.get(key);
+        return asyncRequest(record);
+      },
+      getAll(range) {
+        return asyncRequest(getRecords(range));
+      },
+      getAllKeys(range) {
+        const values = [...records.values()]
+          .filter((record) => range === undefined || range.includes(record[keyPath]))
+          .map((record) => record[keyPath])
+          .sort();
+        return asyncRequest(values);
+      },
+      add(record) {
+        if (records.has(record[keyPath])) throw new Error('主键已存在');
+        records.set(record[keyPath], structuredClone(record));
+      },
+      put(record) {
+        records.set(record[keyPath], structuredClone(record));
+      },
+      clear() {
+        records.clear();
+      },
+      index(indexName) {
+        const definition = indexes[indexName];
+        if (definition === undefined) throw new Error(`索引不存在: ${indexName}`);
+        const matching = (range) => {
+          database.indexReads.push({ storeName: name, indexName, range });
+          return [...records.entries()].filter(([, record]) => (
+            keysFor(record, definition.keyPath, definition.multiEntry)
+              .some((key) => range === undefined || range.includes(key))
+          ));
+        };
+        return {
+          getAll(range) {
+            return asyncRequest(matching(range).map(([, record]) => record));
+          },
+          getAllKeys(range) {
+            const keys = matching(range)
+              .map(([primaryKey]) => primaryKey)
+              .sort();
+            return asyncRequest(keys);
+          },
+        };
+      },
+    };
+  }
+
+  snapshot() {
+    return Object.fromEntries(
+      [...this.#stores].map(([name, records]) => [
+        name,
+        structuredClone([...records.values()]),
+      ]),
+    );
+  }
+}
+
+function indexedTask(overrides = {}) {
+  return {
+    ...BASE_TASK,
+    id: 'task',
+    scheduledDate: null,
+    firstScheduledDate: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 class SimulatedStore {
   #transaction;
   #name;
@@ -48,8 +198,12 @@ class SimulatedStore {
   }
 
   put(value) {
-    if (value === null || typeof value !== 'object' || value.id === undefined) {
-      const error = new Error('对象缺少 id');
+    if (
+      value === null
+      || typeof value !== 'object'
+      || (value.id === undefined && value.taskId === undefined)
+    ) {
+      const error = new Error('对象缺少主键');
       error.name = 'DataError';
       throw error;
     }
@@ -105,7 +259,8 @@ class SimulatedTransaction {
         this.#stores.set(operation.name, []);
       } else {
         const values = this.#stores.get(operation.name);
-        const index = values.findIndex((item) => item.id === operation.value.id);
+        const primaryKey = operation.value.id ?? operation.value.taskId;
+        const index = values.findIndex((item) => (item.id ?? item.taskId) === primaryKey);
         if (index === -1) values.push(operation.value);
         else values[index] = operation.value;
       }
@@ -253,6 +408,7 @@ test('TaskRepository.replaceAll 同步 put 失败时显式 abort 并保留五个
     events: [EVENT],
     tags: [TAG],
     recurringTemplates: [TEMPLATE],
+    searchIndex: [],
   });
   const repository = new TaskRepository(database);
   const before = database.snapshot();
@@ -308,6 +464,293 @@ test('TaskRepository 读取、列表和导出边界补齐旧任务关系字段�
 
   const file = await backup.createBackup();
   assert.doesNotThrow(() => backup.validateBackup(JSON.stringify(file)));
+});
+
+test('TaskRepository 范围方法使用闭区间与半开区间边界并返回独立 clone', async () => {
+  const tasks = [
+    indexedTask({ id: 'scheduled-before', scheduledDate: '2026-09-16' }),
+    indexedTask({ id: 'scheduled-start', scheduledDate: '2026-09-17' }),
+    indexedTask({ id: 'scheduled-end', scheduledDate: '2026-09-18' }),
+    indexedTask({ id: 'scheduled-after', scheduledDate: '2026-09-19' }),
+    indexedTask({
+      id: 'completed-start',
+      scheduledDate: null,
+      lifecycle: 'completed',
+      completedAt: '2026-09-17T00:00:00.000Z',
+    }),
+    indexedTask({
+      id: 'completed-end',
+      scheduledDate: null,
+      lifecycle: 'completed',
+      completedAt: '2026-09-18T00:00:00.000Z',
+    }),
+    indexedTask({
+      id: 'created-start',
+      scheduledDate: null,
+      createdAt: '2026-09-17T00:00:00.000Z',
+    }),
+    indexedTask({
+      id: 'created-end',
+      scheduledDate: null,
+      createdAt: '2026-09-18T00:00:00.000Z',
+    }),
+    indexedTask({ id: 'cancelled', scheduledDate: null, lifecycle: 'cancelled' }),
+  ];
+  const events = [
+    { id: 'event-start', taskId: 'scheduled-start', type: 'POSTPONE', occurredAt: '2026-09-17T00:00:00.000Z' },
+    { id: 'event-end', taskId: 'scheduled-end', type: 'RESCHEDULE', occurredAt: '2026-09-18T00:00:00.000Z' },
+    { id: 'event-other', taskId: 'scheduled-end', type: 'EDIT', occurredAt: '2026-09-17T12:00:00.000Z' },
+  ];
+  const repository = new TaskRepository(new IndexedDbFake({ tasks, events }));
+
+  assert.deepEqual(
+    (await repository.listScheduled('2026-09-17', '2026-09-18')).map(({ id }) => id),
+    ['scheduled-start', 'scheduled-end'],
+  );
+  assert.deepEqual(
+    (await repository.listCompleted(
+      '2026-09-17T00:00:00.000Z',
+      '2026-09-18T00:00:00.000Z',
+    )).map(({ id }) => id),
+    ['completed-start'],
+  );
+  assert.deepEqual(
+    (await repository.listCreated(
+      '2026-09-17T00:00:00.000Z',
+      '2026-09-18T00:00:00.000Z',
+    )).map(({ id }) => id),
+    ['created-start'],
+  );
+  assert.deepEqual(
+    (await repository.listByLifecycle('cancelled')).map(({ id }) => id),
+    ['cancelled'],
+  );
+  assert.deepEqual(
+    (await repository.listEventsByOccurredAt(
+      '2026-09-17T00:00:00.000Z',
+      '2026-09-18T00:00:00.000Z',
+      ['POSTPONE'],
+    )).map(({ id }) => id),
+    ['event-start'],
+  );
+
+  const legacyTask = indexedTask({ id: 'legacy', title: '旧标题' });
+  delete legacyTask.parentId;
+  delete legacyTask.tagIds;
+  delete legacyTask.seriesId;
+  delete legacyTask.occurrenceKey;
+  const legacyRepository = new TaskRepository(new IndexedDbFake({ tasks: [legacyTask] }));
+  const [listed] = await legacyRepository.listByLifecycle('todo');
+  listed.title = '外部修改';
+  const fetchedLegacy = await legacyRepository.get('legacy');
+  assert.equal(fetchedLegacy.title, '旧标题');
+  assert.deepEqual(
+    Object.fromEntries(
+      ['parentId', 'tagIds', 'seriesId', 'occurrenceKey']
+        .map((field) => [field, fetchedLegacy[field]]),
+    ),
+    {
+      parentId: null,
+      tagIds: [],
+      seriesId: null,
+      occurrenceKey: null,
+    },
+  );
+});
+
+test('TaskRepository.search 使用 gram 索引、真实包含校验并支持空查询', async () => {
+  const tasks = [
+    indexedTask({
+      id: 'title',
+      title: 'Call Alice',
+      description: '',
+    }),
+    indexedTask({
+      id: 'description',
+      title: '跟进',
+      description: 'Discuss ALICE\n合同',
+    }),
+    indexedTask({
+      id: 'unicode',
+      title: '项目 😀',
+      description: '中文子串',
+    }),
+    indexedTask({
+      id: 'false-positive',
+      title: 'a猫x猫b',
+      description: '',
+    }),
+    indexedTask({
+      id: 'trashed',
+      title: 'Alice archive',
+      trashedAt: NOW,
+    }),
+  ];
+  const database = new IndexedDbFake({ tasks });
+  const repository = new TaskRepository(database);
+
+  assert.deepEqual(
+    (await repository.search('alice')).map(({ id }) => id),
+    ['description', 'title'],
+  );
+  assert.deepEqual(
+    (await repository.search('😀')).map(({ id }) => id),
+    ['unicode'],
+  );
+  assert.deepEqual(
+    (await repository.search('中文子串')).map(({ id }) => id),
+    ['unicode'],
+  );
+  assert.deepEqual(await repository.search('a猫b'), []);
+
+  database.indexReads.length = 0;
+  assert.deepEqual(
+    (await repository.search('')).map(({ id }) => id),
+    ['title', 'description', 'unicode', 'false-positive'],
+  );
+  assert.equal(
+    database.indexReads.some(({ storeName, indexName }) => (
+      storeName === 'searchIndex' && indexName === 'grams'
+    )),
+    false,
+  );
+});
+
+test('TaskRepository 在任务事务中增量维护搜索索引且 replaceAll 不返回派生字段', async () => {
+  const database = new IndexedDbFake();
+  const repository = new TaskRepository(database);
+
+  const created = await repository.create(BASE_TASK, {
+    ...EVENT,
+    type: 'TASK_CREATED',
+  });
+  assert.equal(Object.hasOwn(created, 'grams'), false);
+  assert.deepEqual(
+    database.snapshot().searchIndex[0],
+    createSearchIndexRecord(BASE_TASK),
+  );
+  assert.deepEqual(
+    database.transactionLog.at(-1).storeNames,
+    ['tasks', 'events', 'searchIndex'],
+  );
+
+  await repository.update({ ...BASE_TASK, title: '更新标题' }, 0, {
+    ...EVENT,
+    id: 'event-updated',
+  });
+  assert.ok(database.snapshot().searchIndex[0].grams.includes('更新'));
+  const updateTransaction = database.transactionLog
+    .findLast(({ mode }) => mode === 'readwrite');
+  assert.deepEqual(
+    updateTransaction.storeNames,
+    ['tasks', 'events', 'searchIndex'],
+  );
+  assert.deepEqual(
+    await repository.search('更新标题'),
+    [{ ...BASE_TASK, title: '更新标题', revision: 1 }],
+  );
+
+  const replacement = {
+    ...BASE_TASK,
+    id: 't2',
+    title: '替换任务',
+    description: '替换描述',
+  };
+  await repository.replaceAll({
+    tasks: [replacement],
+    categories: [],
+    events: [{ ...EVENT, id: 'event-replaced', taskId: replacement.id }],
+  });
+  assert.deepEqual(
+    database.snapshot().searchIndex,
+    [createSearchIndexRecord(replacement)],
+  );
+  assert.deepEqual(
+    (await repository.search('替换描述')).map(({ id }) => id),
+    ['t2'],
+  );
+  const replaced = await repository.get('t2');
+  assert.equal(Object.hasOwn(replaced, 'grams'), false);
+  const replaceTransaction = database.transactionLog
+    .findLast(({ mode }) => mode === 'readwrite');
+  assert.deepEqual(
+    replaceTransaction.storeNames,
+    ['tasks', 'categories', 'events', 'tags', 'recurringTemplates', 'searchIndex'],
+  );
+});
+
+test('InMemoryTaskRepository 与真实仓库的新增查询语义一致', async () => {
+  const tasks = [
+    indexedTask({ id: 'a', scheduledDate: '2026-09-17', lifecycle: 'todo' }),
+    indexedTask({
+      id: 'b',
+      scheduledDate: '2026-09-18',
+      lifecycle: 'completed',
+      completedAt: '2026-09-17T09:00:00.000Z',
+    }),
+    indexedTask({
+      id: 'c',
+      scheduledDate: null,
+      lifecycle: 'cancelled',
+      completedAt: null,
+      cancelledAt: NOW,
+    }),
+  ];
+  const events = [
+    {
+      id: 'e1',
+      taskId: 'a',
+      type: 'POSTPONE',
+      occurredAt: '2026-09-17T10:00:00.000Z',
+      detail: null,
+    },
+    {
+      id: 'e2',
+      taskId: 'b',
+      type: 'EDIT',
+      occurredAt: '2026-09-18T10:00:00.000Z',
+      detail: null,
+    },
+  ];
+  const real = new TaskRepository(new IndexedDbFake({ tasks, events }));
+  const memory = new InMemoryTaskRepository(tasks, [], events);
+
+  assert.deepEqual(
+    await real.listScheduled('2026-09-17', '2026-09-18'),
+    await memory.listScheduled('2026-09-17', '2026-09-18'),
+  );
+  assert.deepEqual(
+    await real.listCompleted('2026-09-17T00:00:00.000Z', '2026-09-18T00:00:00.000Z'),
+    await memory.listCompleted('2026-09-17T00:00:00.000Z', '2026-09-18T00:00:00.000Z'),
+  );
+  assert.deepEqual(
+    await real.listCreated('2026-09-17T00:00:00.000Z', '2026-09-18T00:00:00.000Z'),
+    await memory.listCreated('2026-09-17T00:00:00.000Z', '2026-09-18T00:00:00.000Z'),
+  );
+  assert.deepEqual(
+    await real.listByLifecycle('cancelled'),
+    await memory.listByLifecycle('cancelled'),
+  );
+  assert.deepEqual(
+    await real.listEventsByOccurredAt(
+      '2026-09-17T00:00:00.000Z',
+      '2026-09-19T00:00:00.000Z',
+      ['POSTPONE'],
+    ),
+    await memory.listEventsByOccurredAt(
+      '2026-09-17T00:00:00.000Z',
+      '2026-09-19T00:00:00.000Z',
+      ['POSTPONE'],
+    ),
+  );
+  assert.deepEqual(
+    (await real.search('任务')).map(({ id }) => id).sort(),
+    (await memory.search('任务')).map(({ id }) => id).sort(),
+  );
+  assert.deepEqual(
+    (await real.getMany(['a', 'missing', 'a'])).map(({ id }) => id),
+    (await memory.getMany(['a', 'missing', 'a'])).map(({ id }) => id),
+  );
 });
 
 test('settings 与 metadata 使用隔离键且返回独立快照', async () => {

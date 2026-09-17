@@ -51,6 +51,22 @@ function createStatistics(tasks, events = []) {
   return new StatisticsService(new InMemoryTaskRepository(tasks, [], events));
 }
 
+function createRecordingStatistics(tasks, events = []) {
+  const repository = new InMemoryTaskRepository(tasks, [], events);
+  const calls = [];
+  const recordingRepository = new Proxy(repository, {
+    get(target, property) {
+      const value = Reflect.get(target, property, target);
+      if (typeof value !== 'function') return value;
+      return (...args) => {
+        calls.push({ method: property, args });
+        return value.apply(target, args);
+      };
+    },
+  });
+  return { statistics: new StatisticsService(recordingRepository), calls };
+}
+
 test('每日工作记录按 completedAt 而非 scheduledDate 统计', async () => {
   const statistics = createStatistics([
     task({ id: 'planned-open' }),
@@ -362,4 +378,36 @@ test('完成统计使用系统本地日期而不是 UTC 日期字符串', async 
   ]);
 
   assert.equal((await statistics.daily(localDate)).completedCount, 1);
+});
+
+test('统计通过索引范围与批量读取获取数据且不调用 exportAll 或 list', async () => {
+  const { statistics, calls } = createRecordingStatistics([
+    task({
+      id: 'planned',
+      scheduledDate: '2026-09-17',
+      firstScheduledDate: '2026-09-17',
+      lifecycle: 'completed',
+      completedAt: '2026-09-17T09:00:00.000Z',
+    }),
+  ], [
+    event({
+      id: 'postpone',
+      taskId: 'planned',
+      type: 'POSTPONE',
+      occurredAt: '2026-09-17T03:00:00.000Z',
+    }),
+  ]);
+
+  const result = await statistics.daily('2026-09-17');
+
+  assert.equal(result.plannedCount, 1);
+  assert.equal(result.postponedCount, 1);
+  const invoked = calls.map(({ method }) => method);
+  assert.ok(invoked.includes('listCreated'));
+  assert.ok(invoked.includes('listCompleted'));
+  assert.ok(invoked.includes('listScheduled'));
+  assert.ok(invoked.includes('listEventsByOccurredAt'));
+  assert.ok(invoked.includes('getMany'));
+  assert.equal(invoked.includes('list'), false);
+  assert.equal(invoked.includes('exportAll'), false);
 });

@@ -2,6 +2,10 @@ import { createTaskEvent } from '../../src/domain/task-event.js';
 import { ValidationError } from '../../src/domain/errors.js';
 import { validateTask } from '../../src/domain/task.js';
 import { ConflictError } from '../../src/data/task-repository.js';
+import {
+  normalizeSearchQuery,
+  normalizeSearchText,
+} from '../../src/data/search-index.js';
 
 function clone(value) {
   return structuredClone(value);
@@ -17,6 +21,10 @@ function prepareEvent(taskId, event) {
   const copy = createTaskEvent(event);
   if (copy.taskId !== taskId) throw new ValidationError('event.taskId 必须与任务一致');
   return copy;
+}
+
+function matchesCriteria(task, criteria = {}) {
+  return Object.entries(criteria).every(([field, value]) => task[field] === value);
 }
 
 function prepareTag(tag) {
@@ -88,7 +96,73 @@ export class InMemoryTaskRepository {
 
   async list(criteria = {}) {
     return [...this.#tasks.values()]
-      .filter((task) => Object.entries(criteria).every(([field, value]) => task[field] === value))
+      .filter((task) => matchesCriteria(task, criteria))
+      .map(clone);
+  }
+
+  async listScheduled(fromDate, toDate, criteria = {}) {
+    return [...this.#tasks.values()]
+      .filter((task) => (
+        task.scheduledDate !== null
+        && task.scheduledDate >= fromDate
+        && task.scheduledDate <= toDate
+        && matchesCriteria(task, criteria)
+      ))
+      .map(clone);
+  }
+
+  async listCompleted(fromIso, toIso, criteria = {}) {
+    return [...this.#tasks.values()]
+      .filter((task) => (
+        task.completedAt !== null
+        && task.completedAt >= fromIso
+        && task.completedAt < toIso
+        && matchesCriteria(task, criteria)
+      ))
+      .map(clone);
+  }
+
+  async listCreated(fromIso, toIso, criteria = {}) {
+    return [...this.#tasks.values()]
+      .filter((task) => (
+        task.createdAt !== null
+        && task.createdAt >= fromIso
+        && task.createdAt < toIso
+        && matchesCriteria(task, criteria)
+      ))
+      .map(clone);
+  }
+
+  async listByLifecycle(lifecycle, criteria = {}) {
+    return [...this.#tasks.values()]
+      .filter((task) => task.lifecycle === lifecycle && matchesCriteria(task, criteria))
+      .map(clone);
+  }
+
+  async listEventsByOccurredAt(fromIso, toIso, types = null) {
+    const acceptedTypes = types === null ? null : new Set(types);
+    return clone(this.#events.filter((event) => (
+      event.occurredAt >= fromIso
+      && event.occurredAt < toIso
+      && (acceptedTypes === null || acceptedTypes.has(event.type))
+    )));
+  }
+
+  async getMany(ids) {
+    if (!Array.isArray(ids)) throw new ValidationError('ids 必须是数组');
+    return ids
+      .map((id) => this.#tasks.get(id))
+      .filter((task) => task !== undefined)
+      .map(clone);
+  }
+
+  async search(text) {
+    const query = normalizeSearchQuery(text);
+    return [...this.#tasks.values()]
+      .filter((task) => (
+        task.trashedAt === null
+        && (query.length === 0 || normalizeSearchText(task.title, task.description).includes(query))
+      ))
       .map(clone);
   }
 
