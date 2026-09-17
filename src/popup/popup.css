@@ -1,0 +1,39 @@
+@import url("../styles/tokens.css");
+@import url("../styles/base.css");
+
+body { min-width: 360px; background: var(--canvas); }
+
+.popup { min-height: 500px; padding: 18px; }
+
+.popup__topline, .popup__summary, .popup__input-row, .popup__date-options, .task-row {
+  display: flex;
+  align-items: center;
+}
+
+.popup__topline { justify-content: space-between; color: var(--muted); font-size: var(--text-sm); }
+.popup__open-dashboard { border: 0; background: transparent; color: var(--teal); padding: 4px; }
+h1 { margin: 22px 0 4px; font-size: var(--text-lg); }
+.popup__summary { gap: 8px; color: var(--muted); font-size: var(--text-sm); }
+.progress { flex: 1; height: 4px; background: var(--line); }
+.progress > span { display: block; height: 100%; background: var(--teal); }
+
+.task-section { margin-top: 24px; }
+.task-section h2 { margin: 0 0 8px; font-size: var(--text-sm); }
+.task-section--overdue h2 { color: var(--coral); }
+.task-list { margin: 0; padding: 0; list-style: none; }
+.task-row { gap: 9px; min-height: 36px; border-bottom: 1px solid var(--line); font-size: var(--text-sm); }
+.task-row__state { color: var(--teal); font-weight: 700; }
+.task-row__title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-row__detail { color: var(--muted); font-size: var(--text-xs); }
+.task-row__detail--overdue { color: var(--coral); font-weight: 700; }
+
+.popup__form { margin-top: 24px; }
+.popup__input-row { gap: 8px; }
+.popup__input-row input { min-width: 0; flex: 1; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-raised); color: var(--ink); padding: 10px 12px; }
+.popup__submit { border: 0; border-radius: 6px; background: var(--teal); color: var(--surface-raised); min-width: 38px; min-height: 38px; font-size: 20px; }
+.popup__date-options { gap: 8px; margin-top: 10px; }
+.date-option { border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); padding: 5px 10px; font-size: var(--text-xs); }
+.date-option[aria-pressed="true"] { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); font-weight: 700; }
+.form-message { min-height: 20px; margin: 6px 0 0; color: var(--coral); font-size: var(--text-xs); }
+.empty { color: var(--muted); font-size: var(--text-sm); }
+.toast { position: fixed; right: 14px; bottom: 14px; max-width: 310px; border-radius: 6px; background: var(--ink); box-shadow: var(--shadow-float); color: var(--surface-raised); padding: 10px 12px; font-size: var(--text-sm); }

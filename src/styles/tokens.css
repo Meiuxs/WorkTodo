@@ -1,0 +1,21 @@
+:root {
+  --canvas: #e8f1ed;
+  --surface: #fbfaf7;
+  --surface-raised: #fffdf9;
+  --ink: #183331;
+  --muted: #6b7e7a;
+  --line: #cfded8;
+  --teal: #2c7a7b;
+  --teal-soft: #e5f0ec;
+  --coral: #e56d56;
+  --coral-soft: #fae9e4;
+  --focus: #1b6466;
+  --disabled: #a7b5b0;
+  --font-sans: "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 18px;
+  --text-xl: 28px;
+  --shadow-float: 0 8px 24px rgb(24 51 49 / 10%);
+}

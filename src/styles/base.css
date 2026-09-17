@@ -1,0 +1,18 @@
+* { box-sizing: border-box; }
+
+html { color: var(--ink); font-family: var(--font-sans); line-height: 1.5; }
+
+body { margin: 0; background: var(--canvas); }
+
+button, input { font: inherit; }
+
+button { cursor: pointer; }
+
+button:focus-visible, input:focus-visible, a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}
