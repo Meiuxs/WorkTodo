@@ -83,6 +83,16 @@
               <label class="field">截止时间<input name="dueTime" type="time"></label>
             </div>
           </details>
+          <section class="editor-subtasks" data-editor-subtasks hidden>
+            <h3>子任务</h3>
+            <div class="subtask-list" data-subtask-list></div>
+            <div class="subtask-create">
+              <label for="subtask-title">添加子任务</label>
+              <input id="subtask-title" maxlength="200">
+              <button type="button" data-subtask-create>添加子任务</button>
+            </div>
+            <p class="form-message" data-subtask-message role="alert"></p>
+          </section>
           <p class="form-message" data-editor-message role="alert"></p>
           <div class="conflict-panel" data-editor-conflict hidden>
             <p>这个任务刚刚在另一个窗口更新过。你可以保留当前修改为新任务，或载入最新版本。</p>

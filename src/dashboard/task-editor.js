@@ -14,6 +14,7 @@ export function createTaskEditor({
   getCategories,
   getTags,
   onCreateTag,
+  subtaskService,
   onCreate,
   onUpdate,
   onCopy,
@@ -28,6 +29,10 @@ export function createTaskEditor({
   const tagOptions = dialog.querySelector('[data-tag-options]');
   const newTag = dialog.querySelector('#new-tag');
   const tagMessage = dialog.querySelector('[data-tag-message]');
+  const subtasks = dialog.querySelector('[data-editor-subtasks]');
+  const subtaskList = dialog.querySelector('[data-subtask-list]');
+  const subtaskTitle = dialog.querySelector('#subtask-title');
+  const subtaskMessage = dialog.querySelector('[data-subtask-message]');
   let tags = [];
   let currentTask = null;
   let trigger = null;
@@ -52,6 +57,20 @@ export function createTaskEditor({
   async function loadTags(selectedIds = []) {
     tags = await getTags();
     populateTags(tags, selectedIds);
+  }
+
+  async function renderSubtasks() {
+    const canManage = currentTask !== null && currentTask.parentId === null;
+    subtasks.hidden = !canManage;
+    if (!canManage) {
+      subtaskList.replaceChildren();
+      subtaskTitle.value = '';
+      return;
+    }
+    const items = await subtaskService.list(currentTask.id);
+    subtaskList.innerHTML = items.length === 0
+      ? '<p class="empty">还没有子任务。</p>'
+      : items.map((task) => `<button type="button" class="subtask-row" data-subtask-id="${escapeHtml(task.id)}">${escapeHtml(task.title)} <span>${task.lifecycle === 'completed' ? '已完成' : '待办'}</span></button>`).join('');
   }
 
   function readChanges() {
@@ -89,6 +108,7 @@ export function createTaskEditor({
     field(form, 'priority').value = defaults.priority ?? 'none';
     conflict.hidden = true;
     showMessage('');
+    await renderSubtasks();
     if (!dialog.open) dialog.showModal();
     requestAnimationFrame(() => field(form, 'title').focus());
   }
@@ -109,6 +129,7 @@ export function createTaskEditor({
     field(form, 'starred').checked = Boolean(task.starred);
     conflict.hidden = true;
     showMessage('');
+    await renderSubtasks();
     if (!dialog.open) dialog.showModal();
     requestAnimationFrame(() => field(form, 'title').focus());
   }
@@ -187,6 +208,25 @@ export function createTaskEditor({
       tagMessage.textContent = error.message;
       newTag.focus();
     }
+  });
+  dialog.querySelector('[data-subtask-create]').addEventListener('click', async () => {
+    if (currentTask === null) return;
+    subtaskMessage.textContent = '';
+    try {
+      await subtaskService.createSubtask(currentTask.id, { title: subtaskTitle.value });
+      subtaskTitle.value = '';
+      await renderSubtasks();
+      subtaskTitle.focus();
+    } catch (error) {
+      subtaskMessage.textContent = error.message;
+      subtaskTitle.focus();
+    }
+  });
+  subtaskList.addEventListener('click', async (event) => {
+    const row = event.target.closest('[data-subtask-id]');
+    if (row === null) return;
+    const latest = await onReload(row.dataset.subtaskId);
+    await openTask(latest, trigger);
   });
 
   return { openNew, openTask, close };
