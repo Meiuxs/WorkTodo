@@ -10,6 +10,7 @@ import { StatisticsService } from '../services/statistics-service.js';
 import { SummaryService } from '../services/summary-service.js';
 import { BackupService } from '../services/backup-service.js';
 import { DashboardController } from './dashboard-controller.js';
+import { UndoController } from './undo-controller.js';
 import { createTaskEditor } from './task-editor.js';
 import { createTodayView } from './views/today-view.js';
 import { createWeekView } from './views/week-view.js';
@@ -47,6 +48,7 @@ const toast = document.querySelector('#toast');
 const confirmDialog = document.querySelector('#confirm-dialog');
 let controller;
 let toastTimer;
+const undoController = new UndoController();
 
 function dateOffset(date, days) {
   return toLocalDate(new Date(date.getFullYear(), date.getMonth(), date.getDate() + days));
@@ -58,20 +60,30 @@ function formatWorkspaceDate(date) {
 }
 
 function showToast(message, { actionLabel = null, onAction = null } = {}) {
+  clearTimeout(toastTimer);
   toast.replaceChildren(document.createTextNode(message));
   if (actionLabel !== null && onAction !== null) {
+    undoController.offer({ message, undo: onAction });
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = actionLabel;
     button.addEventListener('click', async () => {
       toast.hidden = true;
-      await onAction();
+      try {
+        await undoController.undo();
+      } catch (error) {
+        onError(error);
+      }
     }, { once: true });
     toast.append(' ', button);
+  } else {
+    undoController.dismiss();
   }
   toast.hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toast.hidden = true; }, 5000);
+  toastTimer = setTimeout(() => {
+    toast.hidden = true;
+    undoController.dismiss();
+  }, 5000);
 }
 
 function confirmAction({ title, message, confirmLabel = '确认' }) {
