@@ -42,10 +42,12 @@ function assertNullableIdentifier(value, fieldName) {
 function normalizeTagIds(tagIds) {
   if (tagIds === undefined) return [];
   if (!Array.isArray(tagIds)) throw new ValidationError('tagIds 必须是数组');
-  const normalized = tagIds.map((id) => {
+  const normalized = [];
+  for (let index = 0; index < tagIds.length; index += 1) {
+    const id = tagIds[index];
     assertIdentifier(id, 'tagId');
-    return id;
-  });
+    normalized.push(id);
+  }
   if (new Set(normalized).size !== normalized.length) {
     throw new ValidationError('tagIds 不能重复');
   }

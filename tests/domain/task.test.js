@@ -102,6 +102,29 @@ test('V1.1 任务关系字段兼容旧数据并严格校验已提供值', () => 
   }
 });
 
+test('V1.1 tagIds 拒绝稀疏数组和非法元素', () => {
+  const sparseOnly = new Array(1);
+  const sparseWithTag = [, 'tag-1'];
+
+  assert.throws(
+    () => createTask({ title: '报价', tagIds: sparseOnly }, NOW, 't2'),
+    ValidationError,
+  );
+  assert.throws(
+    () => createTask({ title: '报价', tagIds: sparseWithTag }, NOW, 't3'),
+    ValidationError,
+  );
+  assert.throws(() => validateTask({ ...BASE_TASK, tagIds: sparseOnly }), ValidationError);
+  assert.throws(() => validateTask({ ...BASE_TASK, tagIds: sparseWithTag }), ValidationError);
+
+  assert.throws(
+    () => createTask({ title: '报价', tagIds: [undefined] }, NOW, 't4'),
+    ValidationError,
+  );
+  assert.throws(() => validateTask({ ...BASE_TASK, tagIds: [''] }), ValidationError);
+  assert.throws(() => validateTask({ ...BASE_TASK, tagIds: [42] }), ValidationError);
+});
+
 test('重新安排回收集箱时保留首次计划日期并清空时间字段', () => {
   const task = createTask({
     title: '报价',
