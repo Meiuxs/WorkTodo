@@ -219,14 +219,19 @@ export class TaskRepository {
 
   async exportAll() {
     const database = await this.#getDatabase();
-    const transaction = database.transaction(['tasks', 'categories', 'events'], 'readonly');
-    const [tasks, categories, events] = await Promise.all([
+    const transaction = database.transaction(
+      ['tasks', 'categories', 'events', 'tags', 'recurringTemplates'],
+      'readonly',
+    );
+    const [tasks, categories, events, tags, recurringTemplates] = await Promise.all([
       requestResult(transaction.objectStore('tasks').getAll()),
       requestResult(transaction.objectStore('categories').getAll()),
       requestResult(transaction.objectStore('events').getAll()),
+      requestResult(transaction.objectStore('tags').getAll()),
+      requestResult(transaction.objectStore('recurringTemplates').getAll()),
     ]);
     await transactionResult(transaction);
-    return clone({ tasks, categories, events });
+    return clone({ tasks, categories, events, tags, recurringTemplates });
   }
 
   async replaceAll(snapshot) {
@@ -236,19 +241,28 @@ export class TaskRepository {
     const tasks = (snapshot.tasks ?? []).map(prepareTask);
     const categories = (snapshot.categories ?? []).map(prepareCategory);
     const events = (snapshot.events ?? []).map((event) => createTaskEvent(event));
+    const tags = clone(snapshot.tags ?? []);
+    const recurringTemplates = clone(snapshot.recurringTemplates ?? []);
     const taskIds = new Set(tasks.map((task) => task.id));
     if (events.some((event) => !taskIds.has(event.taskId))) {
       throw new ValidationError('event.taskId 必须引用快照中的任务');
     }
 
     const database = await this.#getDatabase();
-    const transaction = database.transaction(['tasks', 'categories', 'events'], 'readwrite');
-    for (const storeName of ['tasks', 'categories', 'events']) {
+    const transaction = database.transaction(
+      ['tasks', 'categories', 'events', 'tags', 'recurringTemplates'],
+      'readwrite',
+    );
+    for (const storeName of ['tasks', 'categories', 'events', 'tags', 'recurringTemplates']) {
       transaction.objectStore(storeName).clear();
     }
     for (const task of tasks) transaction.objectStore('tasks').put(task);
     for (const category of categories) transaction.objectStore('categories').put(category);
     for (const event of events) transaction.objectStore('events').put(event);
+    for (const tag of tags) transaction.objectStore('tags').put(tag);
+    for (const template of recurringTemplates) {
+      transaction.objectStore('recurringTemplates').put(template);
+    }
     await transactionResult(transaction);
   }
 }

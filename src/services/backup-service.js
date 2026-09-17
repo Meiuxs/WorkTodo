@@ -3,8 +3,10 @@ import { validateTask } from '../domain/task.js';
 import { createTaskEvent } from '../domain/task-event.js';
 import { SettingsRepository } from '../data/settings-repository.js';
 
-const SCHEMA_VERSION = 1;
-const TOP_LEVEL_FIELDS = ['schemaVersion', 'appVersion', 'exportedAt', 'tasks', 'categories', 'events', 'settings'];
+const SCHEMA_VERSION = 2;
+const V1_TOP_LEVEL_FIELDS = ['schemaVersion', 'appVersion', 'exportedAt', 'tasks', 'categories', 'events', 'settings'];
+const V2_TOP_LEVEL_FIELDS = [...V1_TOP_LEVEL_FIELDS, 'tags', 'recurringTemplates'];
+const TASK_RELATIONSHIP_FIELDS = ['parentId', 'tagIds', 'seriesId', 'occurrenceKey'];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function clone(value) {
@@ -51,15 +53,13 @@ function assertUniqueUuid(items, fieldName) {
   }
 }
 
-function validateTopLevel(backup) {
+function validateTopLevel(backup, schemaVersion) {
   assertPlainObject(backup, 'backup');
+  const expectedFields = schemaVersion === 1 ? V1_TOP_LEVEL_FIELDS : V2_TOP_LEVEL_FIELDS;
   const keys = Object.keys(backup).sort();
-  const expected = [...TOP_LEVEL_FIELDS].sort();
+  const expected = [...expectedFields].sort();
   if (keys.length !== expected.length || keys.some((key, index) => key !== expected[index])) {
-    throw new ValidationError(`备份顶层字段必须固定为 ${TOP_LEVEL_FIELDS.join(', ')}`);
-  }
-  if (backup.schemaVersion !== SCHEMA_VERSION) {
-    throw new ValidationError('schemaVersion 不受支持');
+    throw new ValidationError(`备份顶层字段必须固定为 ${expectedFields.join(', ')}`);
   }
   if (typeof backup.appVersion !== 'string' || backup.appVersion.length === 0) {
     throw new ValidationError('appVersion 不能为空');
@@ -68,7 +68,29 @@ function validateTopLevel(backup) {
   assertArray(backup.tasks, 'tasks');
   assertArray(backup.categories, 'categories');
   assertArray(backup.events, 'events');
+  if (schemaVersion === 2) {
+    assertArray(backup.tags, 'tags');
+    assertArray(backup.recurringTemplates, 'recurringTemplates');
+  }
   assertPlainObject(backup.settings, 'settings');
+}
+
+function upgradeBackup(backup) {
+  if (backup.schemaVersion !== 1) {
+    return clone(backup);
+  }
+  const upgraded = clone(backup);
+  upgraded.schemaVersion = SCHEMA_VERSION;
+  upgraded.tasks = upgraded.tasks.map((task) => ({
+    parentId: null,
+    tagIds: [],
+    seriesId: null,
+    occurrenceKey: null,
+    ...task,
+  }));
+  upgraded.tags = [];
+  upgraded.recurringTemplates = [];
+  return upgraded;
 }
 
 function validateCategories(categories) {
@@ -85,6 +107,11 @@ function validateCategories(categories) {
 function validateTasks(tasks, categoryIds) {
   assertUniqueUuid(tasks, 'task');
   for (const task of tasks) {
+    for (const field of TASK_RELATIONSHIP_FIELDS) {
+      if (!Object.hasOwn(task, field)) {
+        throw new ValidationError(`task.${field} 必须显式提供`);
+      }
+    }
     validateTask(task);
     assertUuid(task.id, 'task.id');
     assertIsoString(task.createdAt, 'task.createdAt');
@@ -145,6 +172,8 @@ function allConflicts(current, backup) {
     ...conflictsFor('tasks', current.tasks, backup.tasks),
     ...conflictsFor('categories', current.categories, backup.categories),
     ...conflictsFor('events', current.events, backup.events),
+    ...conflictsFor('tags', current.tags ?? [], backup.tags),
+    ...conflictsFor('recurringTemplates', current.recurringTemplates ?? [], backup.recurringTemplates),
   ];
 }
 
@@ -190,13 +219,18 @@ export class BackupService {
 
   validateBackup(text) {
     const backup = parseBackup(text);
-    validateTopLevel(backup);
-    const categoryIds = new Set(backup.categories.map((category) => category.id));
-    validateCategories(backup.categories);
-    validateTasks(backup.tasks, categoryIds);
-    const taskIds = new Set(backup.tasks.map((task) => task.id));
-    validateEvents(backup.events, taskIds);
-    return clone(backup);
+    assertPlainObject(backup, 'backup');
+    if (![1, SCHEMA_VERSION].includes(backup.schemaVersion)) {
+      throw new ValidationError('schemaVersion 不受支持');
+    }
+    validateTopLevel(backup, backup.schemaVersion);
+    const upgraded = upgradeBackup(backup);
+    const categoryIds = new Set(upgraded.categories.map((category) => category.id));
+    validateCategories(upgraded.categories);
+    validateTasks(upgraded.tasks, categoryIds);
+    const taskIds = new Set(upgraded.tasks.map((task) => task.id));
+    validateEvents(upgraded.events, taskIds);
+    return clone(upgraded);
   }
 
   serializeBackup(snapshot) {
@@ -212,6 +246,8 @@ export class BackupService {
       tasks: snapshot.tasks,
       categories: snapshot.categories,
       events: snapshot.events,
+      tags: snapshot.tags ?? [],
+      recurringTemplates: snapshot.recurringTemplates ?? [],
       settings: (await this.#settingsRepository.getSettings()) ?? {},
     };
     await this.#saveMetadata({ lastExportedAt: backup.exportedAt });
@@ -243,6 +279,12 @@ export class BackupService {
       tasks: mergeById(current.tasks, backup.tasks, 'updatedAt'),
       categories: mergeById(current.categories, backup.categories, 'updatedAt'),
       events: mergeById(current.events, backup.events, 'occurredAt'),
+      tags: mergeById(current.tags ?? [], backup.tags, 'updatedAt'),
+      recurringTemplates: mergeById(
+        current.recurringTemplates ?? [],
+        backup.recurringTemplates,
+        'updatedAt',
+      ),
     };
     await this.#repository.replaceAll(snapshot);
     await this.#saveMetadata({ lastImportedAt: this.#now() });
@@ -257,6 +299,8 @@ export class BackupService {
       tasks: backup.tasks,
       categories: backup.categories,
       events: backup.events,
+      tags: backup.tags,
+      recurringTemplates: backup.recurringTemplates,
     };
     try {
       await this.#repository.replaceAll(snapshot);

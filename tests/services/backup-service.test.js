@@ -12,12 +12,18 @@ const OTHER_ID = '22222222-2222-4222-8222-222222222222';
 const CATEGORY_ID = '33333333-3333-4333-8333-333333333333';
 const EVENT_ID = '44444444-4444-4444-8444-444444444444';
 const OTHER_EVENT_ID = '55555555-5555-4555-8555-555555555555';
+const TAG_ID = '66666666-6666-4666-8666-666666666666';
+const TEMPLATE_ID = '77777777-7777-4777-8777-777777777777';
 
 const BASE_TASK = {
   id: SAME_ID,
   title: '本机较新版本',
   priority: 'none',
   categoryId: CATEGORY_ID,
+  parentId: null,
+  tagIds: [],
+  seriesId: null,
+  occurrenceKey: null,
   scheduledDate: '2026-09-17',
   firstScheduledDate: '2026-09-17',
   startTime: null,
@@ -41,15 +47,28 @@ const OTHER_TASK = {
 const CATEGORY = { id: CATEGORY_ID, name: '项目', createdAt: NOW, updatedAt: NOW };
 const EVENT = { id: EVENT_ID, taskId: SAME_ID, type: 'CREATE', occurredAt: NOW, detail: null };
 const OTHER_EVENT = { id: OTHER_EVENT_ID, taskId: OTHER_ID, type: 'CREATE', occurredAt: NOW, detail: null };
+const TAG = { id: TAG_ID, name: '客户', createdAt: NOW, updatedAt: NOW };
+const TEMPLATE = { id: TEMPLATE_ID, title: '周报', active: true, updatedAt: NOW };
+
+function legacyTask(overrides = {}) {
+  const task = { ...OTHER_TASK, ...overrides };
+  delete task.parentId;
+  delete task.tagIds;
+  delete task.seriesId;
+  delete task.occurrenceKey;
+  return task;
+}
 
 function backupFile(overrides = {}) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     appVersion: '0.1.0',
     exportedAt: NOW,
     tasks: [OTHER_TASK],
     categories: [],
     events: [OTHER_EVENT],
+    tags: [],
+    recurringTemplates: [],
     settings: { firstDayOfWeek: 1 },
     ...overrides,
   };
@@ -64,9 +83,16 @@ function installStorage(storage = new InMemoryStorageArea()) {
   };
 }
 
-function createBackupService({ tasks = [BASE_TASK], categories = [CATEGORY], events = [EVENT], storage } = {}) {
+function createBackupService({
+  tasks = [BASE_TASK],
+  categories = [CATEGORY],
+  events = [EVENT],
+  tags = [],
+  recurringTemplates = [],
+  storage,
+} = {}) {
   const restoreChrome = installStorage(storage);
-  const repo = new InMemoryTaskRepository(tasks, categories, events);
+  const repo = new InMemoryTaskRepository(tasks, categories, events, tags, recurringTemplates);
   const backup = new BackupService(repo, { now: () => NOW, appVersion: '0.1.0' });
   return { backup, repo, restoreChrome, storage };
 }
@@ -102,14 +128,31 @@ test('合并保留 updatedAt 较新的同 UUID 任务并报告冲突', async () 
   }
 });
 
-test('导出包含版本和导出时间并记录 metadata', async () => {
+test('导出包含 schema v2、V1.1 集合并记录 metadata', async () => {
   const storage = new InMemoryStorageArea();
-  const { backup, restoreChrome } = createBackupService({ storage });
+  const { backup, restoreChrome } = createBackupService({
+    tags: [TAG],
+    recurringTemplates: [TEMPLATE],
+    storage,
+  });
   try {
     const file = await backup.createBackup();
-    assert.equal(file.schemaVersion, 1);
+    assert.equal(file.schemaVersion, 2);
     assert.equal(file.appVersion, '0.1.0');
     assert.match(file.exportedAt, /T/);
+    assert.deepEqual(Object.keys(file), [
+      'schemaVersion',
+      'appVersion',
+      'exportedAt',
+      'tasks',
+      'categories',
+      'events',
+      'tags',
+      'recurringTemplates',
+      'settings',
+    ]);
+    assert.deepEqual(file.tags, [TAG]);
+    assert.deepEqual(file.recurringTemplates, [TEMPLATE]);
     assert.equal(storage.snapshot().metadata.lastExportedAt, NOW);
   } finally {
     restoreChrome();
@@ -120,13 +163,91 @@ test('严格校验顶层字段、schema 版本、UUID 唯一性和任务必需�
   const { backup, restoreChrome } = createBackupService();
   try {
     assert.throws(() => backup.validateBackup(JSON.stringify({ ...backupFile(), extra: true })), ValidationError);
-    assert.throws(() => backup.validateBackup(JSON.stringify(backupFile({ schemaVersion: 2 }))), ValidationError);
+    assert.throws(() => backup.validateBackup(JSON.stringify(backupFile({
+      schemaVersion: 1,
+      tags: [],
+      recurringTemplates: [],
+    }))), ValidationError);
+    const missingTags = backupFile();
+    delete missingTags.tags;
+    assert.throws(() => backup.validateBackup(JSON.stringify(missingTags)), ValidationError);
+    assert.throws(() => backup.validateBackup(JSON.stringify(backupFile({ schemaVersion: 3 }))), ValidationError);
     assert.throws(() => backup.validateBackup(JSON.stringify(backupFile({
       tasks: [OTHER_TASK, { ...OTHER_TASK, title: '重复 UUID' }],
     }))), ValidationError);
     assert.throws(() => backup.validateBackup(JSON.stringify(backupFile({
       tasks: [{ ...OTHER_TASK, title: '' }],
     }))), ValidationError);
+    for (const field of ['parentId', 'tagIds', 'seriesId', 'occurrenceKey']) {
+      const task = { ...OTHER_TASK };
+      delete task[field];
+      assert.throws(
+        () => backup.validateBackup(JSON.stringify(backupFile({ tasks: [task] }))),
+        ValidationError,
+      );
+    }
+  } finally {
+    restoreChrome();
+  }
+});
+
+test('v1 备份导入时补齐 V1.1 字段并保留原任务、分类、事件和设置', async () => {
+  const legacy = JSON.stringify({
+    schemaVersion: 1,
+    appVersion: '0.1.0',
+    exportedAt: NOW,
+    tasks: [legacyTask()],
+    categories: [CATEGORY],
+    events: [OTHER_EVENT],
+    settings: { firstDayOfWeek: 1 },
+  });
+  const { backup, repo, restoreChrome } = createBackupService();
+  try {
+    const upgraded = await backup.validateBackup(legacy);
+    const preview = await backup.previewImport(legacy);
+
+    assert.equal(upgraded.schemaVersion, 2);
+    assert.deepEqual(upgraded.tags, []);
+    assert.deepEqual(upgraded.recurringTemplates, []);
+    assert.deepEqual(upgraded.tasks[0].tagIds, []);
+    assert.equal(upgraded.tasks[0].parentId, null);
+    assert.equal(upgraded.tasks[0].seriesId, null);
+    assert.equal(upgraded.tasks[0].occurrenceKey, null);
+    assert.equal(upgraded.tasks[0].title, OTHER_TASK.title);
+    assert.deepEqual(upgraded.categories, [CATEGORY]);
+    assert.deepEqual(upgraded.events, [OTHER_EVENT]);
+    assert.deepEqual(upgraded.settings, { firstDayOfWeek: 1 });
+    assert.equal(preview.taskCount, 1);
+    assert.equal((await repo.get(SAME_ID)).title, BASE_TASK.title);
+  } finally {
+    restoreChrome();
+  }
+});
+
+test('v1 备份 merge 保留本机标签和模板，replace 将其替换为空数组', async () => {
+  const legacy = JSON.stringify({
+    schemaVersion: 1,
+    appVersion: '0.1.0',
+    exportedAt: NOW,
+    tasks: [legacyTask()],
+    categories: [],
+    events: [OTHER_EVENT],
+    settings: { firstDayOfWeek: 1 },
+  });
+  const { backup, repo, restoreChrome } = createBackupService({
+    tags: [TAG],
+    recurringTemplates: [TEMPLATE],
+  });
+  try {
+    await backup.importBackup(legacy, 'merge');
+    let snapshot = await repo.exportAll();
+    assert.deepEqual(snapshot.tags, [TAG]);
+    assert.deepEqual(snapshot.recurringTemplates, [TEMPLATE]);
+
+    await backup.importBackup(legacy, 'replace');
+    snapshot = await repo.exportAll();
+    assert.deepEqual(snapshot.tags, []);
+    assert.deepEqual(snapshot.recurringTemplates, []);
   } finally {
     restoreChrome();
   }
@@ -220,6 +341,38 @@ test('merge 对分类和事件同时间冲突保留本机实体', async () => {
     const snapshot = await repo.exportAll();
     assert.equal(snapshot.categories.find((category) => category.id === CATEGORY_ID).name, '项目');
     assert.equal(snapshot.events.find((event) => event.id === EVENT_ID).type, 'CREATE');
+  } finally {
+    restoreChrome();
+  }
+});
+
+test('merge 和 replace 传递标签与重复模板快照', async () => {
+  const incomingTag = { ...TAG, name: '重点客户', updatedAt: LATER };
+  const incomingTemplate = { ...TEMPLATE, active: false, updatedAt: LATER };
+  const incoming = backupFile({
+    tags: [incomingTag],
+    recurringTemplates: [incomingTemplate],
+  });
+  const { backup, repo, restoreChrome } = createBackupService({
+    tasks: [],
+    categories: [],
+    events: [],
+    tags: [TAG],
+    recurringTemplates: [TEMPLATE],
+  });
+  try {
+    await backup.importBackup(JSON.stringify(incoming), 'merge');
+    let snapshot = await repo.exportAll();
+    assert.deepEqual(snapshot.tags, [incomingTag]);
+    assert.deepEqual(snapshot.recurringTemplates, [incomingTemplate]);
+
+    await backup.importBackup(JSON.stringify(backupFile({
+      tags: [TAG],
+      recurringTemplates: [TEMPLATE],
+    })), 'replace');
+    snapshot = await repo.exportAll();
+    assert.deepEqual(snapshot.tags, [TAG]);
+    assert.deepEqual(snapshot.recurringTemplates, [TEMPLATE]);
   } finally {
     restoreChrome();
   }

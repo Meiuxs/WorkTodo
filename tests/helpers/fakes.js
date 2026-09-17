@@ -36,12 +36,16 @@ export class InMemoryTaskRepository {
   #tasks;
   #categories;
   #events;
+  #tags;
+  #recurringTemplates;
   #nextCategoryMigrationFailure = null;
 
-  constructor(tasks = [], categories = [], events = []) {
+  constructor(tasks = [], categories = [], events = [], tags = [], recurringTemplates = []) {
     this.#tasks = new Map(tasks.map((task) => [task.id, prepareTask(task)]));
     this.#categories = clone(categories);
     this.#events = events.map((event) => createTaskEvent(event));
+    this.#tags = clone(tags);
+    this.#recurringTemplates = clone(recurringTemplates);
   }
 
   #addEvent(event) {
@@ -159,7 +163,13 @@ export class InMemoryTaskRepository {
   }
 
   async exportAll() {
-    return clone({ tasks: [...this.#tasks.values()], categories: this.#categories, events: this.#events });
+    return clone({
+      tasks: [...this.#tasks.values()],
+      categories: this.#categories,
+      events: this.#events,
+      tags: this.#tags,
+      recurringTemplates: this.#recurringTemplates,
+    });
   }
 
   async replaceAll(snapshot) {
@@ -175,6 +185,8 @@ export class InMemoryTaskRepository {
     this.#tasks = new Map(tasks.map((task) => [task.id, task]));
     this.#categories = clone(snapshot.categories ?? []);
     this.#events = events;
+    this.#tags = clone(snapshot.tags ?? []);
+    this.#recurringTemplates = clone(snapshot.recurringTemplates ?? []);
   }
 }
 

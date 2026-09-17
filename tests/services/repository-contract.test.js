@@ -6,11 +6,17 @@ import { SettingsRepository } from '../../src/data/settings-repository.js';
 import { InMemoryStorageArea, InMemoryTaskRepository } from '../helpers/fakes.js';
 
 const NOW = '2026-09-17T08:30:00.000Z';
+const TAG_ID = '66666666-6666-4666-8666-666666666666';
+const TEMPLATE_ID = '77777777-7777-4777-8777-777777777777';
 const BASE_TASK = {
   id: 't1',
   title: '报价',
   priority: 'none',
   categoryId: null,
+  parentId: null,
+  tagIds: [],
+  seriesId: null,
+  occurrenceKey: null,
   scheduledDate: '2026-09-17',
   firstScheduledDate: '2026-09-17',
   startTime: null,
@@ -23,6 +29,8 @@ const BASE_TASK = {
   trashedAt: null,
 };
 const EVENT = { id: 'e1', taskId: 't1', type: 'TASK_UPDATED', occurredAt: NOW, detail: null };
+const TAG = { id: TAG_ID, name: '客户', createdAt: NOW, updatedAt: NOW };
+const TEMPLATE = { id: TEMPLATE_ID, title: '周报', active: true, updatedAt: NOW };
 
 test('update 在 revision 过期时拒绝静默覆盖', async () => {
   const currentTask = { ...BASE_TASK, revision: 1 };
@@ -68,6 +76,33 @@ test('replaceAll 替换数据且不复用传入快照', async () => {
   snapshot.tasks[0].title = '外部修改';
   assert.equal((await repo.get('t1')), undefined);
   assert.equal((await repo.get('t2')).title, '导入任务');
+});
+
+test('exportAll 与 replaceAll round-trip 标签和重复模板并返回独立快照', async () => {
+  const repo = new InMemoryTaskRepository([], [], [], [TAG], [TEMPLATE]);
+  const exported = await repo.exportAll();
+  assert.deepEqual(exported.tags, [TAG]);
+  assert.deepEqual(exported.recurringTemplates, [TEMPLATE]);
+
+  exported.tags[0].name = '外部修改';
+  exported.recurringTemplates[0].active = false;
+  assert.deepEqual((await repo.exportAll()).tags, [TAG]);
+  assert.deepEqual((await repo.exportAll()).recurringTemplates, [TEMPLATE]);
+
+  const snapshot = {
+    tasks: [],
+    categories: [],
+    events: [],
+    tags: [{ ...TAG, name: '重点客户' }],
+    recurringTemplates: [{ ...TEMPLATE, active: false }],
+  };
+  await repo.replaceAll(snapshot);
+  snapshot.tags[0].name = '再次外部修改';
+  snapshot.recurringTemplates[0].active = true;
+
+  const replaced = await repo.exportAll();
+  assert.deepEqual(replaced.tags, [{ ...TAG, name: '重点客户' }]);
+  assert.deepEqual(replaced.recurringTemplates, [{ ...TEMPLATE, active: false }]);
 });
 
 test('settings 与 metadata 使用隔离键且返回独立快照', async () => {
