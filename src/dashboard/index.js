@@ -1,4 +1,5 @@
 import { toLocalDate } from '../domain/dates.js';
+import { applyTheme } from '../shared/theme.js';
 import { TaskRepository } from '../data/task-repository.js';
 import { TagRepository } from '../data/tag-repository.js';
 import { SettingsRepository } from '../data/settings-repository.js';
@@ -310,4 +311,7 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 document.querySelector('#workspace-date').textContent = formatWorkspaceDate(toLocalDate(new Date()));
+settingsRepository.getSettings()
+  .then((settings) => applyTheme(settings?.theme ?? 'system'))
+  .catch(onError);
 navigate('today').catch(onError);

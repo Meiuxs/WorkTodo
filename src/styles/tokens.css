@@ -11,6 +11,7 @@
   --coral-soft: #fae9e4;
   --focus: #1b6466;
   --disabled: #a7b5b0;
+  --nav-hover: rgb(255 253 249 / 60%);
   --font-sans: "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
   --text-xs: 12px;
   --text-sm: 13px;
@@ -18,4 +19,21 @@
   --text-lg: 18px;
   --text-xl: 28px;
   --shadow-float: 0 8px 24px rgb(24 51 49 / 10%);
+}
+
+:root[data-theme="dark"] {
+  --canvas: #10201f;
+  --surface: #162a28;
+  --surface-raised: #1d3532;
+  --ink: #e8f1ed;
+  --muted: #a5b8b3;
+  --line: #31504b;
+  --teal: #63c3b7;
+  --teal-soft: #1e4642;
+  --coral: #ff9a82;
+  --coral-soft: #4b2d2a;
+  --focus: #8ce1d5;
+  --disabled: #71817d;
+  --nav-hover: rgb(29 53 50 / 88%);
+  --shadow-float: 0 8px 24px rgb(0 0 0 / 28%);
 }

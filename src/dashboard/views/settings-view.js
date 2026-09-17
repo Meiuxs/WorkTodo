@@ -1,4 +1,5 @@
 import { escapeHtml, runViewAction } from '../../shared/ui.js';
+import { applyTheme, THEME_SETTINGS } from '../../shared/theme.js';
 
 const INITIAL_STATE = Object.freeze({
   kind: 'idle',
@@ -197,9 +198,26 @@ export function createSettingsView({
   async function render(signal) {
     categories = await taskService.listCategories();
     if (signal?.aborted) return;
-    const metadata = await settingsRepository.getMetadata() ?? {};
+    const [metadataValue, settings] = await Promise.all([
+      settingsRepository.getMetadata(),
+      settingsRepository.getSettings(),
+    ]);
     if (signal?.aborted) return;
-    root.innerHTML = `<section class="view-section" aria-labelledby="data-management-heading">
+    const metadata = metadataValue ?? {};
+    const selectedTheme = THEME_SETTINGS.includes(settings?.theme) ? settings.theme : 'system';
+    root.innerHTML = `<section class="view-section" aria-labelledby="appearance-heading">
+      <div class="section-heading">
+        <div><h2 id="appearance-heading">外观</h2></div>
+      </div>
+      <label class="field theme-setting">主题
+        <select data-theme-setting>
+          <option value="system">跟随系统</option>
+          <option value="light">浅色</option>
+          <option value="dark">深色</option>
+        </select>
+      </label>
+    </section>
+    <section class="view-section" aria-labelledby="data-management-heading">
       <div class="section-heading">
         <div><h2 id="data-management-heading">数据管理</h2><p>扩展卸载会清除本地数据。重要工作请定期导出 JSON 备份。</p></div>
         <span class="data-timestamp">最近导出：${metadata.lastExportedAt ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(metadata.lastExportedAt)) : '尚未导出'}</span>
@@ -240,6 +258,21 @@ export function createSettingsView({
       </dialog>
     </section>`;
 
+    const themeSelect = root.querySelector('[data-theme-setting]');
+    themeSelect.value = selectedTheme;
+    themeSelect.addEventListener('change', () => {
+      runViewAction(async () => {
+        const current = await settingsRepository.getSettings() ?? {};
+        const next = { ...current, theme: themeSelect.value };
+        try {
+          await settingsRepository.saveSettings(next);
+        } catch (error) {
+          themeSelect.value = THEME_SETTINGS.includes(current.theme) ? current.theme : 'system';
+          throw error;
+        }
+        applyTheme(next.theme);
+      }, { signal, onError });
+    });
     renderDataState(signal);
     root.querySelector('#export-backup').addEventListener('click', () => {
       runViewAction(() => exportBackup(signal), { signal, onError });

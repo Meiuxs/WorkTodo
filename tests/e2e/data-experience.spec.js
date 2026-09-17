@@ -186,3 +186,14 @@ test('设置页可以下载 CSV 文件而不申请 downloads 权限', async ({ e
     '"标题","状态","优先级","分类","标签","计划日期","开始时间","截止时间","完成时间","创建时间"',
   );
 });
+
+test('深色模式选择在重新打开设置页后保持', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.getByRole('button', { name: '设置' }).click();
+  await page.getByLabel('主题').selectOption('dark');
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+  await page.reload();
+  await page.getByRole('button', { name: '设置' }).click();
+  await expect(page.getByLabel('主题')).toHaveValue('dark');
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+});

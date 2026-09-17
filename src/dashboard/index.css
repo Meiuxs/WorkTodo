@@ -50,7 +50,7 @@
 }
 
 .nav button:hover,
-.nav__settings:hover { background: rgb(255 253 249 / 60%); }
+.nav__settings:hover { background: var(--nav-hover); }
 .nav button[aria-current="page"],
 .nav__settings[aria-current="page"] {
   border-left-color: var(--teal);
@@ -331,6 +331,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .metrics dd { margin: 4px 0 0; color: var(--teal); font-size: var(--text-lg); font-weight: 700; }
 
 .data-timestamp { color: var(--muted); font-size: var(--text-xs); }
+.theme-setting { max-width: 260px; }
 .data-actions,
 .category-create,
 .category-row { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; }
