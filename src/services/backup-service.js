@@ -77,6 +77,8 @@ function validateCategories(categories) {
     if (typeof category.name !== 'string' || category.name.trim().length === 0) {
       throw new ValidationError('category.name 不能为空');
     }
+    assertIsoString(category.createdAt, 'category.createdAt');
+    assertIsoString(category.updatedAt, 'category.updatedAt');
   }
 }
 
@@ -120,16 +122,37 @@ function parseBackup(text) {
   }
 }
 
-function latestTask(local, incoming) {
-  const incomingTime = Date.parse(incoming.updatedAt);
-  const localTime = Date.parse(local.updatedAt);
+function latestEntity(local, incoming, timeField) {
+  const incomingTime = Date.parse(incoming[timeField]);
+  const localTime = Date.parse(local[timeField]);
   return incomingTime > localTime ? incoming : local;
 }
 
-function mergeById(localItems, incomingItems) {
+function conflictsFor(entity, localItems, incomingItems) {
+  const incomingById = new Map(incomingItems.map((item) => [item.id, item]));
+  return localItems
+    .filter((item) => incomingById.has(item.id))
+    .map((item) => ({
+      entity,
+      id: item.id,
+      local: item,
+      incoming: incomingById.get(item.id),
+    }));
+}
+
+function allConflicts(current, backup) {
+  return [
+    ...conflictsFor('tasks', current.tasks, backup.tasks),
+    ...conflictsFor('categories', current.categories, backup.categories),
+    ...conflictsFor('events', current.events, backup.events),
+  ];
+}
+
+function mergeById(localItems, incomingItems, timeField) {
   const items = new Map(localItems.map((item) => [item.id, item]));
   for (const item of incomingItems) {
-    if (!items.has(item.id)) items.set(item.id, item);
+    const local = items.get(item.id);
+    items.set(item.id, local === undefined ? item : latestEntity(local, item, timeField));
   }
   return [...items.values()];
 }
@@ -198,10 +221,7 @@ export class BackupService {
   async previewImport(text) {
     const backup = this.validateBackup(text);
     const current = await this.#repository.exportAll();
-    const currentTaskIds = new Set(current.tasks.map((task) => task.id));
-    const conflicts = backup.tasks
-      .filter((task) => currentTaskIds.has(task.id))
-      .map((task) => ({ id: task.id, local: current.tasks.find((item) => item.id === task.id), incoming: task }));
+    const conflicts = allConflicts(current, backup);
     return importResult(backup, conflicts);
   }
 
@@ -218,19 +238,11 @@ export class BackupService {
 
   async #mergeImport(backup) {
     const current = await this.#repository.exportAll();
-    const incomingTasks = new Map(backup.tasks.map((task) => [task.id, task]));
-    const conflicts = current.tasks
-      .filter((task) => incomingTasks.has(task.id))
-      .map((task) => ({ id: task.id, local: task, incoming: incomingTasks.get(task.id) }));
-    const mergedTasks = new Map(current.tasks.map((task) => [task.id, task]));
-    for (const task of backup.tasks) {
-      const local = mergedTasks.get(task.id);
-      mergedTasks.set(task.id, local === undefined ? task : latestTask(local, task));
-    }
+    const conflicts = allConflicts(current, backup);
     const snapshot = {
-      tasks: [...mergedTasks.values()],
-      categories: mergeById(current.categories, backup.categories),
-      events: mergeById(current.events, backup.events),
+      tasks: mergeById(current.tasks, backup.tasks, 'updatedAt'),
+      categories: mergeById(current.categories, backup.categories, 'updatedAt'),
+      events: mergeById(current.events, backup.events, 'occurredAt'),
     };
     await this.#repository.replaceAll(snapshot);
     await this.#saveMetadata({ lastImportedAt: this.#now() });

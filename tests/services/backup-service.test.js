@@ -91,7 +91,11 @@ test('合并保留 updatedAt 较新的同 UUID 任务并报告冲突', async () 
   const { backup, repo, restoreChrome } = createBackupService();
   try {
     const result = await backup.importBackup(JSON.stringify(incoming), 'merge');
-    assert.equal(result.conflicts.length, 1);
+    assert.deepEqual(result.conflicts.map(({ entity, id }) => ({ entity, id })), [
+      { entity: 'tasks', id: SAME_ID },
+      { entity: 'categories', id: CATEGORY_ID },
+      { entity: 'events', id: EVENT_ID },
+    ]);
     assert.equal((await repo.get(SAME_ID)).title, '本机较新版本');
   } finally {
     restoreChrome();
@@ -142,14 +146,94 @@ test('预览只读返回数量和冲突但不修改旧数据', async () => {
       taskCount: preview.taskCount,
       categoryCount: preview.categoryCount,
       eventCount: preview.eventCount,
-      conflicts: preview.conflicts.map((conflict) => conflict.id),
+      conflicts: preview.conflicts.map(({ entity, id }) => ({ entity, id })),
     }, {
       taskCount: 2,
       categoryCount: 1,
       eventCount: 2,
-      conflicts: [SAME_ID],
+      conflicts: [
+        { entity: 'tasks', id: SAME_ID },
+        { entity: 'categories', id: CATEGORY_ID },
+        { entity: 'events', id: EVENT_ID },
+      ],
     });
     assert.deepEqual(await repo.exportAll(), before);
+  } finally {
+    restoreChrome();
+  }
+});
+
+test('预览和 merge 报告任务分类事件冲突并按时间选择较新实体', async () => {
+  const incomingCategory = { ...CATEGORY, name: '导入较新分类', updatedAt: LATER };
+  const incomingEvent = {
+    ...EVENT,
+    type: 'EDIT',
+    occurredAt: LATER,
+    detail: { source: 'import' },
+  };
+  const incoming = backupFile({
+    tasks: [{ ...OLD_LOCAL_TASK, title: '导入较新任务', updatedAt: LATER }],
+    categories: [incomingCategory],
+    events: [incomingEvent],
+  });
+  const storage = new InMemoryStorageArea();
+  const { backup, repo, restoreChrome } = createBackupService({
+    tasks: [OLD_LOCAL_TASK],
+    categories: [CATEGORY],
+    events: [EVENT],
+    storage,
+  });
+  try {
+    const preview = await backup.previewImport(JSON.stringify(incoming));
+    const merged = await backup.importBackup(JSON.stringify(incoming), 'merge');
+    const expectedConflicts = [
+      { entity: 'tasks', id: SAME_ID },
+      { entity: 'categories', id: CATEGORY_ID },
+      { entity: 'events', id: EVENT_ID },
+    ];
+    assert.deepEqual(preview.conflicts.map(({ entity, id }) => ({ entity, id })), expectedConflicts);
+    assert.deepEqual(merged.conflicts.map(({ entity, id }) => ({ entity, id })), expectedConflicts);
+
+    const snapshot = await repo.exportAll();
+    assert.equal((await repo.get(SAME_ID)).title, '导入较新任务');
+    assert.equal(snapshot.categories.find((category) => category.id === CATEGORY_ID).name, '导入较新分类');
+    assert.equal(snapshot.events.find((event) => event.id === EVENT_ID).type, 'EDIT');
+    assert.deepEqual(snapshot.events.find((event) => event.id === EVENT_ID).detail, { source: 'import' });
+  } finally {
+    restoreChrome();
+  }
+});
+
+test('merge 对分类和事件同时间冲突保留本机实体', async () => {
+  const incoming = backupFile({
+    tasks: [{ ...OLD_LOCAL_TASK, title: '导入同时间任务' }],
+    categories: [{ ...CATEGORY, name: '导入同时间分类' }],
+    events: [{ ...EVENT, type: 'EDIT', detail: { source: 'import' } }],
+  });
+  const { backup, repo, restoreChrome } = createBackupService({
+    tasks: [OLD_LOCAL_TASK],
+    categories: [CATEGORY],
+    events: [EVENT],
+  });
+  try {
+    await backup.importBackup(JSON.stringify(incoming), 'merge');
+    const snapshot = await repo.exportAll();
+    assert.equal(snapshot.categories.find((category) => category.id === CATEGORY_ID).name, '项目');
+    assert.equal(snapshot.events.find((event) => event.id === EVENT_ID).type, 'CREATE');
+  } finally {
+    restoreChrome();
+  }
+});
+
+test('分类必须携带合法 createdAt 和 updatedAt 时间', async () => {
+  const { backup, restoreChrome } = createBackupService();
+  try {
+    assert.throws(() => backup.validateBackup(JSON.stringify(backupFile({
+      categories: [{ ...CATEGORY, createdAt: 123 }],
+    }))), ValidationError);
+    assert.throws(() => backup.validateBackup(JSON.stringify(backupFile({
+      categories: [{ ...CATEGORY, updatedAt: '不是时间' }],
+    }))), ValidationError);
   } finally {
     restoreChrome();
   }
@@ -168,7 +252,11 @@ test('merge 导入较新的同 UUID 任务，时间相同保留本机，并写�
   const { backup, repo, restoreChrome } = createBackupService({ tasks: [OLD_LOCAL_TASK], storage });
   try {
     const result = await backup.importBackup(JSON.stringify(incoming), 'merge');
-    assert.equal(result.conflicts.length, 1);
+    assert.deepEqual(result.conflicts.map(({ entity, id }) => ({ entity, id })), [
+      { entity: 'tasks', id: SAME_ID },
+      { entity: 'categories', id: CATEGORY_ID },
+      { entity: 'events', id: EVENT_ID },
+    ]);
     assert.equal((await repo.get(SAME_ID)).title, '导入较新版本');
     assert.equal((await repo.get(OTHER_ID)).title, '导入任务');
     assert.equal(storage.snapshot().metadata.lastImportedAt, NOW);
@@ -249,6 +337,41 @@ test('replace 写入设置失败时恢复已覆盖的任务数据和旧设置', 
     assert.deepEqual(await repo.exportAll(), before);
     assert.deepEqual(storage.snapshot().settings, { firstDayOfWeek: 2 });
     assert.equal(storage.snapshot().metadata, undefined);
+  } finally {
+    restoreChrome();
+  }
+});
+
+test('replace 写入 metadata 失败时恢复任务、设置和旧 metadata', async () => {
+  class FailingMetadataStorage extends InMemoryStorageArea {
+    failNextMetadataWrite = false;
+
+    async set(values) {
+      if (this.failNextMetadataWrite && Object.hasOwn(values, 'metadata')) {
+        this.failNextMetadataWrite = false;
+        await super.set(values);
+        throw new Error('metadata 写入失败');
+      }
+      await super.set(values);
+    }
+  }
+
+  const storage = new FailingMetadataStorage();
+  const restoreChrome = installStorage(storage);
+  const repo = new InMemoryTaskRepository([BASE_TASK], [CATEGORY], [EVENT]);
+  const backup = new BackupService(repo, { now: () => NOW, appVersion: '0.1.0' });
+  try {
+    await storage.set({
+      settings: { firstDayOfWeek: 2 },
+      metadata: { lastImportedAt: '2026-09-16T08:30:00.000Z' },
+    });
+    const before = await repo.exportAll();
+    storage.failNextMetadataWrite = true;
+
+    await assert.rejects(() => backup.importBackup(JSON.stringify(backupFile()), 'replace'), /metadata 写入失败/);
+    assert.deepEqual(await repo.exportAll(), before);
+    assert.deepEqual(storage.snapshot().settings, { firstDayOfWeek: 2 });
+    assert.deepEqual(storage.snapshot().metadata, { lastImportedAt: '2026-09-16T08:30:00.000Z' });
   } finally {
     restoreChrome();
   }
