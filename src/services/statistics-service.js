@@ -1,11 +1,10 @@
-import { assertLocalDate, toLocalDate } from '../domain/dates.js';
-
-function addDays(date, days) {
-  assertLocalDate(date);
-  const [year, month, day] = date.split('-').map(Number);
-  const value = new Date(Date.UTC(year, month - 1, day + days));
-  return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`;
-}
+import {
+  addLocalDays,
+  assertLocalDate,
+  endOfMonth,
+  startOfMonth,
+  toLocalDate,
+} from '../domain/dates.js';
 
 function inRange(date, startDate, endDate) {
   return date >= startDate && date <= endDate;
@@ -80,6 +79,11 @@ export class StatisticsService {
 
   weekly(weekStart) {
     assertLocalDate(weekStart, 'weekStart');
-    return this.#range(weekStart, addDays(weekStart, 6));
+    return this.#range(weekStart, addLocalDays(weekStart, 6));
+  }
+
+  monthly(anchorDate) {
+    assertLocalDate(anchorDate, 'anchorDate');
+    return this.#range(startOfMonth(anchorDate), endOfMonth(anchorDate));
   }
 }

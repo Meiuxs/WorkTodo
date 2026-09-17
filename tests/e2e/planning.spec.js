@@ -105,6 +105,83 @@ test('月历旧月份请求失败时静默丢弃', async ({ extension }) => {
   expect(await page.locator('#toast').evaluate((element) => element.hidden)).toBe(true);
 });
 
+test('工作记录可以生成并复制规则模板总结', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.getByLabel('记录一个新事项').fill('总结用任务');
+  await page.locator('#quick-add-date').selectOption('today');
+  await page.getByRole('button', { name: '添加', exact: true }).click();
+  await page.getByRole('checkbox', { name: '完成任务', exact: true }).first().click();
+  await page.getByRole('button', { name: '工作记录', exact: true }).click();
+
+  await expect(page.getByRole('button', { name: '生成本周总结', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '生成本月总结', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '生成本周总结', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '总结文本' })).toHaveValue(/实际完成/);
+  await expect(page.getByRole('textbox', { name: '总结文本' })).toHaveValue(/总结用任务/);
+
+  await page.evaluate(() => {
+    window.__copiedSummary = '';
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text) => {
+          window.__copiedSummary = text;
+        },
+        readText: async () => {
+          throw new Error('不应读取剪贴板');
+        },
+      },
+    });
+  });
+  await page.getByRole('button', { name: '复制总结', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__copiedSummary)).toContain('实际完成');
+  await expect.poll(() => page.evaluate(() => window.__copiedSummary)).toContain('总结用任务');
+});
+
+test('较慢的旧总结请求不会覆盖新总结', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.getByRole('button', { name: '工作记录', exact: true }).click();
+  await page.evaluate(async () => {
+    const { SummaryService } = await import('../services/summary-service.js');
+    const originalWeekly = SummaryService.prototype.weekly;
+    const originalMonthly = SummaryService.prototype.monthly;
+    SummaryService.prototype.weekly = async function delayedWeekly(anchorDate) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return originalWeekly.call(this, anchorDate);
+    };
+    SummaryService.prototype.monthly = async function delayedMonthly(anchorDate) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      return originalMonthly.call(this, anchorDate);
+    };
+  });
+
+  await page.getByRole('button', { name: '生成本周总结', exact: true }).click();
+  await page.getByRole('button', { name: '生成本月总结', exact: true }).click();
+
+  const output = page.getByRole('textbox', { name: '总结文本' });
+  await expect(output).toHaveValue(/本月总结/);
+  await page.waitForTimeout(350);
+  await expect(output).toHaveValue(/本月总结/);
+  await expect(output).not.toHaveValue(/本周总结/);
+});
+
+test('总结面板在 390px 下可键盘生成且没有横向溢出', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: '工作记录', exact: true }).click();
+
+  const generate = page.getByRole('button', { name: '生成本周总结', exact: true });
+  await generate.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('textbox', { name: '总结文本' })).toHaveValue(/实际完成/);
+
+  const overflow = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
+});
+
 test('快速切换路由时旧周视图不会覆盖当前视图', async ({ extension }) => {
   const page = await openDashboard(extension);
   await page.evaluate(async () => {

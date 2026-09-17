@@ -7,6 +7,7 @@ import { TagService } from '../services/tag-service.js';
 import { SubtaskService } from '../services/subtask-service.js';
 import { TaskQueryService } from '../services/task-query-service.js';
 import { StatisticsService } from '../services/statistics-service.js';
+import { SummaryService } from '../services/summary-service.js';
 import { BackupService } from '../services/backup-service.js';
 import { DashboardController } from './dashboard-controller.js';
 import { createTaskEditor } from './task-editor.js';
@@ -37,6 +38,7 @@ const taskService = new TaskService(repository);
 const subtaskService = new SubtaskService(taskService, repository);
 const query = new TaskQueryService(repository);
 const statistics = new StatisticsService(repository);
+const summaryService = new SummaryService({ statistics, query });
 const backupService = new BackupService(repository, { settingsRepository });
 const tagRepository = new TagRepository();
 const tagService = new TagService(tagRepository);
@@ -146,7 +148,18 @@ async function onEdit(taskId) {
   await taskEditor.openTask(task, document.activeElement);
 }
 
-const viewOptions = { root, query, taskService, tagService, statistics, today: () => toLocalDate(new Date()), onAction, onEdit, onError };
+const viewOptions = {
+  root,
+  query,
+  taskService,
+  tagService,
+  statistics,
+  summaryService,
+  today: () => toLocalDate(new Date()),
+  onAction,
+  onEdit,
+  onError,
+};
 const views = {
   today: createTodayView(viewOptions),
   tomorrow: createWeekView({ ...viewOptions, singleDate: true }),

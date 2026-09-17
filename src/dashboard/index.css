@@ -304,6 +304,19 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .history-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin: 16px 0; }
 .history-toolbar label { display: grid; gap: 4px; color: var(--muted); font-size: var(--text-xs); }
 
+.summary-panel { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 18px; }
+.summary-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.summary-panel textarea {
+  display: block;
+  width: 100%;
+  min-height: 150px;
+  margin-top: 10px;
+  font: inherit;
+  line-height: 1.6;
+}
+.summary-panel textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.summary-copy { margin-top: 8px; }
+
 .metrics {
   display: grid;
   grid-template-columns: repeat(5, minmax(100px, 1fr));

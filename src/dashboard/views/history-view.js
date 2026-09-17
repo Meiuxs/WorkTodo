@@ -1,47 +1,65 @@
+import { addLocalDays, endOfWeek, startOfWeek } from '../../domain/dates.js';
 import { renderTaskList } from '../task-list.js';
 import { runViewAction } from '../../shared/ui.js';
-
-function addDays(date, days) {
-  const value = new Date(`${date}T00:00:00`);
-  value.setDate(value.getDate() + days);
-  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-}
-
-function startOfWeek(date) {
-  const value = new Date(`${date}T00:00:00`);
-  const offset = (value.getDay() + 6) % 7;
-  value.setDate(value.getDate() - offset);
-  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-}
 
 function formatRate(rate) {
   return rate === null ? '暂无计划' : `${Math.round(rate * 100)}%`;
 }
 
-export function createHistoryView({ root, query, statistics, today, onAction, onEdit, onError }) {
+export function createHistoryView({
+  root,
+  query,
+  statistics,
+  summaryService,
+  today,
+  onAction,
+  onEdit,
+  onError,
+}) {
   let mode = 'daily';
   let anchor = today();
+  let renderVersion = 0;
+  let summaryVersion = 0;
+
+  function invalidateSummary() {
+    summaryVersion += 1;
+    const output = root.querySelector('#history-summary-text');
+    if (output !== null) output.value = '';
+    const copy = root.querySelector('[data-summary-copy]');
+    if (copy !== null) copy.disabled = true;
+  }
 
   return {
     async render(signal) {
-      const fromDate = mode === 'daily' ? anchor : startOfWeek(anchor);
-      const toDate = mode === 'daily' ? anchor : addDays(fromDate, 6);
-      const [summary, completed] = await Promise.all([
-        mode === 'daily' ? statistics.daily(anchor) : statistics.weekly(fromDate),
-        query.completed({ completedFrom: fromDate, completedTo: toDate }),
-      ]);
-      if (signal?.aborted) return;
-      const rangeText = mode === 'daily' ? anchor : `${fromDate} 至 ${toDate}`;
+      const requestVersion = ++renderVersion;
+      summaryVersion += 1;
+      const requestedMode = mode;
+      const requestedAnchor = anchor;
+      const fromDate = requestedMode === 'daily' ? requestedAnchor : startOfWeek(requestedAnchor);
+      const toDate = requestedMode === 'daily' ? requestedAnchor : endOfWeek(requestedAnchor);
+      let summary;
+      let completed;
+      try {
+        [summary, completed] = await Promise.all([
+          requestedMode === 'daily' ? statistics.daily(requestedAnchor) : statistics.weekly(fromDate),
+          query.completed({ completedFrom: fromDate, completedTo: toDate }),
+        ]);
+      } catch (error) {
+        if (signal?.aborted || requestVersion !== renderVersion) return;
+        throw error;
+      }
+      if (signal?.aborted || requestVersion !== renderVersion) return;
+      const rangeText = requestedMode === 'daily' ? requestedAnchor : `${fromDate} 至 ${toDate}`;
       root.innerHTML = `<section class="view-section" aria-labelledby="history-heading">
         <div class="section-heading">
           <div><h2 id="history-heading">工作记录</h2><p>完成记录按实际完成日期统计；计划任务按计划日期统计。</p></div>
           <div class="segmented-control" role="group" aria-label="记录范围">
-            <button type="button" data-history-mode="daily" aria-pressed="${mode === 'daily'}">按日</button>
-            <button type="button" data-history-mode="weekly" aria-pressed="${mode === 'weekly'}">按周</button>
+            <button type="button" data-history-mode="daily" aria-pressed="${requestedMode === 'daily'}">按日</button>
+            <button type="button" data-history-mode="weekly" aria-pressed="${requestedMode === 'weekly'}">按周</button>
           </div>
         </div>
         <div class="history-toolbar">
-          <label>${mode === 'daily' ? '查看日期' : '所在周'}<input type="date" id="history-date" value="${anchor}"></label>
+          <label>${requestedMode === 'daily' ? '查看日期' : '所在周'}<input type="date" id="history-date" value="${requestedAnchor}"></label>
           <span class="filter-count">${rangeText}</span>
         </div>
         <dl class="metrics">
@@ -51,19 +69,75 @@ export function createHistoryView({ root, query, statistics, today, onAction, on
           <div><dt>延期次数</dt><dd>${summary.postponedCount}</dd></div>
           <div><dt>完成率</dt><dd>${formatRate(summary.completionRate)}</dd></div>
         </dl>
+        <section class="summary-panel" aria-labelledby="history-summary-heading">
+          <div>
+            <h3 id="history-summary-heading">规则模板总结</h3>
+            <p>只使用本地统计和已完成任务标题生成纯文本。</p>
+          </div>
+          <div class="summary-actions" role="group" aria-label="生成总结">
+            <button type="button" class="button-secondary" data-summary-kind="week">生成本周总结</button>
+            <button type="button" class="button-secondary" data-summary-kind="month">生成本月总结</button>
+          </div>
+          <textarea id="history-summary-text" aria-label="总结文本" readonly placeholder="选择周或月后生成总结。"></textarea>
+          <button type="button" class="button-secondary summary-copy" data-summary-copy disabled>复制总结</button>
+        </section>
         <h3>实际完成明细</h3>
         <div id="history-list"></div>
       </section>`;
       root.querySelectorAll('[data-history-mode]').forEach((button) => {
         button.addEventListener('click', () => {
           mode = button.dataset.historyMode;
+          invalidateSummary();
           runViewAction(() => this.render(signal), { signal, onError });
         });
       });
       root.querySelector('#history-date').addEventListener('change', (event) => {
         if (event.target.value.length === 0) return;
         anchor = event.target.value;
+        invalidateSummary();
         runViewAction(() => this.render(signal), { signal, onError });
+      });
+      root.querySelectorAll('[data-summary-kind]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const requestedSummaryVersion = ++summaryVersion;
+          const requestedSummaryAnchor = anchor;
+          runViewAction(async () => {
+            let generated;
+            try {
+              generated = button.dataset.summaryKind === 'week'
+                ? await summaryService.weekly(requestedSummaryAnchor)
+                : await summaryService.monthly(requestedSummaryAnchor);
+            } catch (error) {
+              if (
+                signal?.aborted
+                || requestedSummaryVersion !== summaryVersion
+                || requestedSummaryAnchor !== anchor
+              ) {
+                return;
+              }
+              throw error;
+            }
+            if (
+              signal?.aborted
+              || requestedSummaryVersion !== summaryVersion
+              || requestedSummaryAnchor !== anchor
+            ) {
+              return;
+            }
+            const output = root.querySelector('#history-summary-text');
+            const copy = root.querySelector('[data-summary-copy]');
+            if (output === null) return;
+            output.value = generated.text;
+            if (copy !== null) copy.disabled = false;
+          }, { signal, onError });
+        });
+      });
+      root.querySelector('[data-summary-copy]').addEventListener('click', () => {
+        runViewAction(async () => {
+          const output = root.querySelector('#history-summary-text');
+          if (output === null || output.value.length === 0) return;
+          await summaryService.copyText(output.value);
+        }, { signal, onError });
       });
       renderTaskList(root.querySelector('#history-list'), completed, {
         today: today(),
