@@ -60,12 +60,14 @@ test('删除分类在仓库事务内枚举当前任务，不依赖服务层预�
     [BASE_TASK, secondTask],
     [{ id: 'old', name: '旧分类' }, { id: 'new', name: '新分类' }],
   );
-  const service = new TaskService(repo, { now: () => NOW, generateId: () => 'event-1' });
+  let nextEventId = 1;
+  const service = new TaskService(repo, { now: () => NOW, generateId: () => `event-${nextEventId++}` });
 
   await service.deleteCategory('old', 'new');
   assert.equal((await repo.get('t1')).categoryId, 'new');
   assert.equal((await repo.get('t2')).categoryId, 'new');
-  assert.equal((await repo.exportAll()).events.length, 2);
+  const events = (await repo.exportAll()).events;
+  assert.deepEqual(events.map((event) => event.id), ['event-1', 'event-2']);
 });
 
 test('分类迁移事务失败时不会部分迁移任务、删除分类或写事件', async () => {
@@ -74,13 +76,24 @@ test('分类迁移事务失败时不会部分迁移任务、删除分类或写�
     tasks: [BASE_TASK, secondTask],
     categories: [{ id: 'old', name: '旧分类' }, { id: 'new', name: '新分类' }],
   });
-  repo.failNextCategoryMigration(new Error('事务失败'));
+  const before = await repo.exportAll();
+  let stagedWrites = 0;
+  repo.failNextCategoryMigration(new Error('事务失败'), (partial) => {
+    stagedWrites += 1;
+    assert.equal(partial.tasks.find((task) => task.id === 't1').categoryId, 'new');
+    assert.equal(partial.tasks.find((task) => task.id === 't1').revision, 1);
+    assert.equal(partial.events.length, 1);
+  });
 
   await assert.rejects(() => service.deleteCategory('old', 'new'), /事务失败/);
+  assert.equal(stagedWrites, 1);
   assert.equal((await repo.get('t1')).categoryId, 'old');
   assert.equal((await repo.get('t2')).categoryId, 'old');
+  assert.equal((await repo.get('t1')).revision, 0);
+  assert.equal((await repo.get('t2')).revision, 0);
   assert.ok(await repo.getCategory('old'));
   assert.equal((await repo.exportAll()).events.length, 0);
+  assert.deepEqual(await repo.exportAll(), before);
 });
 
 test('创建、编辑和开始任务分别写入稳定事件', async () => {

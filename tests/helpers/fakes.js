@@ -31,12 +31,19 @@ export class InMemoryTaskRepository {
     this.#events = events.map((event) => createTaskEvent(event));
   }
 
+  #addEvent(event) {
+    if (this.#events.some((item) => item.id === event.id)) {
+      throw new Error(`事件 ${event.id} 已存在`);
+    }
+    this.#events.push(event);
+  }
+
   async create(task, event) {
     const taskToSave = prepareTask(task);
     const eventToSave = prepareEvent(taskToSave.id, event);
     if (this.#tasks.has(taskToSave.id)) throw new Error(`任务 ${taskToSave.id} 已存在`);
     this.#tasks.set(taskToSave.id, taskToSave);
-    this.#events.push(eventToSave);
+    this.#addEvent(eventToSave);
     return clone(taskToSave);
   }
 
@@ -58,7 +65,7 @@ export class InMemoryTaskRepository {
     const taskToSave = { ...requestedTask, revision: expectedRevision + 1 };
     validateTask(taskToSave);
     this.#tasks.set(taskToSave.id, taskToSave);
-    this.#events.push(eventToSave);
+    this.#addEvent(eventToSave);
     return clone(taskToSave);
   }
 
@@ -91,8 +98,8 @@ export class InMemoryTaskRepository {
     return clone(this.#categories[index]);
   }
 
-  failNextCategoryMigration(error) {
-    this.#nextCategoryMigrationFailure = error;
+  failNextCategoryMigration(error, afterFirstWrite = null) {
+    this.#nextCategoryMigrationFailure = { error, afterFirstWrite };
   }
 
   async deleteCategoryAndMoveTasks(categoryId, destinationCategoryId, { updatedAt, createEvent }) {
@@ -100,29 +107,42 @@ export class InMemoryTaskRepository {
     if (categoryIndex === -1 || (destinationCategoryId !== null && !this.#categories.some((item) => item.id === destinationCategoryId))) {
       throw new ValidationError('分类不存在');
     }
-    if (this.#nextCategoryMigrationFailure !== null) {
-      const error = this.#nextCategoryMigrationFailure;
-      this.#nextCategoryMigrationFailure = null;
+    if (typeof createEvent !== 'function') throw new ValidationError('分类迁移需要事件创建函数');
+    const snapshot = {
+      tasks: new Map([...this.#tasks].map(([id, task]) => [id, clone(task)])),
+      categories: clone(this.#categories),
+      events: clone(this.#events),
+    };
+    try {
+      const saved = [...this.#tasks.values()]
+        .filter((task) => task.categoryId === categoryId)
+        .map((current) => {
+          const task = prepareTask({
+            ...current,
+            categoryId: destinationCategoryId,
+            updatedAt,
+            revision: current.revision + 1,
+          });
+          return { task, event: prepareEvent(task.id, createEvent(task)) };
+        });
+      for (const item of saved) {
+        this.#tasks.set(item.task.id, item.task);
+        this.#addEvent(item.event);
+        if (this.#nextCategoryMigrationFailure !== null) {
+          const { error, afterFirstWrite } = this.#nextCategoryMigrationFailure;
+          this.#nextCategoryMigrationFailure = null;
+          afterFirstWrite?.(clone({ tasks: [...this.#tasks.values()], categories: this.#categories, events: this.#events }));
+          throw error;
+        }
+      }
+      this.#categories.splice(categoryIndex, 1);
+      return clone(saved);
+    } catch (error) {
+      this.#tasks = snapshot.tasks;
+      this.#categories = snapshot.categories;
+      this.#events = snapshot.events;
       throw error;
     }
-    if (typeof createEvent !== 'function') throw new ValidationError('分类迁移需要事件创建函数');
-    const saved = [...this.#tasks.values()]
-      .filter((task) => task.categoryId === categoryId)
-      .map((current) => {
-        const task = prepareTask({
-          ...current,
-          categoryId: destinationCategoryId,
-          updatedAt,
-          revision: current.revision + 1,
-        });
-        return { task, event: prepareEvent(task.id, createEvent(task)) };
-      });
-    for (const item of saved) {
-      this.#tasks.set(item.task.id, item.task);
-      this.#events.push(item.event);
-    }
-    this.#categories.splice(categoryIndex, 1);
-    return clone(saved);
   }
 
   async exportAll() {
