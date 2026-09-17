@@ -50,6 +50,10 @@ export function createHistoryView({
       }
       if (signal?.aborted || requestVersion !== renderVersion) return;
       const rangeText = requestedMode === 'daily' ? requestedAnchor : `${fromDate} 至 ${toDate}`;
+      const plannedCompletedLabel = requestedMode === 'weekly' ? '本周计划并完成' : '计划并完成';
+      const carriedOverCompletedLabel = requestedMode === 'weekly'
+        ? '历史延期到本周完成'
+        : '历史延期完成';
       root.innerHTML = `<section class="view-section" aria-labelledby="history-heading">
         <div class="section-heading">
           <div><h2 id="history-heading">工作记录</h2><p>完成记录按实际完成日期统计；计划任务按计划日期统计。</p></div>
@@ -67,6 +71,8 @@ export function createHistoryView({
           <div><dt>计划任务</dt><dd>${summary.plannedCount}</dd></div>
           <div><dt>新增任务</dt><dd>${summary.createdCount}</dd></div>
           <div><dt>延期次数</dt><dd>${summary.postponedCount}</dd></div>
+          <div><dt>${plannedCompletedLabel}</dt><dd>${summary.plannedCompletedCount}</dd></div>
+          <div><dt>${carriedOverCompletedLabel}</dt><dd>${summary.carriedOverCompletedCount}</dd></div>
           <div><dt>完成率</dt><dd>${formatRate(summary.completionRate)}</dd></div>
         </dl>
         <section class="summary-panel" aria-labelledby="history-summary-heading">

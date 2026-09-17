@@ -21,6 +21,8 @@ function completionRate(completedCount, plannedCount, cancelledCount) {
   return denominator <= 0 ? null : completedCount / denominator;
 }
 
+const PLANNED_EVENT_TYPES = new Set(['POSTPONE', 'RESCHEDULE']);
+
 export class StatisticsService {
   #repository;
 
@@ -40,6 +42,23 @@ export class StatisticsService {
     assertLocalDate(endDate, 'endDate');
     const { tasks, events } = await this.#snapshot();
     const visibleTasks = tasks.filter((task) => task.trashedAt === null);
+    const visibleTasksById = new Map(visibleTasks.map((task) => [task.id, task]));
+    const plannedDatesByTask = new Map();
+    const addPlannedDate = (taskId, date) => {
+      if (!visibleTasksById.has(taskId) || typeof date !== 'string' || !inRange(date, startDate, endDate)) {
+        return;
+      }
+      if (!plannedDatesByTask.has(taskId)) plannedDatesByTask.set(taskId, new Set());
+      plannedDatesByTask.get(taskId).add(date);
+    };
+
+    visibleTasks.forEach((task) => {
+      addPlannedDate(task.id, task.scheduledDate);
+    });
+    events.forEach((event) => {
+      if (!PLANNED_EVENT_TYPES.has(event.type)) return;
+      addPlannedDate(event.taskId, isoLocalDate(event.occurredAt));
+    });
 
     const createdCount = visibleTasks.filter((task) => {
       const date = isoLocalDate(task.createdAt);
@@ -49,17 +68,33 @@ export class StatisticsService {
       const date = isoLocalDate(task.completedAt);
       return date !== null && inRange(date, startDate, endDate);
     }).length;
-    const plannedCount = visibleTasks.filter((task) => (
-      task.scheduledDate !== null && inRange(task.scheduledDate, startDate, endDate)
-    )).length;
-    const cancelledCount = visibleTasks.filter((task) => (
-      task.lifecycle === 'cancelled'
-      && task.scheduledDate !== null
-      && inRange(task.scheduledDate, startDate, endDate)
-    )).length;
+    const plannedCount = [...plannedDatesByTask.values()]
+      .reduce((total, dates) => total + dates.size, 0);
+    const cancelledCount = [...plannedDatesByTask]
+      .filter(([taskId]) => visibleTasksById.get(taskId).lifecycle === 'cancelled')
+      .reduce((total, [, dates]) => total + dates.size, 0);
+    const plannedCompletedCount = visibleTasks.filter((task) => {
+      const completedDate = isoLocalDate(task.completedAt);
+      if (completedDate === null || !inRange(completedDate, startDate, endDate)) return false;
+      const firstDateInRange = typeof task.firstScheduledDate === 'string'
+        && inRange(task.firstScheduledDate, startDate, endDate);
+      const currentDateInRange = typeof task.scheduledDate === 'string'
+        && inRange(task.scheduledDate, startDate, endDate);
+      return firstDateInRange || currentDateInRange;
+    }).length;
+    const carriedOverCompletedCount = visibleTasks.filter((task) => {
+      const completedDate = isoLocalDate(task.completedAt);
+      return completedDate !== null
+        && inRange(completedDate, startDate, endDate)
+        && typeof task.firstScheduledDate === 'string'
+        && task.firstScheduledDate < startDate;
+    }).length;
     const postponedCount = events.filter((event) => {
       const date = isoLocalDate(event.occurredAt);
-      return event.type === 'POSTPONE' && date !== null && inRange(date, startDate, endDate);
+      return event.type === 'POSTPONE'
+        && visibleTasksById.has(event.taskId)
+        && date !== null
+        && inRange(date, startDate, endDate);
     }).length;
 
     return {
@@ -69,6 +104,8 @@ export class StatisticsService {
       plannedCount,
       cancelledCount,
       completionRate: completionRate(completedCount, plannedCount, cancelledCount),
+      plannedCompletedCount,
+      carriedOverCompletedCount,
     };
   }
 

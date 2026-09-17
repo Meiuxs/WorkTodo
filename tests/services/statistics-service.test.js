@@ -42,6 +42,11 @@ function event(overrides = {}) {
   };
 }
 
+function localNoon(date) {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day, 12).toISOString();
+}
+
 function createStatistics(tasks, events = []) {
   return new StatisticsService(new InMemoryTaskRepository(tasks, [], events));
 }
@@ -104,6 +109,216 @@ test('daily 统计创建、取消和 POSTPONE 事件', async () => {
   assert.equal(daily.completionRate, 0);
 });
 
+test('plannedCount 合并当前计划与计划事件，并按任务和本地日期去重', async () => {
+  const statistics = createStatistics([
+    task({
+      id: 'task-a',
+      scheduledDate: '2026-09-15',
+      firstScheduledDate: '2026-09-15',
+    }),
+    task({
+      id: 'task-b',
+      scheduledDate: null,
+      firstScheduledDate: null,
+    }),
+  ], [
+    event({
+      id: 'task-a-same-day',
+      taskId: 'task-a',
+      type: 'POSTPONE',
+      occurredAt: localNoon('2026-09-15'),
+    }),
+    event({
+      id: 'task-a-postpone',
+      taskId: 'task-a',
+      type: 'POSTPONE',
+      occurredAt: localNoon('2026-09-16'),
+    }),
+    event({
+      id: 'task-a-reschedule',
+      taskId: 'task-a',
+      type: 'RESCHEDULE',
+      occurredAt: localNoon('2026-09-17'),
+    }),
+    event({
+      id: 'task-b-event',
+      taskId: 'task-b',
+      type: 'RESCHEDULE',
+      occurredAt: localNoon('2026-09-16'),
+    }),
+    event({
+      id: 'ignored-edit',
+      taskId: 'task-b',
+      type: 'EDIT',
+      occurredAt: localNoon('2026-09-18'),
+    }),
+  ]);
+
+  const weekly = await statistics.weekly('2026-09-14');
+
+  assert.equal(weekly.plannedCount, 4);
+  assert.equal(weekly.postponedCount, 2);
+});
+
+test('计划事件使用 occurredAt 的本地日期，不使用 detail.toDate', async () => {
+  const statistics = createStatistics([
+    task({ id: 'event-in-range', scheduledDate: null, firstScheduledDate: null }),
+    task({ id: 'detail-in-range', scheduledDate: null, firstScheduledDate: null }),
+  ], [
+    event({
+      id: 'event-in-range',
+      taskId: 'event-in-range',
+      occurredAt: localNoon('2026-09-16'),
+      detail: { toDate: '2026-09-30' },
+    }),
+    event({
+      id: 'detail-in-range',
+      taskId: 'detail-in-range',
+      occurredAt: localNoon('2026-09-30'),
+      detail: { toDate: '2026-09-16' },
+    }),
+  ]);
+
+  assert.equal((await statistics.weekly('2026-09-14')).plannedCount, 1);
+});
+
+test('已删除任务及其计划事件不进入统计', async () => {
+  const statistics = createStatistics([
+    task({
+      id: 'trashed',
+      scheduledDate: '2026-09-15',
+      firstScheduledDate: '2026-09-15',
+      trashedAt: NOW,
+    }),
+    task({ id: 'visible', scheduledDate: null, firstScheduledDate: null }),
+  ], [
+    event({
+      id: 'trashed-current',
+      taskId: 'trashed',
+      occurredAt: localNoon('2026-09-16'),
+    }),
+    event({
+      id: 'visible-event',
+      taskId: 'visible',
+      occurredAt: localNoon('2026-09-16'),
+    }),
+    event({
+      id: 'missing-task',
+      taskId: 'missing',
+      occurredAt: localNoon('2026-09-17'),
+    }),
+  ]);
+
+  const weekly = await statistics.weekly('2026-09-14');
+
+  assert.equal(weekly.plannedCount, 1);
+  assert.equal(weekly.cancelledCount, 0);
+  assert.equal(weekly.postponedCount, 1);
+});
+
+test('完成率扣除区间内的取消任务实例', async () => {
+  const statistics = createStatistics([
+    task({
+      id: 'cancelled-current',
+      lifecycle: 'cancelled',
+      scheduledDate: '2026-09-15',
+      firstScheduledDate: '2026-08-01',
+    }),
+    task({
+      id: 'cancelled-event',
+      lifecycle: 'cancelled',
+      scheduledDate: null,
+      firstScheduledDate: '2026-08-01',
+    }),
+    task({
+      id: 'active',
+      lifecycle: 'completed',
+      scheduledDate: '2026-09-17',
+      firstScheduledDate: '2026-09-17',
+      completedAt: localNoon('2026-09-17'),
+    }),
+  ], [
+    event({
+      id: 'cancelled-event',
+      taskId: 'cancelled-event',
+      type: 'RESCHEDULE',
+      occurredAt: localNoon('2026-09-16'),
+    }),
+  ]);
+
+  const weekly = await statistics.weekly('2026-09-14');
+
+  assert.equal(weekly.plannedCount, 3);
+  assert.equal(weekly.cancelledCount, 2);
+  assert.equal(weekly.completedCount, 1);
+  assert.equal(weekly.completionRate, 1);
+});
+
+test('取消全部计划实例时完成率为 null', async () => {
+  const statistics = createStatistics([
+    task({
+      id: 'cancelled',
+      lifecycle: 'cancelled',
+      scheduledDate: '2026-09-15',
+      firstScheduledDate: '2026-09-15',
+    }),
+  ]);
+
+  const weekly = await statistics.weekly('2026-09-14');
+
+  assert.equal(weekly.plannedCount, 1);
+  assert.equal(weekly.cancelledCount, 1);
+  assert.equal(weekly.completionRate, null);
+  assert.equal(weekly.plannedCompletedCount, 0);
+  assert.equal(weekly.carriedOverCompletedCount, 0);
+});
+
+test('计划并完成匹配首次或当前计划，历史延期完成只匹配开始日前首次计划', async () => {
+  const statistics = createStatistics([
+    task({
+      id: 'first-hit',
+      lifecycle: 'completed',
+      firstScheduledDate: '2026-09-14',
+      scheduledDate: '2026-09-21',
+      completedAt: localNoon('2026-09-15'),
+    }),
+    task({
+      id: 'current-hit',
+      lifecycle: 'completed',
+      firstScheduledDate: '2026-09-01',
+      scheduledDate: '2026-09-16',
+      completedAt: localNoon('2026-09-17'),
+    }),
+    task({
+      id: 'neither',
+      lifecycle: 'completed',
+      firstScheduledDate: '2026-09-21',
+      scheduledDate: null,
+      completedAt: localNoon('2026-09-18'),
+    }),
+    task({
+      id: 'completed-outside',
+      lifecycle: 'completed',
+      firstScheduledDate: '2026-09-01',
+      scheduledDate: '2026-09-16',
+      completedAt: localNoon('2026-09-21'),
+    }),
+    task({
+      id: 'carried-only',
+      lifecycle: 'completed',
+      firstScheduledDate: '2026-09-01',
+      scheduledDate: '2026-09-21',
+      completedAt: localNoon('2026-09-19'),
+    }),
+  ]);
+
+  const weekly = await statistics.weekly('2026-09-14');
+
+  assert.equal(weekly.completedCount, 4);
+  assert.equal(weekly.plannedCompletedCount, 2);
+  assert.equal(weekly.carriedOverCompletedCount, 2);
+});
+
 test('weekly 聚合 weekStart 起连续七天', async () => {
   const statistics = createStatistics([
     task({ id: 'week-start', scheduledDate: '2026-09-14', firstScheduledDate: '2026-09-14' }),
@@ -129,9 +344,9 @@ test('weekly 聚合 weekStart 起连续七天', async () => {
   const weekly = await statistics.weekly('2026-09-14');
 
   assert.equal(weekly.completedCount, 1);
-  assert.equal(weekly.plannedCount, 2);
+  assert.equal(weekly.plannedCount, 3);
   assert.equal(weekly.postponedCount, 1);
-  assert.equal(weekly.completionRate, 0.5);
+  assert.equal(weekly.completionRate, 1 / 3);
 });
 
 test('完成统计使用系统本地日期而不是 UTC 日期字符串', async () => {

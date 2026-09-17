@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { createHistoryView } from '../../src/dashboard/views/history-view.js';
 import { StatisticsService } from '../../src/services/statistics-service.js';
 import { SummaryService } from '../../src/services/summary-service.js';
 import { InMemoryTaskRepository } from '../helpers/fakes.js';
@@ -44,6 +45,8 @@ test('周总结只使用本地统计和已完成任务标题', async () => {
           completedCount: 2,
           plannedCount: 3,
           postponedCount: 1,
+          plannedCompletedCount: 2,
+          carriedOverCompletedCount: 1,
           completionRate: 2 / 3,
         };
       },
@@ -64,6 +67,7 @@ test('周总结只使用本地统计和已完成任务标题', async () => {
   assert.match(summary.text, /计划任务 3 项/);
   assert.match(summary.text, /延期 1 次/);
   assert.match(summary.text, /完成率 67%/);
+  assert.match(summary.text, /计划并完成 2 项，历史延期完成 1 项。/);
   assert.match(summary.text, /- 完成报价/);
   assert.match(summary.text, /- 整理材料/);
 });
@@ -76,6 +80,8 @@ test('总结标题只折叠空白并原样保留用户文本', async () => {
           completedCount: 12,
           plannedCount: 12,
           postponedCount: 0,
+          plannedCompletedCount: 12,
+          carriedOverCompletedCount: 0,
           completionRate: 1,
         };
       },
@@ -126,6 +132,8 @@ test('月总结使用本地整月边界且没有计划时显示暂无计划', as
           completedCount: 0,
           plannedCount: 0,
           postponedCount: 0,
+          plannedCompletedCount: 0,
+          carriedOverCompletedCount: 0,
           completionRate: null,
         };
       },
@@ -144,6 +152,7 @@ test('月总结使用本地整月边界且没有计划时显示暂无计划', as
   assert.equal(summary.title, '本月总结');
   assert.equal(summary.rangeText, '2026-09-01 至 2026-09-30');
   assert.match(summary.text, /完成率 暂无计划/);
+  assert.match(summary.text, /计划并完成 0 项，历史延期完成 0 项。/);
   assert.match(summary.text, /- 暂无/);
   assert.deepEqual(calls, [
     ['statistics', '2026-09-17'],
@@ -184,6 +193,8 @@ test('StatisticsService.monthly 按本地日历整月聚合', async () => {
   assert.equal(monthly.completedCount, 2);
   assert.equal(monthly.plannedCount, 2);
   assert.equal(monthly.completionRate, 1);
+  assert.equal(monthly.plannedCompletedCount, 2);
+  assert.equal(monthly.carriedOverCompletedCount, 0);
 });
 
 test('copyText 只写入剪贴板且不读取', async () => {
@@ -215,4 +226,99 @@ test('copyText 只写入剪贴板且不读取', async () => {
       Object.defineProperty(globalThis, 'navigator', originalNavigator);
     }
   }
+});
+
+function createHistoryRoot() {
+  const elements = new Map();
+  const listeners = new Map();
+  const modeButtons = ['daily', 'weekly'].map((historyMode) => {
+    const button = {
+      dataset: { historyMode },
+      addEventListener(type, listener) {
+        listeners.set(`mode:${historyMode}:${type}`, listener);
+      },
+    };
+    return button;
+  });
+  const root = {
+    innerHTML: '',
+    querySelector(selector) {
+      if (!elements.has(selector)) {
+        elements.set(selector, {
+          innerHTML: '',
+          value: '',
+          disabled: false,
+          addEventListener(type, listener) {
+            listeners.set(`${selector}:${type}`, listener);
+          },
+        });
+      }
+      return elements.get(selector);
+    },
+    querySelectorAll(selector) {
+      return selector === '[data-history-mode]' ? modeButtons : [];
+    },
+  };
+  return { root, listeners };
+}
+
+test('History 视图在日模式和周模式显示新增指标标签', async () => {
+  const calls = [];
+  const { root, listeners } = createHistoryRoot();
+  const statistics = {
+    async daily(date) {
+      calls.push(['daily', date]);
+      return {
+        completedCount: 4,
+        plannedCount: 5,
+        createdCount: 3,
+        postponedCount: 1,
+        completionRate: 0.8,
+        plannedCompletedCount: 7,
+        carriedOverCompletedCount: 2,
+      };
+    },
+    async weekly(weekStart) {
+      calls.push(['weekly', weekStart]);
+      return {
+        completedCount: 8,
+        plannedCount: 9,
+        createdCount: 6,
+        postponedCount: 3,
+        completionRate: 8 / 9,
+        plannedCompletedCount: 11,
+        carriedOverCompletedCount: 4,
+      };
+    },
+  };
+  const view = createHistoryView({
+    root,
+    query: { async completed() { return []; } },
+    statistics,
+    summaryService: {},
+    today: () => '2026-09-17',
+    onAction() {},
+    onEdit() {},
+  });
+
+  await view.render();
+
+  assert.deepEqual(calls, [['daily', '2026-09-17']]);
+  assert.match(root.innerHTML, /<dt>实际完成<\/dt>/);
+  assert.match(root.innerHTML, /<dt>计划任务<\/dt>/);
+  assert.match(root.innerHTML, /<dt>新增任务<\/dt>/);
+  assert.match(root.innerHTML, /<dt>延期次数<\/dt>/);
+  assert.match(root.innerHTML, /<dt>完成率<\/dt>/);
+  assert.match(root.innerHTML, /<dt>计划并完成<\/dt><dd>7<\/dd>/);
+  assert.match(root.innerHTML, /<dt>历史延期完成<\/dt><dd>2<\/dd>/);
+
+  await listeners.get('mode:weekly:click')();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(calls, [
+    ['daily', '2026-09-17'],
+    ['weekly', '2026-09-14'],
+  ]);
+  assert.match(root.innerHTML, /<dt>本周计划并完成<\/dt><dd>11<\/dd>/);
+  assert.match(root.innerHTML, /<dt>历史延期到本周完成<\/dt><dd>4<\/dd>/);
 });

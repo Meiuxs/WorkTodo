@@ -22,6 +22,7 @@ function format({ title, rangeText, stats, completedTasks }) {
     .join('\n');
   return `${title}（${rangeText}）
 实际完成 ${stats.completedCount} 项，计划任务 ${stats.plannedCount} 项，延期 ${stats.postponedCount} 次，完成率 ${rateText(stats.completionRate)}。
+计划并完成 ${stats.plannedCompletedCount} 项，历史延期完成 ${stats.carriedOverCompletedCount} 项。
 
 实际完成明细：
 ${completed.length === 0 ? '- 暂无' : completed}`;
