@@ -6,6 +6,7 @@ const ROUTES = new Set([
   'inbox',
   'all',
   'completed',
+  'trash',
   'history',
   'settings',
 ]);
@@ -83,7 +84,14 @@ export class DashboardController {
 
   async handleTaskAction(action, taskId, revision, value = undefined) {
     const methods = {
-      start: 'start', complete: 'complete', restore: 'restore', cancel: 'cancel', trash: 'trash', untrash: 'untrash', copy: 'copy',
+      start: 'start',
+      complete: 'complete',
+      restore: 'restore',
+      cancel: 'cancel',
+      trash: 'trash',
+      untrash: 'untrash',
+      'delete-permanently': 'permanentlyDelete',
+      copy: 'copy',
     };
     let result;
     if (action === 'complete' && this.#subtaskService !== null) {

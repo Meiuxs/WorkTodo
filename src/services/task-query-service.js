@@ -295,6 +295,12 @@ export class TaskQueryService {
     ));
   }
 
+  async trashed() {
+    const tasks = await this.#repository.listTrashed();
+    return tasks
+      .sort((left, right) => right.trashedAt.localeCompare(left.trashedAt));
+  }
+
   async search(filters = {}) {
     const text = filters.text ?? filters.query ?? '';
     const tasks = await this.#repository.search(text);

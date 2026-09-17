@@ -77,6 +77,7 @@ function taskActions(task) {
   const actions = [];
   if (task.trashedAt !== null) {
     actions.push('<button type="button" data-action="untrash">恢复</button>');
+    actions.push('<button type="button" data-action="delete-permanently">永久删除</button>');
     return actions.join('');
   }
   if (task.lifecycle === 'todo') actions.push('<button type="button" data-action="start">开始</button>');

@@ -121,6 +121,9 @@ export class TaskService {
   }
   trash(id, expectedRevision) { return this.#transition(id, expectedRevision, { type: 'TRASH' }, 'TRASH'); }
   untrash(id, expectedRevision) { return this.#transition(id, expectedRevision, { type: 'UNTRASH' }, 'UNTRASH'); }
+  async permanentlyDelete(id, expectedRevision) {
+    return { task: await this.#repository.permanentlyDelete(id, expectedRevision) };
+  }
 
   async copy(id) {
     const source = await this.#task(id);

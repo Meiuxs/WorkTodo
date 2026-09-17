@@ -150,6 +150,53 @@ export class TaskRepository {
       .map(clone);
   }
 
+  async listTrashed() {
+    const database = await this.#getDatabase();
+    const transaction = database.transaction('tasks', 'readonly');
+    const tasks = await requestResult(
+      transaction.objectStore('tasks')
+        .index('trashedAt')
+        .getAll(IDBKeyRange.bound('', '\uffff')),
+    );
+    await transactionResult(transaction);
+    return matchingTasks(tasks);
+  }
+
+  async permanentlyDelete(id, expectedRevision) {
+    assertRevision(expectedRevision);
+    const database = await this.#getDatabase();
+    const transaction = database.transaction(['tasks', 'events', 'searchIndex'], 'readwrite');
+    const tasks = transaction.objectStore('tasks');
+    const searchIndex = transaction.objectStore('searchIndex');
+    const current = await requestResult(tasks.get(id));
+    if (current === undefined || current.revision !== expectedRevision) {
+      transaction.abort();
+      try {
+        await transactionResult(transaction);
+      } catch {
+        // 冲突是调用方可恢复的业务结果，不泄露 IndexedDB 的中止错误。
+      }
+      throw new ConflictError(id);
+    }
+    if (current.trashedAt === null) {
+      transaction.abort();
+      try {
+        await transactionResult(transaction);
+      } catch {
+        // 非回收站任务是可恢复的校验结果。
+      }
+      throw new ValidationError('只能永久删除回收站中的任务');
+    }
+    const events = await requestResult(
+      transaction.objectStore('events').index('taskId').getAll(id),
+    );
+    for (const event of events) transaction.objectStore('events').delete(event.id);
+    searchIndex.delete(id);
+    tasks.delete(id);
+    await transactionResult(transaction);
+    return clone(current);
+  }
+
   async #listTaskIndex(indexName, range, criteria = {}) {
     const database = await this.#getDatabase();
     const transaction = database.transaction('tasks', 'readonly');

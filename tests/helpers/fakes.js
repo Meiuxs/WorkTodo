@@ -120,6 +120,41 @@ export class InMemoryTaskRepository {
     return taskResults([...this.#tasks.values()], criteria);
   }
 
+  async listTrashed() {
+    return taskResults(
+      [...this.#tasks.values()].filter((task) => task.trashedAt !== null),
+      {},
+      compareByIndex('trashedAt'),
+    );
+  }
+
+  async permanentlyDelete(id, expectedRevision) {
+    if (!Number.isInteger(expectedRevision) || expectedRevision < 0) {
+      throw new ValidationError('expectedRevision 必须是非负整数');
+    }
+    const current = this.#tasks.get(id);
+    if (current === undefined || current.revision !== expectedRevision) {
+      throw new ConflictError(id);
+    }
+    if (current.trashedAt === null) {
+      throw new ValidationError('只能永久删除回收站中的任务');
+    }
+
+    const snapshot = {
+      tasks: new Map([...this.#tasks].map(([taskId, task]) => [taskId, clone(task)])),
+      events: clone(this.#events),
+    };
+    try {
+      this.#tasks.delete(id);
+      this.#events = this.#events.filter((event) => event.taskId !== id);
+      return clone(materializeTaskRelationships(current));
+    } catch (error) {
+      this.#tasks = snapshot.tasks;
+      this.#events = snapshot.events;
+      throw error;
+    }
+  }
+
   async listScheduled(fromDate, toDate, criteria = {}) {
     return taskResults(
       [...this.#tasks.values()].filter((task) => (

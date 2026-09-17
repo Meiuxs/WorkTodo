@@ -18,6 +18,7 @@ import { createMonthView } from './views/month-view.js';
 import { createInboxView } from './views/inbox-view.js';
 import { createAllTasksView } from './views/all-tasks-view.js';
 import { createCompletedView } from './views/completed-view.js';
+import { createTrashView } from './views/trash-view.js';
 import { createHistoryView } from './views/history-view.js';
 import { createSettingsView } from './views/settings-view.js';
 
@@ -29,6 +30,7 @@ const routeMeta = {
   inbox: ['收集箱', '先记录，再整理'],
   all: ['全部任务', '查找、筛选和调整工作'],
   completed: ['已完成', '回看已经结束的任务'],
+  trash: ['回收站', '恢复或永久删除已删除任务'],
   history: ['工作记录', '按实际完成日期回顾工作'],
   settings: ['设置', '分类与本地数据管理'],
 };
@@ -134,6 +136,15 @@ async function onAction(action, taskId, revision, value) {
     if (!confirmed) return null;
   }
 
+  if (action === 'delete-permanently') {
+    const confirmed = await confirmAction({
+      title: '永久删除任务？',
+      message: '删除后无法从回收站恢复，任务事件也会一起移除。',
+      confirmLabel: '永久删除',
+    });
+    if (!confirmed) return null;
+  }
+
   const result = await controller.handleTaskAction(action, taskId, revision, value);
   if (action === 'cancel') {
     showToast('已取消任务', {
@@ -149,6 +160,10 @@ async function onAction(action, taskId, revision, value) {
     showToast(`已延期到 ${value}`);
   } else if (action === 'copy') {
     showToast('已复制为新任务');
+  } else if (action === 'delete-permanently') {
+    showToast('已永久删除');
+  } else if (action === 'untrash') {
+    showToast('已恢复任务');
   } else {
     showToast('任务已更新');
   }
@@ -180,6 +195,7 @@ const views = {
   inbox: createInboxView(viewOptions),
   all: createAllTasksView(viewOptions),
   completed: createCompletedView(viewOptions),
+  trash: createTrashView(viewOptions),
   history: createHistoryView(viewOptions),
   settings: createSettingsView({
     root,

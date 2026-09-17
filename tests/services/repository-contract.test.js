@@ -5,6 +5,7 @@ import { ConflictError, TaskRepository } from '../../src/data/task-repository.js
 import { createSearchIndexRecord } from '../../src/data/search-index.js';
 import { TagRepository } from '../../src/data/tag-repository.js';
 import { SettingsRepository } from '../../src/data/settings-repository.js';
+import { ValidationError } from '../../src/domain/errors.js';
 import { BackupService } from '../../src/services/backup-service.js';
 import { InMemoryStorageArea, InMemoryTaskRepository } from '../helpers/fakes.js';
 
@@ -378,6 +379,63 @@ test('update 原子地保存任务、事件并递增 revision', async () => {
   assert.equal(updated.revision, 1);
   assert.equal(updated.title, '已更新');
   assert.equal((await repo.exportAll()).events.length, 1);
+});
+
+test('永久删除校验 revision 并原子删除任务、事件与搜索索引', async () => {
+  const repo = new InMemoryTaskRepository(
+    [{ ...BASE_TASK, trashedAt: NOW }],
+    [],
+    [{ ...EVENT, type: 'TRASH' }],
+  );
+
+  await assert.rejects(repo.permanentlyDelete('t1', 1), ConflictError);
+  await repo.permanentlyDelete('t1', 0);
+
+  assert.equal(await repo.get('t1'), undefined);
+  assert.equal((await repo.exportAll()).events.length, 0);
+});
+
+test('永久删除拒绝非回收站任务并保留任务与事件', async () => {
+  const repo = new InMemoryTaskRepository([BASE_TASK], [], [EVENT]);
+
+  await assert.rejects(
+    repo.permanentlyDelete(BASE_TASK.id, 0),
+    (error) => error instanceof ValidationError
+      && error.message === '只能永久删除回收站中的任务',
+  );
+
+  assert.ok(await repo.get(BASE_TASK.id));
+  assert.equal((await repo.exportAll()).events.length, 1);
+});
+
+test('真实仓库永久删除事务覆盖 searchIndex', async () => {
+  const database = new IndexedDbFake({
+    tasks: [{ ...BASE_TASK, trashedAt: NOW }],
+    events: [{ ...EVENT, type: 'TRASH' }],
+  });
+  const repository = new TaskRepository(database);
+
+  await repository.permanentlyDelete('t1', 0);
+
+  assert.equal(database.snapshot().searchIndex.length, 0);
+  assert.deepEqual(
+    database.transactionLog.at(-1).storeNames,
+    ['tasks', 'events', 'searchIndex'],
+  );
+});
+
+test('listTrashed 只通过 trashedAt 索引读取回收站任务', async () => {
+  const database = new IndexedDbFake({
+    tasks: [
+      { ...BASE_TASK, id: 'active' },
+      { ...BASE_TASK, id: 'trashed', trashedAt: NOW },
+    ],
+  });
+  const repository = new TaskRepository(database);
+
+  assert.deepEqual((await repository.listTrashed()).map(({ id }) => id), ['trashed']);
+  assert.equal(database.indexReads.at(-1).storeName, 'tasks');
+  assert.equal(database.indexReads.at(-1).indexName, 'trashedAt');
 });
 
 test('replaceAll 替换数据且不复用传入快照', async () => {
