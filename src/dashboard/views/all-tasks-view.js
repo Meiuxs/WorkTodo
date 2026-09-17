@@ -46,10 +46,11 @@ export function createAllTasksView({ root, query, taskService, tagService, today
   let tags = [];
   let searchTimer;
 
-  async function refreshList() {
+  async function refreshList(signal) {
     const listRoot = root.querySelector('#all-tasks-list');
     if (listRoot === null) return;
     const tasks = await query.search(queryFilters(filters));
+    if (signal?.aborted) return;
     renderTaskList(listRoot, tasks, {
       today: today(),
       onAction,
@@ -67,11 +68,12 @@ export function createAllTasksView({ root, query, taskService, tagService, today
   }
 
   return {
-    async render() {
+    async render(signal) {
       [categories, tags] = await Promise.all([
         taskService.listCategories(),
         tagService.list(),
       ]);
+      if (signal?.aborted) return;
       root.innerHTML = `<section class="view-section" aria-labelledby="all-tasks-heading">
         <div class="section-heading">
           <div><h2 id="all-tasks-heading">全部任务</h2><p>筛选条件始终可见，可单独清除，也可一次清空。</p></div>
@@ -98,17 +100,17 @@ export function createAllTasksView({ root, query, taskService, tagService, today
       form.addEventListener('input', (event) => {
         readFilters();
         clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => refreshList(), event.target.type === 'search' ? 150 : 0);
+        searchTimer = setTimeout(() => refreshList(signal), event.target.type === 'search' ? 150 : 0);
       });
       form.addEventListener('change', () => {
         readFilters();
-        refreshList();
+        refreshList(signal);
       });
       root.querySelector('#clear-filters').addEventListener('click', () => {
         filters = { ...EMPTY_FILTERS };
-        return this.render();
+        return this.render(signal);
       });
-      await refreshList();
+      await refreshList(signal);
     },
   };
 }

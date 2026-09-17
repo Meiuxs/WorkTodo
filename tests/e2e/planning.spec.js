@@ -31,3 +31,17 @@ test('快速切换路由时旧周视图不会覆盖当前视图', async ({ exten
   await expect(page.locator('#today-tasks-heading')).toBeVisible();
   await expect(page.locator('#week-heading')).toHaveCount(0);
 });
+
+test('永不结束的旧周视图不会阻塞最新导航', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.evaluate(async () => {
+    const { TaskQueryService } = await import('../services/task-query-service.js');
+    TaskQueryService.prototype.week = () => new Promise(() => {});
+  });
+
+  await page.getByRole('button', { name: '本周', exact: true }).click();
+  await page.getByRole('button', { name: '今天', exact: true }).click();
+
+  await expect(page.locator('#today-tasks-heading')).toBeVisible({ timeout: 1_000 });
+  await expect(page.locator('#week-heading')).toHaveCount(0);
+});

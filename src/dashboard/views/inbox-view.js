@@ -2,8 +2,9 @@ import { renderTaskList } from '../task-list.js';
 
 export function createInboxView({ root, query, today, onAction, onEdit, onError }) {
   return {
-    async render() {
+    async render(signal) {
       const tasks = await query.inbox();
+      if (signal?.aborted) return;
       root.innerHTML = `<section class="view-section" aria-labelledby="inbox-heading">
         <div class="section-heading">
           <div><h2 id="inbox-heading">收集箱 · ${tasks.length}</h2><p>先记录，再决定日期、优先级和分类。</p></div>

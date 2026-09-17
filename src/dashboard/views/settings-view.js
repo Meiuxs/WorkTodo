@@ -135,7 +135,8 @@ export function createSettingsView({
     </div>`;
   }
 
-  function renderDataState() {
+  function renderDataState(signal) {
+    if (signal?.aborted) return;
     const region = root.querySelector('#data-state');
     if (region === null) return;
     region.innerHTML = dataStateMarkup(dataController.state);
@@ -147,19 +148,22 @@ export function createSettingsView({
         confirmation.addEventListener('close', async () => {
           if (confirmation.returnValue !== 'confirm') return;
           await dataController.confirm(mode);
-          renderDataState();
+          if (signal?.aborted) return;
+          renderDataState(signal);
           if (dataController.state.kind === 'result') await onDataChanged();
         }, { once: true });
         return;
       }
       await dataController.confirm(mode);
-      renderDataState();
+      if (signal?.aborted) return;
+      renderDataState(signal);
       if (dataController.state.kind === 'result') await onDataChanged();
     });
   }
 
-  async function exportBackup() {
+  async function exportBackup(signal) {
     const backup = await backupService.createBackup();
+    if (signal?.aborted) return;
     const contents = backupService.serializeBackup(backup);
     const url = URL.createObjectURL(new Blob([contents], { type: 'application/json' }));
     const link = document.createElement('a');
@@ -169,12 +173,14 @@ export function createSettingsView({
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    await render();
+    await render(signal);
   }
 
-  async function render() {
+  async function render(signal) {
     categories = await taskService.listCategories();
+    if (signal?.aborted) return;
     const metadata = await settingsRepository.getMetadata() ?? {};
+    if (signal?.aborted) return;
     root.innerHTML = `<section class="view-section" aria-labelledby="data-management-heading">
       <div class="section-heading">
         <div><h2 id="data-management-heading">数据管理</h2><p>扩展卸载会清除本地数据。重要工作请定期导出 JSON 备份。</p></div>
@@ -215,13 +221,14 @@ export function createSettingsView({
       </dialog>
     </section>`;
 
-    renderDataState();
-    root.querySelector('#export-backup').addEventListener('click', () => exportBackup());
+    renderDataState(signal);
+    root.querySelector('#export-backup').addEventListener('click', () => exportBackup(signal));
     root.querySelector('#import-file').addEventListener('change', async (event) => {
       const file = event.target.files?.[0];
       if (file === undefined) return;
       await dataController.selectFile(file);
-      renderDataState();
+      if (signal?.aborted) return;
+      renderDataState(signal);
       event.target.value = '';
     });
     root.querySelector('#create-category').addEventListener('submit', async (event) => {
@@ -229,8 +236,10 @@ export function createSettingsView({
       const input = event.currentTarget.elements.namedItem('name');
       try {
         await taskService.createCategory(input.value);
-        await render();
+        if (signal?.aborted) return;
+        await render(signal);
       } catch (error) {
+        if (signal?.aborted) return;
         root.querySelector('#category-message').textContent = error.message;
         input.focus();
       }
@@ -243,8 +252,10 @@ export function createSettingsView({
       try {
         const destination = deleteDialog.querySelector('select').value || null;
         await taskService.deleteCategory(categoryId, destination);
-        await render();
+        if (signal?.aborted) return;
+        await render(signal);
       } catch (error) {
+        if (signal?.aborted) return;
         deleteDialog.querySelector('[data-delete-message]').textContent = error.message;
         requestAnimationFrame(() => deleteDialog.showModal());
       }
@@ -258,8 +269,10 @@ export function createSettingsView({
       if (button.dataset.categoryAction === 'rename') {
         try {
           await taskService.renameCategory(categoryId, row.querySelector('input').value);
-          await render();
+          if (signal?.aborted) return;
+          await render(signal);
         } catch (error) {
+          if (signal?.aborted) return;
           root.querySelector('#category-message').textContent = error.message;
           row.querySelector('input').focus();
         }

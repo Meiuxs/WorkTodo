@@ -2,8 +2,9 @@ import { renderTaskList } from '../task-list.js';
 
 export function createCompletedView({ root, query, today, onAction, onEdit, onError }) {
   return {
-    async render() {
+    async render(signal) {
       const [completed, cancelled] = await Promise.all([query.completed(), query.cancelled()]);
+      if (signal?.aborted) return;
       root.innerHTML = `<section class="view-section" aria-labelledby="completed-heading">
         <div class="section-heading"><div><h2 id="completed-heading">已完成 · ${completed.length}</h2><p>按完成时间保留工作记录，可恢复为待办或复制为新任务。</p></div></div>
         <div id="completed-list"></div>

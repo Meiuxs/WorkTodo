@@ -11,7 +11,7 @@ export function createWeekView({
   singleDate = false,
 }) {
   return {
-    async render() {
+    async render(signal) {
       const anchor = today();
       const tomorrow = addLocalDays(anchor, 1);
       const result = singleDate
@@ -23,6 +23,7 @@ export function createWeekView({
           }
         : await query.week(anchor);
 
+      if (signal?.aborted) return;
       root.innerHTML = `<section class="view-section" aria-labelledby="week-heading">
         <div class="section-heading">
           <div>

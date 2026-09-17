@@ -10,13 +10,14 @@ function formatDate(date) {
 
 export function createTodayView({ root, query, statistics, today, onAction, onEdit, onError }) {
   return {
-    async render() {
+    async render(signal) {
       const date = today();
       const [tasks, completed, summary] = await Promise.all([
         query.today(date),
         query.completed({ completedDate: date }),
         statistics.daily(date),
       ]);
+      if (signal?.aborted) return;
       const overdue = tasks.filter((task) => task.scheduledDate !== null && task.scheduledDate < date);
       const planned = tasks.filter((task) => task.scheduledDate === date);
       const progress = summary.completionRate === null ? 0 : Math.round(summary.completionRate * 100);

@@ -15,8 +15,7 @@ export class DashboardController {
   #subtaskService;
   #sendMessage;
   #route = 'today';
-  #renderVersion = 0;
-  #renderQueue = Promise.resolve();
+  #renderAbortController = null;
 
   constructor({ views, taskService = null, subtaskService = null, sendMessage = async () => {} }) {
     this.#views = views;
@@ -41,15 +40,29 @@ export class DashboardController {
   }
 
   #render(route) {
-    const version = ++this.#renderVersion;
-    const view = this.#views[route];
-    const run = async () => {
-      if (version !== this.#renderVersion) return;
-      await view.render();
-    };
-    const render = this.#renderQueue.then(run, run);
-    this.#renderQueue = render.catch(() => {});
-    return render;
+    this.#renderAbortController?.abort();
+    const renderAbortController = new AbortController();
+    this.#renderAbortController = renderAbortController;
+    return this.#renderView(route, renderAbortController);
+  }
+
+  async #renderView(route, renderAbortController) {
+    const render = Promise.resolve().then(() => (
+      this.#views[route].render(renderAbortController.signal)
+    ));
+    const aborted = new Promise((resolve) => {
+      renderAbortController.signal.addEventListener('abort', resolve, { once: true });
+    });
+    try {
+      await Promise.race([render, aborted]);
+    } catch (error) {
+      if (renderAbortController.signal.aborted || error?.name === 'AbortError') return;
+      throw error;
+    } finally {
+      if (this.#renderAbortController === renderAbortController) {
+        this.#renderAbortController = null;
+      }
+    }
   }
 
   async onMessage(message) {

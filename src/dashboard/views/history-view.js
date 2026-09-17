@@ -22,13 +22,14 @@ export function createHistoryView({ root, query, statistics, today, onAction, on
   let anchor = today();
 
   return {
-    async render() {
+    async render(signal) {
       const fromDate = mode === 'daily' ? anchor : startOfWeek(anchor);
       const toDate = mode === 'daily' ? anchor : addDays(fromDate, 6);
       const [summary, completed] = await Promise.all([
         mode === 'daily' ? statistics.daily(anchor) : statistics.weekly(fromDate),
         query.completed({ completedFrom: fromDate, completedTo: toDate }),
       ]);
+      if (signal?.aborted) return;
       const rangeText = mode === 'daily' ? anchor : `${fromDate} 至 ${toDate}`;
       root.innerHTML = `<section class="view-section" aria-labelledby="history-heading">
         <div class="section-heading">
@@ -55,13 +56,13 @@ export function createHistoryView({ root, query, statistics, today, onAction, on
       root.querySelectorAll('[data-history-mode]').forEach((button) => {
         button.addEventListener('click', async () => {
           mode = button.dataset.historyMode;
-          await this.render();
+          await this.render(signal);
         });
       });
       root.querySelector('#history-date').addEventListener('change', async (event) => {
         if (event.target.value.length === 0) return;
         anchor = event.target.value;
-        await this.render();
+        await this.render(signal);
       });
       renderTaskList(root.querySelector('#history-list'), completed, {
         today: today(),

@@ -37,18 +37,53 @@ test('tomorrow 和 week 是正式识别路由', async () => {
   assert.deepEqual(rendered, ['tomorrow', 'week']);
 });
 
-test('较慢的旧 render 不会覆盖最新导航视图', async () => {
+test('新导航不会等待永不结束的旧 render', async () => {
   const rendered = [];
-  let releaseToday;
+  let todaySignal;
   const todayView = {
-    async render() {
-      await new Promise((resolve) => { releaseToday = resolve; });
-      rendered.push('today');
+    async render(signal) {
+      todaySignal = signal;
+      await new Promise(() => {});
     },
   };
   const inboxView = {
-    async render() {
+    async render(signal) {
+      assert.equal(signal.aborted, false);
       rendered.push('inbox');
+    },
+  };
+  const controller = new DashboardController({
+    views: { today: todayView, inbox: inboxView },
+  });
+
+  const staleRender = controller.refresh();
+  await Promise.resolve();
+  const latestNavigation = controller.navigate('inbox');
+  const outcome = await Promise.race([
+    latestNavigation.then(() => 'completed'),
+    new Promise((resolve) => setTimeout(() => resolve('timeout'), 100)),
+  ]);
+
+  assert.equal(outcome, 'completed');
+  assert.equal(todaySignal.aborted, true);
+  assert.deepEqual(rendered, ['inbox']);
+  await staleRender;
+});
+
+test('旧 render 释放后不会覆盖最新导航视图', async () => {
+  const rendered = [];
+  let releaseToday;
+  let todaySignal;
+  const todayView = {
+    async render(signal) {
+      todaySignal = signal;
+      await new Promise((resolve) => { releaseToday = resolve; });
+      if (!signal?.aborted) rendered.push('today');
+    },
+  };
+  const inboxView = {
+    async render(signal) {
+      if (!signal?.aborted) rendered.push('inbox');
     },
   };
   const controller = new DashboardController({
@@ -61,8 +96,32 @@ test('较慢的旧 render 不会覆盖最新导航视图', async () => {
   releaseToday();
   await Promise.all([staleRender, latestNavigation]);
 
-  assert.equal(controller.route, 'inbox');
-  assert.deepEqual(rendered, ['today', 'inbox']);
+  assert.equal(todaySignal?.aborted, true);
+  assert.deepEqual(rendered, ['inbox']);
+});
+
+test('已取消 render 的 AbortError 不会向调用方传播', async () => {
+  let releaseToday;
+  const todayView = {
+    async render() {
+      await new Promise((resolve) => { releaseToday = resolve; });
+      const error = new Error('render aborted');
+      error.name = 'AbortError';
+      throw error;
+    },
+  };
+  const inboxView = { async render() {} };
+  const controller = new DashboardController({
+    views: { today: todayView, inbox: inboxView },
+  });
+
+  const staleRender = controller.refresh();
+  await Promise.resolve();
+  const latestNavigation = controller.navigate('inbox');
+  releaseToday();
+  await latestNavigation;
+
+  await assert.doesNotReject(staleRender);
 });
 
 test('任务操作调用服务、广播并刷新当前视图', async () => {
