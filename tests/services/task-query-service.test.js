@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { toLocalDate } from '../../src/domain/dates.js';
+import { ValidationError } from '../../src/domain/errors.js';
 import { TaskQueryService } from '../../src/services/task-query-service.js';
 import { InMemoryTaskRepository } from '../helpers/fakes.js';
 
@@ -9,6 +10,7 @@ const NOW = '2026-09-17T08:30:00.000Z';
 
 function task(overrides = {}) {
   const scheduledDate = overrides.scheduledDate ?? '2026-09-17';
+  const startTime = overrides.startTime ?? null;
   return {
     id: 'task',
     title: '任务',
@@ -18,8 +20,8 @@ function task(overrides = {}) {
     categoryId: null,
     scheduledDate,
     firstScheduledDate: scheduledDate,
-    startTime: null,
-    dueTime: null,
+    startTime,
+    dueTime: startTime === null ? null : '23:59',
     lifecycle: 'todo',
     revision: 0,
     createdAt: NOW,
@@ -200,4 +202,18 @@ test('完成日期筛选使用系统本地日期而不是 UTC 日期字符串', 
     (await query.completed({ completedDate: localDate })).map((item) => item.id),
     ['local-midnight'],
   );
+});
+
+test('range 返回闭区间内未删除任务并按计划顺序排序', async () => {
+  const { query } = createQuery([
+    task({ id: 'late', scheduledDate: '2026-09-18', startTime: '15:00' }),
+    task({ id: 'early', scheduledDate: '2026-09-17', startTime: '09:00' }),
+    task({ id: 'outside', scheduledDate: '2026-09-20' }),
+    task({ id: 'trashed', scheduledDate: '2026-09-17', trashedAt: NOW }),
+  ]);
+
+  const result = await query.range('2026-09-17', '2026-09-18');
+
+  assert.deepEqual(result.map((item) => item.id), ['early', 'late']);
+  await assert.rejects(query.range('2026-09-18', '2026-09-17'), ValidationError);
 });

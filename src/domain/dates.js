@@ -46,3 +46,43 @@ export function assertLocalDate(value, fieldName = '日期') {
     throw new ValidationError(`${fieldName} 不是有效日期`);
   }
 }
+
+export function addLocalDays(date, days) {
+  assertLocalDate(date);
+  const [year, month, day] = date.split('-').map(Number);
+  const value = new Date(Date.UTC(year, month - 1, day + days));
+  return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`;
+}
+
+export function startOfWeek(date, weekStartsOn = 1) {
+  assertLocalDate(date);
+  const [year, month, day] = date.split('-').map(Number);
+  const value = new Date(Date.UTC(year, month - 1, day));
+  const offset = (value.getUTCDay() - weekStartsOn + 7) % 7;
+  return addLocalDays(date, -offset);
+}
+
+export function endOfWeek(date, weekStartsOn = 1) {
+  return addLocalDays(startOfWeek(date, weekStartsOn), 6);
+}
+
+export function startOfMonth(date) {
+  assertLocalDate(date);
+  return `${date.slice(0, 7)}-01`;
+}
+
+export function endOfMonth(date) {
+  assertLocalDate(date);
+  const [year, month] = date.split('-').map(Number);
+  return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+}
+
+export function eachLocalDate(startDate, endDate) {
+  assertLocalDate(startDate, 'startDate');
+  assertLocalDate(endDate, 'endDate');
+  const result = [];
+  for (let current = startDate; current <= endDate; current = addLocalDays(current, 1)) {
+    result.push(current);
+  }
+  return result;
+}

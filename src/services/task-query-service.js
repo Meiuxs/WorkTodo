@@ -1,4 +1,5 @@
 import { assertLocalDate, isOverdueTask, toLocalDate } from '../domain/dates.js';
+import { ValidationError } from '../domain/errors.js';
 import { isInboxTask } from '../domain/task.js';
 
 const PRIORITY_RANK = {
@@ -36,6 +37,20 @@ function compareForWorkList(today) {
     const createdAt = left.task.createdAt.localeCompare(right.task.createdAt);
     if (createdAt !== 0) return createdAt;
 
+    return left.index - right.index;
+  };
+}
+
+function compareForRange() {
+  return (left, right) => {
+    const scheduledDate = left.task.scheduledDate.localeCompare(right.task.scheduledDate);
+    if (scheduledDate !== 0) return scheduledDate;
+    const startTime = compareNullableText(left.task.startTime, right.task.startTime);
+    if (startTime !== 0) return startTime;
+    const priority = (PRIORITY_RANK[right.task.priority] ?? 0) - (PRIORITY_RANK[left.task.priority] ?? 0);
+    if (priority !== 0) return priority;
+    const createdAt = left.task.createdAt.localeCompare(right.task.createdAt);
+    if (createdAt !== 0) return createdAt;
     return left.index - right.index;
   };
 }
@@ -114,6 +129,23 @@ export class TaskQueryService {
     return stableSort(
       tasks.filter((task) => isOverdueTask(task, date)),
       compareForWorkList(date),
+    );
+  }
+
+  async range(fromDate, toDate, filters = {}) {
+    assertLocalDate(fromDate, 'fromDate');
+    assertLocalDate(toDate, 'toDate');
+    if (fromDate > toDate) throw new ValidationError('fromDate 不能晚于 toDate');
+    const tasks = await this.#tasks();
+    return stableSort(
+      tasks.filter((task) => (
+        task.trashedAt === null
+        && task.scheduledDate !== null
+        && task.scheduledDate >= fromDate
+        && task.scheduledDate <= toDate
+        && matchesFilters(task, filters)
+      )),
+      compareForRange(),
     );
   }
 
