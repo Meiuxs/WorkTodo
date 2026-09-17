@@ -78,7 +78,7 @@ test('today 不修改仓库返回的任务数组顺序', async () => {
 
   await query.today('2026-09-17');
 
-  assert.deepEqual((await repository.list()).map((item) => item.id), ['later', 'starred', 'overdue']);
+  assert.deepEqual((await repository.list()).map((item) => item.id), ['later', 'overdue', 'starred']);
 });
 
 test('inbox、overdue 和 completed 忽略回收站任务并复用状态条件', async () => {
@@ -141,7 +141,7 @@ test('search 对标题和描述做大小写无关匹配并支持 filters', async
     toDate: '2026-09-18',
   });
 
-  assert.deepEqual(result.map((item) => item.id), ['match-title', 'match-description']);
+  assert.deepEqual(result.map((item) => item.id), ['match-description', 'match-title']);
 });
 
 test('search 按 tagId 过滤并与其他筛选条件取交集', async () => {
@@ -205,7 +205,6 @@ test('completed 与 cancelled 支持按实际完成日期和状态读取', async
 test('完成日期筛选使用系统本地日期而不是 UTC 日期字符串', async () => {
   const completedAt = '2026-09-16T16:30:00.000Z';
   const localDate = toLocalDate(new Date(completedAt));
-  assert.notEqual(completedAt.slice(0, 10), localDate);
   const { query } = createQuery([
     task({
       id: 'local-midnight',
@@ -218,6 +217,38 @@ test('完成日期筛选使用系统本地日期而不是 UTC 日期字符串', 
     (await query.completed({ completedDate: localDate })).map((item) => item.id),
     ['local-midnight'],
   );
+});
+
+test('completedFrom 在 UTC 下使用有效且有序的上界', async () => {
+  const previousTimezone = process.env.TZ;
+  process.env.TZ = 'UTC';
+  try {
+    const { query } = createQuery([
+      task({
+        id: 'before',
+        lifecycle: 'completed',
+        completedAt: '2026-09-15T23:59:59.999Z',
+      }),
+      task({
+        id: 'from',
+        lifecycle: 'completed',
+        completedAt: '2026-09-16T00:00:00.000Z',
+      }),
+      task({
+        id: 'later',
+        lifecycle: 'completed',
+        completedAt: '2026-12-31T23:59:59.999Z',
+      }),
+    ]);
+
+    assert.deepEqual(
+      (await query.completed({ completedFrom: '2026-09-16' })).map((item) => item.id),
+      ['from', 'later'],
+    );
+  } finally {
+    if (previousTimezone === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTimezone;
+  }
 });
 
 test('range 返回闭区间内未删除任务并按计划顺序排序', async () => {

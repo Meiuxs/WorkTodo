@@ -21,6 +21,7 @@ const PRIORITY_RANK = {
 const ACTIVE_LIFECYCLES = ['todo', 'in_progress'];
 const MIN_LOCAL_DATE = '0001-01-01';
 const MAX_LOCAL_DATE = '9999-12-31';
+const MAX_LOCAL_DATE_UPPER_BOUND = '9999-12-31T23:59:59.999Z';
 
 function isActiveTask(task) {
   return task.trashedAt === null && !['completed', 'cancelled'].includes(task.lifecycle);
@@ -40,6 +41,12 @@ function localDateBoundaryIso(date, dayOffset = 0) {
   boundary.setHours(0, 0, 0, 0);
   boundary.setFullYear(year, month - 1, day);
   return boundary.toISOString();
+}
+
+function nextLocalDateBoundaryIso(date) {
+  return date === MAX_LOCAL_DATE
+    ? MAX_LOCAL_DATE_UPPER_BOUND
+    : localDateBoundaryIso(date, 1);
 }
 
 function mergeUniqueTasks(...groups) {
@@ -263,7 +270,7 @@ export class TaskQueryService {
       if (fromDate > toDate) return [];
       tasks = await this.#repository.listCompleted(
         localDateBoundaryIso(fromDate),
-        localDateBoundaryIso(toDate, 1),
+        nextLocalDateBoundaryIso(toDate),
         { lifecycle: 'completed', trashedAt: null },
       );
     } else {

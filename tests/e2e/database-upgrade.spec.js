@@ -20,15 +20,15 @@ const LEGACY_TASK = {
   trashedAt: null,
 };
 const LEGACY_TASKS = [
-  LEGACY_TASK,
   {
     ...LEGACY_TASK,
     id: '22222222-2222-4222-8222-222222222222',
     title: '旧任务二',
   },
+  LEGACY_TASK,
 ];
 
-test('Chromium 中 v1 实库升级到 v3 会物化关系字段并重建可搜索索引', async ({ extension }) => {
+test('Chromium 中 v1 实库升级到 v3 会物化关系字段并按 ID 返回搜索结果', async ({ extension }) => {
   const runner = await openExtensionPage(extension.context, extension.extensionId, 'manifest.json');
   await runner.evaluate(async (legacyTasks) => {
     await new Promise((resolve, reject) => {

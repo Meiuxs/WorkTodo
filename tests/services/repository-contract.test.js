@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { ConflictError, TaskRepository } from '../../src/data/task-repository.js';
 import { createSearchIndexRecord } from '../../src/data/search-index.js';
+import { TagRepository } from '../../src/data/tag-repository.js';
 import { SettingsRepository } from '../../src/data/settings-repository.js';
 import { BackupService } from '../../src/services/backup-service.js';
 import { InMemoryStorageArea, InMemoryTaskRepository } from '../helpers/fakes.js';
@@ -61,14 +62,14 @@ function keysFor(record, keyPath, multiEntry) {
 class IndexedDbFake {
   #stores;
 
-  constructor({ tasks = [], events = [] } = {}) {
+  constructor({ tasks = [], events = [], tags = [] } = {}) {
     this.indexReads = [];
     this.transactionLog = [];
     this.#stores = new Map([
       ['tasks', new Map(tasks.map((task) => [task.id, structuredClone(task)]))],
       ['categories', new Map()],
       ['events', new Map(events.map((event) => [event.id, structuredClone(event)]))],
-      ['tags', new Map()],
+      ['tags', new Map(tags.map((tag) => [tag.id, structuredClone(tag)]))],
       ['recurringTemplates', new Map()],
       [
         'searchIndex',
@@ -111,6 +112,7 @@ class IndexedDbFake {
         };
     const getRecords = (range) => [...records.values()]
       .filter((record) => range === undefined || range.includes(record[keyPath]))
+      .sort((left, right) => compareIndexedKeys(left[keyPath], right[keyPath]))
       .map((record) => structuredClone(record));
 
     return {
@@ -138,24 +140,36 @@ class IndexedDbFake {
       clear() {
         records.clear();
       },
+      delete(key) {
+        records.delete(key);
+      },
       index(indexName) {
         const definition = indexes[indexName];
         if (definition === undefined) throw new Error(`索引不存在: ${indexName}`);
         const matching = (range) => {
           database.indexReads.push({ storeName: name, indexName, range });
-          return [...records.entries()].filter(([, record]) => (
-            keysFor(record, definition.keyPath, definition.multiEntry)
-              .some((key) => range === undefined || range.includes(key))
-          ));
+          return [...records.entries()]
+            .map(([primaryKey, record]) => {
+              const matchingKeys = keysFor(record, definition.keyPath, definition.multiEntry)
+                .filter((key) => range === undefined || range.includes(key))
+                .sort(compareIndexedKeys);
+              return matchingKeys.length === 0
+                ? null
+                : { indexKey: matchingKeys[0], primaryKey, record };
+            })
+            .filter((entry) => entry !== null)
+            .sort((left, right) => (
+              compareIndexedKeys(left.indexKey, right.indexKey)
+              || compareIndexedKeys(left.primaryKey, right.primaryKey)
+            ));
         };
         return {
           getAll(range) {
-            return asyncRequest(matching(range).map(([, record]) => record));
+            return asyncRequest(matching(range).map(({ record }) => record));
           },
           getAllKeys(range) {
             const keys = matching(range)
-              .map(([primaryKey]) => primaryKey)
-              .sort();
+              .map(({ primaryKey }) => primaryKey);
             return asyncRequest(keys);
           },
         };
@@ -171,6 +185,11 @@ class IndexedDbFake {
       ]),
     );
   }
+}
+
+function compareIndexedKeys(left, right) {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
 }
 
 function indexedTask(overrides = {}) {
@@ -606,7 +625,7 @@ test('TaskRepository.search 使用 gram 索引、真实包含校验并支持空�
   database.indexReads.length = 0;
   assert.deepEqual(
     (await repository.search('')).map(({ id }) => id),
-    ['title', 'description', 'unicode', 'false-positive'],
+    ['description', 'false-positive', 'title', 'unicode'],
   );
   assert.equal(
     database.indexReads.some(({ storeName, indexName }) => (
@@ -681,32 +700,43 @@ test('TaskRepository 在任务事务中增量维护搜索索引且 replaceAll �
 
 test('InMemoryTaskRepository 与真实仓库的新增查询语义一致', async () => {
   const tasks = [
-    indexedTask({ id: 'a', scheduledDate: '2026-09-17', lifecycle: 'todo' }),
     indexedTask({
-      id: 'b',
+      id: 'search-task-z',
+      title: '任务 Z',
+      scheduledDate: '2026-09-17',
+      lifecycle: 'todo',
+    }),
+    indexedTask({
+      id: 'search-task-a',
+      title: '任务 A',
       scheduledDate: '2026-09-18',
       lifecycle: 'completed',
       completedAt: '2026-09-17T09:00:00.000Z',
     }),
     indexedTask({
-      id: 'c',
+      id: 'search-task-m',
+      title: '任务 M',
       scheduledDate: null,
       lifecycle: 'cancelled',
       completedAt: null,
       cancelledAt: NOW,
     }),
   ];
+  delete tasks[2].parentId;
+  delete tasks[2].tagIds;
+  delete tasks[2].seriesId;
+  delete tasks[2].occurrenceKey;
   const events = [
     {
       id: 'e1',
-      taskId: 'a',
+      taskId: 'search-task-z',
       type: 'POSTPONE',
       occurredAt: '2026-09-17T10:00:00.000Z',
       detail: null,
     },
     {
       id: 'e2',
-      taskId: 'b',
+      taskId: 'search-task-a',
       type: 'EDIT',
       occurredAt: '2026-09-18T10:00:00.000Z',
       detail: null,
@@ -744,13 +774,54 @@ test('InMemoryTaskRepository 与真实仓库的新增查询语义一致', async 
     ),
   );
   assert.deepEqual(
-    (await real.search('任务')).map(({ id }) => id).sort(),
-    (await memory.search('任务')).map(({ id }) => id).sort(),
+    await real.search('任务'),
+    await memory.search('任务'),
   );
   assert.deepEqual(
-    (await real.getMany(['a', 'missing', 'a'])).map(({ id }) => id),
-    (await memory.getMany(['a', 'missing', 'a'])).map(({ id }) => id),
+    await real.getMany(['search-task-z', 'missing', 'search-task-z']),
+    await memory.getMany(['search-task-z', 'missing', 'search-task-z']),
   );
+  assert.deepEqual(
+    (await memory.search('任务')).map(({ id }) => id),
+    ['search-task-a', 'search-task-m', 'search-task-z'],
+  );
+  const [legacyMemoryTask] = await memory.search('任务 M');
+  assert.deepEqual(
+    Object.fromEntries(
+      ['parentId', 'tagIds', 'seriesId', 'occurrenceKey']
+        .map((field) => [field, legacyMemoryTask[field]]),
+    ),
+    {
+      parentId: null,
+      tagIds: [],
+      seriesId: null,
+      occurrenceKey: null,
+    },
+  );
+});
+
+test('TagRepository.deleteAndDetach 在同一事务同步搜索索引 revision', async () => {
+  const database = new IndexedDbFake({
+    tasks: [{ ...BASE_TASK, tagIds: [TAG_ID] }],
+    tags: [TAG],
+  });
+  const repository = new TagRepository(database);
+
+  await repository.deleteAndDetach(TAG_ID, {
+    updatedAt: NOW,
+    createEvent: (task) => ({
+      ...EVENT,
+      id: 'event-tag-detached',
+      taskId: task.id,
+      type: 'EDIT',
+    }),
+  });
+
+  assert.deepEqual(
+    database.transactionLog.at(-1).storeNames,
+    ['tasks', 'tags', 'events', 'searchIndex'],
+  );
+  assert.equal(database.snapshot().searchIndex[0].revision, 1);
 });
 
 test('settings 与 metadata 使用隔离键且返回独立快照', async () => {

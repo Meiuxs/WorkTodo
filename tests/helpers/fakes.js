@@ -2,6 +2,7 @@ import { createTaskEvent } from '../../src/domain/task-event.js';
 import { ValidationError } from '../../src/domain/errors.js';
 import { validateTask } from '../../src/domain/task.js';
 import { ConflictError } from '../../src/data/task-repository.js';
+import { materializeTaskRelationships } from '../../src/data/database.js';
 import {
   normalizeSearchQuery,
   normalizeSearchText,
@@ -25,6 +26,27 @@ function prepareEvent(taskId, event) {
 
 function matchesCriteria(task, criteria = {}) {
   return Object.entries(criteria).every(([field, value]) => task[field] === value);
+}
+
+function compareText(left, right) {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
+function compareById(left, right) {
+  return compareText(left.id, right.id);
+}
+
+function compareByIndex(key) {
+  return (left, right) => compareText(left[key], right[key]) || compareById(left, right);
+}
+
+function taskResults(tasks, criteria = {}, compare = compareById) {
+  return tasks
+    .map(materializeTaskRelationships)
+    .filter((task) => matchesCriteria(task, criteria))
+    .sort(compare)
+    .map(clone);
 }
 
 function prepareTag(tag) {
@@ -74,7 +96,7 @@ export class InMemoryTaskRepository {
 
   async get(id) {
     const task = this.#tasks.get(id);
-    return task === undefined ? undefined : clone(task);
+    return task === undefined ? undefined : clone(materializeTaskRelationships(task));
   }
 
   async update(task, expectedRevision, event) {
@@ -95,57 +117,66 @@ export class InMemoryTaskRepository {
   }
 
   async list(criteria = {}) {
-    return [...this.#tasks.values()]
-      .filter((task) => matchesCriteria(task, criteria))
-      .map(clone);
+    return taskResults([...this.#tasks.values()], criteria);
   }
 
   async listScheduled(fromDate, toDate, criteria = {}) {
-    return [...this.#tasks.values()]
-      .filter((task) => (
+    return taskResults(
+      [...this.#tasks.values()].filter((task) => (
         task.scheduledDate !== null
         && task.scheduledDate >= fromDate
         && task.scheduledDate <= toDate
-        && matchesCriteria(task, criteria)
-      ))
-      .map(clone);
+      )),
+      criteria,
+      compareByIndex('scheduledDate'),
+    );
   }
 
   async listCompleted(fromIso, toIso, criteria = {}) {
-    return [...this.#tasks.values()]
-      .filter((task) => (
+    return taskResults(
+      [...this.#tasks.values()].filter((task) => (
         task.completedAt !== null
         && task.completedAt >= fromIso
         && task.completedAt < toIso
-        && matchesCriteria(task, criteria)
-      ))
-      .map(clone);
+      )),
+      criteria,
+      compareByIndex('completedAt'),
+    );
   }
 
   async listCreated(fromIso, toIso, criteria = {}) {
-    return [...this.#tasks.values()]
-      .filter((task) => (
+    return taskResults(
+      [...this.#tasks.values()].filter((task) => (
         task.createdAt !== null
         && task.createdAt >= fromIso
         && task.createdAt < toIso
-        && matchesCriteria(task, criteria)
-      ))
-      .map(clone);
+      )),
+      criteria,
+      compareByIndex('createdAt'),
+    );
   }
 
   async listByLifecycle(lifecycle, criteria = {}) {
-    return [...this.#tasks.values()]
-      .filter((task) => task.lifecycle === lifecycle && matchesCriteria(task, criteria))
-      .map(clone);
+    return taskResults(
+      [...this.#tasks.values()].filter((task) => task.lifecycle === lifecycle),
+      criteria,
+      compareByIndex('lifecycle'),
+    );
   }
 
   async listEventsByOccurredAt(fromIso, toIso, types = null) {
     const acceptedTypes = types === null ? null : new Set(types);
-    return clone(this.#events.filter((event) => (
-      event.occurredAt >= fromIso
-      && event.occurredAt < toIso
-      && (acceptedTypes === null || acceptedTypes.has(event.type))
-    )));
+    return this.#events
+      .filter((event) => (
+        event.occurredAt >= fromIso
+        && event.occurredAt < toIso
+        && (acceptedTypes === null || acceptedTypes.has(event.type))
+      ))
+      .sort((left, right) => (
+        compareText(left.occurredAt, right.occurredAt)
+        || compareText(left.id, right.id)
+      ))
+      .map(clone);
   }
 
   async getMany(ids) {
@@ -153,17 +184,18 @@ export class InMemoryTaskRepository {
     return ids
       .map((id) => this.#tasks.get(id))
       .filter((task) => task !== undefined)
+      .map(materializeTaskRelationships)
       .map(clone);
   }
 
   async search(text) {
     const query = normalizeSearchQuery(text);
-    return [...this.#tasks.values()]
-      .filter((task) => (
+    return taskResults(
+      [...this.#tasks.values()].filter((task) => (
         task.trashedAt === null
         && (query.length === 0 || normalizeSearchText(task.title, task.description).includes(query))
-      ))
-      .map(clone);
+      )),
+    );
   }
 
   async createCategory(category) {

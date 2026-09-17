@@ -7,6 +7,7 @@ import { TaskQueryService } from '../../src/services/task-query-service.js';
 import { InMemoryStorageArea, InMemoryTaskRepository } from '../helpers/fakes.js';
 
 const NOW = '2026-09-17T08:30:00.000Z';
+const PRIORITY_RANK = { high: 3, medium: 2, low: 1, none: 0 };
 
 function makeTasks(count) {
   return Array.from({ length: count }, (_, index) => ({
@@ -31,6 +32,22 @@ function makeTasks(count) {
     cancelledAt: null,
     trashedAt: null,
   }));
+}
+
+function expectedRangeTaskIds(tasks, fromDate, toDate) {
+  return tasks
+    .map((task, index) => ({ task, index }))
+    .filter(({ task }) => (
+      task.scheduledDate >= fromDate
+      && task.scheduledDate <= toDate
+    ))
+    .sort((left, right) => (
+      left.task.scheduledDate.localeCompare(right.task.scheduledDate)
+      || (PRIORITY_RANK[right.task.priority] ?? 0) - (PRIORITY_RANK[left.task.priority] ?? 0)
+      || left.task.createdAt.localeCompare(right.task.createdAt)
+      || left.index - right.index
+    ))
+    .map(({ task }) => task.id);
 }
 
 test('10,000 条任务的今日查询不修改输入且返回数组', async () => {
@@ -95,6 +112,14 @@ test('10,000 条任务的本周和月历范围查询保持确定性', async () =
   assert.ok(month.weeks.every((weekDates) => weekDates.length === 7));
   assert.deepEqual(Object.keys(week.byDate), week.days);
   assert.deepEqual(Object.keys(month.byDate), renderedDates);
+  assert.deepEqual(
+    week.tasks.map(({ id }) => id),
+    expectedRangeTaskIds(tasks, week.days[0], week.days.at(-1)),
+  );
+  assert.deepEqual(
+    month.tasks.map(({ id }) => id),
+    expectedRangeTaskIds(tasks, month.gridStart, month.gridEnd),
+  );
   assert.deepEqual(weekAgain, week);
   assert.deepEqual(monthAgain, month);
   assert.deepEqual(await repository.exportAll(), before);

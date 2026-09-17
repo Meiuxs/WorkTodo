@@ -2,6 +2,7 @@ import { ValidationError } from '../domain/errors.js';
 import { createTaskEvent } from '../domain/task-event.js';
 import { validateTask } from '../domain/task.js';
 import { openWorkTodoDatabase } from './database.js';
+import { createSearchIndexRecord } from './search-index.js';
 
 function clone(value) {
   return structuredClone(value);
@@ -107,9 +108,13 @@ export class TagRepository {
 
   async deleteAndDetach(id, { updatedAt, createEvent }) {
     const database = await this.#getDatabase();
-    const transaction = database.transaction(['tasks', 'tags', 'events'], 'readwrite');
+    const transaction = database.transaction(
+      ['tasks', 'tags', 'events', 'searchIndex'],
+      'readwrite',
+    );
     const tags = transaction.objectStore('tags');
     const tasks = transaction.objectStore('tasks');
+    const searchIndex = transaction.objectStore('searchIndex');
 
     try {
       const tag = await requestResult(tags.get(id));
@@ -134,6 +139,7 @@ export class TagRepository {
       for (const { task, event } of changes) {
         tasks.put(task);
         transaction.objectStore('events').add(event);
+        searchIndex.put(createSearchIndexRecord(task));
       }
       tags.delete(id);
       await transactionResult(transaction);
