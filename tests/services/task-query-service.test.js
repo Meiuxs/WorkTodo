@@ -327,11 +327,26 @@ test('completed 无完成日期过滤时使用 lifecycle 索引', async () => {
   assert.deepEqual(calls[0].args, ['completed', { trashedAt: null }]);
 });
 
-test('all 返回全部任务快照并包含回收站任务', async () => {
+test('all 返回全部任务独立快照并包含回收站任务', async () => {
   const { query } = createQuery([
-    task({ id: 'active' }),
-    task({ id: 'trashed', trashedAt: NOW }),
+    task({ id: 'active', title: '活动任务' }),
+    task({ id: 'trashed', title: '回收站任务', trashedAt: NOW }),
   ]);
 
-  assert.deepEqual((await query.all()).map((item) => item.id).sort(), ['active', 'trashed']);
+  const first = await query.all();
+  assert.deepEqual(first.map((item) => item.id).sort(), ['active', 'trashed']);
+
+  first.find((item) => item.id === 'active').title = '外部修改';
+  first.find((item) => item.id === 'trashed').title = '回收站外部修改';
+
+  const second = await query.all();
+  assert.deepEqual(second.map((item) => item.id).sort(), ['active', 'trashed']);
+  assert.equal(second.find((item) => item.id === 'active').title, '活动任务');
+  assert.equal(second.find((item) => item.id === 'trashed').title, '回收站任务');
+  for (const firstTask of first) {
+    assert.notStrictEqual(
+      firstTask,
+      second.find((item) => item.id === firstTask.id),
+    );
+  }
 });

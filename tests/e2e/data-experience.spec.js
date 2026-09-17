@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { test, expect, openDashboard } from './fixtures.js';
 
 async function seedTrashedTasks(page, tasks) {
@@ -169,8 +170,19 @@ test('回收站主复选框恢复四种状态并只清空 trashedAt', async ({ e
 test('设置页可以下载 CSV 文件而不申请 downloads 权限', async ({ extension }) => {
   const page = await openDashboard(extension);
   await page.getByRole('button', { name: '设置' }).click();
+  const permissions = await page.evaluate(() => chrome.runtime.getManifest().permissions ?? []);
+  expect(permissions).not.toContain('downloads');
+
   const downloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: '导出 CSV' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^worktodo-tasks-.*\.csv$/);
+
+  const filePath = await download.path();
+  expect(filePath).not.toBeNull();
+  const contents = await readFile(filePath);
+  expect([...contents.subarray(0, 3)]).toEqual([0xEF, 0xBB, 0xBF]);
+  expect(contents.toString('utf8').slice(1).split('\r\n')[0]).toBe(
+    '"标题","状态","优先级","分类","标签","计划日期","开始时间","截止时间","完成时间","创建时间"',
+  );
 });
