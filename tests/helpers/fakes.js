@@ -19,6 +19,19 @@ function prepareEvent(taskId, event) {
   return copy;
 }
 
+function prepareTag(tag) {
+  if (tag === null || typeof tag !== 'object' || Array.isArray(tag)) {
+    throw new ValidationError('tag 必须是对象');
+  }
+  if (typeof tag.id !== 'string' || tag.id.length === 0) {
+    throw new ValidationError('tag.id 不能为空');
+  }
+  if (typeof tag.name !== 'string' || tag.name.trim().length === 0) {
+    throw new ValidationError('tag.name 不能为空');
+  }
+  return clone({ ...tag, name: tag.name.trim() });
+}
+
 export class InMemoryTaskRepository {
   #tasks;
   #categories;
@@ -162,6 +175,132 @@ export class InMemoryTaskRepository {
     this.#tasks = new Map(tasks.map((task) => [task.id, task]));
     this.#categories = clone(snapshot.categories ?? []);
     this.#events = events;
+  }
+}
+
+export class InMemoryTagRepository {
+  #tags;
+  #tasks;
+  #events;
+  #nextDeleteAndDetachFailure = null;
+
+  constructor(tags = [], tasks = [], events = []) {
+    this.#tags = new Map(tags.map((tag) => [tag.id, prepareTag(tag)]));
+    this.#tasks = new Map(tasks.map((task) => [task.id, prepareTask(task)]));
+    this.#events = events.map((event) => createTaskEvent(event));
+  }
+
+  #assertUniqueName(tag, excludedId = null) {
+    if ([...this.#tags.values()].some((current) => current.id !== excludedId && current.name === tag.name)) {
+      throw new Error('标签名称已存在');
+    }
+  }
+
+  #addEvent(event) {
+    if (this.#events.some((item) => item.id === event.id)) {
+      throw new Error(`事件 ${event.id} 已存在`);
+    }
+    this.#events.push(event);
+  }
+
+  async seedTask(task) {
+    const taskToSave = prepareTask(task);
+    if (this.#tasks.has(taskToSave.id)) throw new Error(`任务 ${taskToSave.id} 已存在`);
+    this.#tasks.set(taskToSave.id, taskToSave);
+    return clone(taskToSave);
+  }
+
+  async getTask(id) {
+    const task = this.#tasks.get(id);
+    return task === undefined ? undefined : clone(task);
+  }
+
+  async create(tag) {
+    const tagToSave = prepareTag(tag);
+    if (this.#tags.has(tagToSave.id)) throw new Error(`标签 ${tagToSave.id} 已存在`);
+    this.#assertUniqueName(tagToSave);
+    this.#tags.set(tagToSave.id, tagToSave);
+    return clone(tagToSave);
+  }
+
+  async get(id) {
+    const tag = this.#tags.get(id);
+    return tag === undefined ? undefined : clone(tag);
+  }
+
+  async list() {
+    return clone([...this.#tags.values()]);
+  }
+
+  async update(tag) {
+    const tagToSave = prepareTag(tag);
+    if (!this.#tags.has(tagToSave.id)) throw new ValidationError(`标签 ${tagToSave.id} 不存在`);
+    this.#assertUniqueName(tagToSave, tagToSave.id);
+    this.#tags.set(tagToSave.id, tagToSave);
+    return clone(tagToSave);
+  }
+
+  failNextDeleteAndDetach(error, afterFirstWrite = null) {
+    this.#nextDeleteAndDetachFailure = { error, afterFirstWrite };
+  }
+
+  async deleteAndDetach(id, { updatedAt, createEvent }) {
+    if (!this.#tags.has(id)) throw new ValidationError(`标签 ${id} 不存在`);
+    if (typeof createEvent !== 'function') {
+      throw new ValidationError('删除标签需要事件创建函数');
+    }
+    const snapshot = {
+      tags: new Map([...this.#tags].map(([tagId, tag]) => [tagId, clone(tag)])),
+      tasks: new Map([...this.#tasks].map(([taskId, task]) => [taskId, clone(task)])),
+      events: clone(this.#events),
+    };
+
+    try {
+      const affected = [...this.#tasks.values()]
+        .filter((task) => task.tagIds.includes(id))
+        .map((current) => {
+          const task = prepareTask({
+            ...current,
+            tagIds: current.tagIds.filter((tagId) => tagId !== id),
+            updatedAt,
+            revision: current.revision + 1,
+          });
+          return { task, event: prepareEvent(task.id, createEvent(task)) };
+        });
+
+      for (const item of affected) {
+        this.#tasks.set(item.task.id, item.task);
+        this.#addEvent(item.event);
+        if (this.#nextDeleteAndDetachFailure !== null) {
+          const { error, afterFirstWrite } = this.#nextDeleteAndDetachFailure;
+          this.#nextDeleteAndDetachFailure = null;
+          afterFirstWrite?.(clone({
+            tags: [...this.#tags.values()],
+            tasks: [...this.#tasks.values()],
+            events: this.#events,
+          }));
+          throw error;
+        }
+      }
+      this.#tags.delete(id);
+    } catch (error) {
+      this.#tags = snapshot.tags;
+      this.#tasks = snapshot.tasks;
+      this.#events = snapshot.events;
+      throw error;
+    }
+  }
+
+  async listEvents(taskId) {
+    return clone(this.#events.filter((event) => event.taskId === taskId));
+  }
+
+  async exportAll() {
+    return clone({
+      tags: [...this.#tags.values()],
+      tasks: [...this.#tasks.values()],
+      events: this.#events,
+    });
   }
 }
 
