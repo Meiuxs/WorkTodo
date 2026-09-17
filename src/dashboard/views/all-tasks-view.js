@@ -45,13 +45,21 @@ export function createAllTasksView({ root, query, taskService, tagService, today
   let categories = [];
   let tags = [];
   let searchTimer;
+  let listVersion = 0;
 
   async function refreshList(signal) {
+    const requestedVersion = ++listVersion;
     if (signal?.aborted) return;
     const listRoot = root.querySelector('#all-tasks-list');
     if (listRoot === null) return;
-    const tasks = await query.search(queryFilters(filters));
-    if (signal?.aborted || !listRoot.isConnected) return;
+    let tasks;
+    try {
+      tasks = await query.search(queryFilters(filters));
+    } catch (error) {
+      if (signal?.aborted || requestedVersion !== listVersion || error?.name === 'AbortError') return;
+      throw error;
+    }
+    if (signal?.aborted || !listRoot.isConnected || requestedVersion !== listVersion) return;
     const filterCount = root.querySelector('#filter-count');
     if (filterCount === null) return;
     renderTaskList(listRoot, tasks, {

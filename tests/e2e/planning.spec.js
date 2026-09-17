@@ -324,6 +324,39 @@ test('延迟搜索返回后不会写入已离开的全部任务视图', async ({
   expect(await page.evaluate(() => window.__planningErrors)).toEqual([]);
 });
 
+test('全部任务同视图连续搜索时旧结果不覆盖新结果', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.getByLabel('记录一个新事项').fill('请求 a');
+  await page.locator('#quick-add-date').selectOption('today');
+  await page.getByRole('button', { name: '添加', exact: true }).click();
+  await page.getByLabel('记录一个新事项').fill('请求 b');
+  await page.locator('#quick-add-date').selectOption('today');
+  await page.getByRole('button', { name: '添加', exact: true }).click();
+
+  await page.getByRole('button', { name: '全部任务', exact: true }).click();
+  await expect(page.locator('#all-tasks-heading')).toBeVisible();
+  await page.evaluate(async () => {
+    const { TaskQueryService } = await import('../services/task-query-service.js');
+    const originalSearch = TaskQueryService.prototype.search;
+    TaskQueryService.prototype.search = async function delayedSearch(filters) {
+      const delay = filters.text === 'a' ? 500 : filters.text === 'b' ? 25 : 0;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return originalSearch.call(this, filters);
+    };
+  });
+
+  const search = page.getByLabel('搜索');
+  await search.fill('a');
+  await page.waitForTimeout(200);
+  await search.fill('b');
+  const list = page.locator('#all-tasks-list');
+  await expect(list).toContainText('请求 b');
+  await expect(list).not.toContainText('请求 a');
+  await page.waitForTimeout(600);
+  await expect(list).toContainText('请求 b');
+  await expect(list).not.toContainText('请求 a');
+});
+
 test('全部任务 timer 的迟到普通错误不会形成未处理 rejection', async ({ extension }) => {
   const page = await openDashboard(extension);
   const pageErrors = [];
