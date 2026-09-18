@@ -3,7 +3,8 @@ import { TaskRepository } from '../data/task-repository.js';
 import { TaskService } from '../services/task-service.js';
 import { TaskQueryService } from '../services/task-query-service.js';
 import { StatisticsService } from '../services/statistics-service.js';
-import { escapeHtml, showToast } from '../shared/ui.js';
+import { escapeHtml } from '../shared/ui.js';
+import { getQuickAddFeedback } from '../shared/ux.js';
 import { PopupController } from './popup-controller.js';
 
 function dateOffset(date, days) {
@@ -13,6 +14,25 @@ function dateOffset(date, days) {
 function formatDate(date) {
   return new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' })
     .format(new Date(`${date}T00:00:00`));
+}
+
+function openDashboard() {
+  chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard/index.html') });
+}
+
+function showPopupSuccess(feedback) {
+  toast.replaceChildren();
+  const text = document.createElement('span');
+  text.textContent = feedback.message;
+  const action = document.createElement('button');
+  action.type = 'button';
+  action.className = 'toast__action';
+  action.textContent = feedback.nextAction;
+  action.addEventListener('click', openDashboard, { once: true });
+  toast.append(text, action);
+  toast.hidden = false;
+  window.clearTimeout(showPopupSuccess.timeoutId);
+  showPopupSuccess.timeoutId = window.setTimeout(() => { toast.hidden = true; }, 5000);
 }
 
 function taskMarkup(task, today) {
@@ -72,7 +92,7 @@ form.addEventListener('submit', async (event) => {
     await controller.quickCreate(input.value, scheduledDate);
     input.value = '';
     setSelectedDate('inbox');
-    showToast(toast, scheduledDate === null ? '已添加到收集箱' : `已安排到 ${formatDate(scheduledDate)}`);
+    showPopupSuccess(getQuickAddFeedback({ scheduledDate }));
     await refresh();
     input.focus();
   } catch {
@@ -81,9 +101,7 @@ form.addEventListener('submit', async (event) => {
   }
 });
 
-document.querySelector('#open-dashboard').addEventListener('click', () => {
-  chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard/index.html') });
-});
+document.querySelector('#open-dashboard').addEventListener('click', openDashboard);
 
 input.focus();
 refresh().catch(() => { message.textContent = '任务列表暂时无法加载。请重新打开扩展。'; });

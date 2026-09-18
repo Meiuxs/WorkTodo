@@ -1,6 +1,7 @@
 import { addLocalDays, endOfWeek, formatLocalDay, formatLocalDayWithWeekday, startOfWeek } from '../../domain/dates.js';
 import { renderTaskList } from '../task-list.js';
 import { runViewAction } from '../../shared/ui.js';
+import { shouldShowSummaryEditor } from '../../shared/ux.js';
 
 function formatRate(rate) {
   return rate === null ? '暂无计划' : `${Math.round(rate * 100)}%`;
@@ -26,7 +27,14 @@ export function createHistoryView({
     const output = root.querySelector('#history-summary-text');
     if (output !== null) output.value = '';
     const copy = root.querySelector('[data-summary-copy]');
-    if (copy !== null) copy.disabled = true;
+    if (copy !== null) {
+      copy.disabled = true;
+      copy.hidden = true;
+    }
+    const editor = root.querySelector('#history-summary-text');
+    if (editor !== null) editor.hidden = true;
+    const empty = root.querySelector('[data-summary-empty]');
+    if (empty !== null) empty.hidden = false;
   }
 
   return {
@@ -78,6 +86,7 @@ export function createHistoryView({
           <div><dt>${carriedOverCompletedLabel}</dt><dd>${summary.carriedOverCompletedCount}</dd></div>
           <div><dt>完成率</dt><dd>${formatRate(summary.completionRate)}</dd></div>
         </dl>
+        <p class="history-conclusion" data-history-conclusion>这段时间实际完成 ${summary.completedCount} 项，完成率 ${formatRate(summary.completionRate)}。</p>
         <section class="summary-panel" aria-labelledby="history-summary-heading">
           <div>
             <h3 id="history-summary-heading">规则模板总结</h3>
@@ -87,8 +96,9 @@ export function createHistoryView({
             <button type="button" class="button-secondary" data-summary-kind="week">生成本周总结</button>
             <button type="button" class="button-secondary" data-summary-kind="month">生成本月总结</button>
           </div>
-          <textarea id="history-summary-text" aria-label="总结文本" readonly placeholder="选择周或月后生成总结。"></textarea>
-          <button type="button" class="button-secondary summary-copy" data-summary-copy disabled>复制总结</button>
+          <p class="summary-empty" data-summary-empty>先看结论，再按需生成可复制总结。</p>
+          <textarea id="history-summary-text" aria-label="总结文本" readonly hidden></textarea>
+          <button type="button" class="button-secondary summary-copy" data-summary-copy disabled hidden>复制总结</button>
         </section>
         <h3>实际完成明细</h3>
         <div id="history-list"></div>
@@ -137,7 +147,13 @@ export function createHistoryView({
             const copy = root.querySelector('[data-summary-copy]');
             if (output === null) return;
             output.value = generated.text;
-            if (copy !== null) copy.disabled = false;
+            output.hidden = !shouldShowSummaryEditor(generated.text);
+            const empty = root.querySelector('[data-summary-empty]');
+            if (empty !== null) empty.hidden = output.hidden;
+            if (copy !== null) {
+              copy.disabled = output.hidden;
+              copy.hidden = output.hidden;
+            }
           }, { signal, onError });
         });
       });

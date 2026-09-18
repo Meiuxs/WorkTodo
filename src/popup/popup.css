@@ -108,3 +108,13 @@ h1 {
   padding: var(--sp-3) var(--sp-4);
   font-size: var(--fs-ui);
 }
+.toast__action {
+  margin-left: var(--sp-3);
+  border: 0;
+  background: transparent;
+  color: var(--toast-action, #b9f1df);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.toast__action:hover { text-decoration: underline; }

@@ -624,6 +624,13 @@ input::placeholder { color: var(--muted); }
   font: inherit;
   line-height: var(--lh-body);
 }
+.history-conclusion {
+  margin: var(--sp-5) 0 0;
+  color: var(--ink);
+  font-size: var(--fs-ui);
+  font-weight: 700;
+}
+.summary-empty { margin: var(--sp-4) 0 0; color: var(--muted); font-size: var(--fs-ui); }
 .summary-copy { margin-top: var(--sp-3); }
 
 /* ============ 指标条 ============ */
