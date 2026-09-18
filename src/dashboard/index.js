@@ -1,4 +1,4 @@
-import { toLocalDate } from '../domain/dates.js';
+import { formatLocalDay, toLocalDate } from '../domain/dates.js';
 import { applyTheme } from '../shared/theme.js';
 import { TaskRepository } from '../data/task-repository.js';
 import { TagRepository } from '../data/tag-repository.js';
@@ -160,7 +160,8 @@ async function onAction(action, taskId, revision, value) {
       onAction: () => controller.handleTaskAction('untrash', taskId, result.task.revision).catch(onError),
     });
   } else if (action === 'postpone') {
-    showToast(`已延期到 ${value}`);
+    // 日期在界面上只写中文格式，ISO 只留在数据层与导出文件里。
+    showToast(value ? `已延期到 ${formatLocalDay(value)}` : '任务已更新');
   } else if (action === 'copy') {
     showToast('已复制为新任务');
   } else if (action === 'delete-permanently') {
@@ -295,7 +296,7 @@ document.querySelector('#quick-add').addEventListener('submit', async (event) =>
     custom.value = '';
     select.value = 'inbox';
     custom.hidden = true;
-    showToast(scheduledDate === null ? '已添加到收集箱' : `已安排到 ${scheduledDate}`, {
+    showToast(scheduledDate === null ? '已添加到收集箱' : `已安排到 ${formatLocalDay(scheduledDate)}`, {
       actionLabel: '撤销',
       onAction: () => controller.handleTaskAction('trash', result.task.id, result.task.revision).catch(onError),
     });

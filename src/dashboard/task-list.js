@@ -1,15 +1,10 @@
-import { toLocalDate } from '../domain/dates.js';
+import { formatLocalDay, toLocalDate } from '../domain/dates.js';
 import { escapeHtml } from '../shared/ui.js';
 
 const ACTIVE_LIFECYCLES = new Set(['todo', 'in_progress']);
 
 function offsetDate(date, days) {
   return toLocalDate(new Date(date.getFullYear(), date.getMonth(), date.getDate() + days));
-}
-
-function shortDate(date) {
-  const [, month, day] = date.split('-');
-  return `${Number(month)}月${Number(day)}日`;
 }
 
 function localDateTime(value) {
@@ -43,13 +38,13 @@ export function taskMeta(task, today) {
     }
   }
   if (task.scheduledDate !== null && task.scheduledDate < today) {
-    return `原计划 ${shortDate(task.scheduledDate)}`;
+    return `原计划 ${formatLocalDay(task.scheduledDate)}`;
   }
   if (task.startTime !== null && task.dueTime !== null) return `${task.startTime}–${task.dueTime}`;
   if (task.startTime !== null) return task.startTime;
-  if (task.lifecycle === 'cancelled') return task.scheduledDate === null ? '无计划日期' : shortDate(task.scheduledDate);
+  if (task.lifecycle === 'cancelled') return task.scheduledDate === null ? '无计划日期' : formatLocalDay(task.scheduledDate);
   if (task.scheduledDate === today) return '今天 · 无时间';
-  return task.scheduledDate === null ? '收集箱 · 无时间' : `${shortDate(task.scheduledDate)} · 无时间`;
+  return task.scheduledDate === null ? '收集箱 · 无时间' : `${formatLocalDay(task.scheduledDate)} · 无时间`;
 }
 
 function taskStatus(task, today) {
@@ -64,7 +59,7 @@ function taskStatus(task, today) {
 function postponeMenu(task, today) {
   if (!ACTIVE_LIFECYCLES.has(task.lifecycle) || task.scheduledDate === null) return '';
   const options = getPostponeOptions(today)
-    .map((option) => `<button type="button" data-action="postpone" data-date="${option.value}">${option.label} · ${shortDate(option.value)}</button>`)
+    .map((option) => `<button type="button" data-action="postpone" data-date="${option.value}">${option.label} · ${formatLocalDay(option.value)}</button>`)
     .join('');
   return `<div class="task__postpone" role="group" aria-label="延期 ${escapeHtml(task.title)}">
     <span class="task__menu-label">延期到</span>
@@ -139,7 +134,9 @@ export function renderTaskList(container, tasks, {
   tags = [],
 } = {}) {
   if (!Array.isArray(tasks) || tasks.length === 0) {
-    container.innerHTML = `<p class="empty">${escapeHtml(emptyMessage)}</p>`;
+    // 月历格传空字符串表示"这一格不需要占位文案"。此时必须什么都不渲染，
+    // 否则空的 <p class="empty"> 会在每个空格子里留下一条悬空横线（.empty 自带下边框）。
+    container.innerHTML = emptyMessage === '' ? '' : `<p class="empty">${escapeHtml(emptyMessage)}</p>`;
     container.onclick = null;
     return;
   }

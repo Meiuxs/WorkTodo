@@ -1,23 +1,79 @@
+/* 设计令牌：所有尺寸、间距、圆角、字号、动效与颜色只在这里定义一次。
+   业务样式表只引用变量，不再出现裸数值，避免同类元素各写一套。 */
 :root {
+  /* ---- 结构色 ---- */
   --canvas: #e8f1ed;
   --surface: #fbfaf7;
   --surface-raised: #fffdf9;
   --ink: #183331;
-  --muted: #6b7e7a;
+  /* 4.95:1 on canvas / 5.46:1 on surface，12px 小字也满足 WCAG AA */
+  --muted: #596a67;
+  /* 结构分隔线：纯装饰，不承担控件边界职责 */
   --line: #cfded8;
-  --teal: #2c7a7b;
+  /* 控件边界：输入框、下拉框、次级按钮的可见轮廓，3.0:1 on surface */
+  --line-strong: #6d9b89;
+
+  /* ---- 语义色（动作 / 完成 / 提醒）---- */
+  --teal: #276b6c;
   --teal-soft: #e5f0ec;
-  --coral: #e56d56;
+  /* 文字与实心按钮共用同一个值：surface 上 4.99:1，白字压其上 5.13:1 */
+  --coral: #c23f22;
   --coral-soft: #fae9e4;
   --focus: #1b6466;
   --disabled: #a7b5b0;
+  --hover-tint: rgb(39 107 108 / 7%);
   --nav-hover: rgb(255 253 249 / 60%);
+  --toast-action: #f5c7bd;
+
+  /* ---- 布局骨架 ---- */
+  --sidebar-w: 216px;
+  --content-measure: 960px;
+  --control-h: 38px;
+  --control-h-sm: 30px;
+
+  /* ---- 间距刻度（4px 基准）---- */
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 8px;
+  --sp-4: 12px;
+  --sp-5: 16px;
+  --sp-6: 20px;
+  --sp-7: 24px;
+  --sp-8: 32px;
+  --sp-9: 40px;
+  --sp-10: 56px;
+
+  /* ---- 圆角刻度 ---- */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+
+  /* ---- 排版 ----
+     阶梯 12 / 13 / 14 / 16 / 20 / 24 / 30，中段每级差 >=4px，层级才读得出来。
+     系统 CJK 字体（Microsoft YaHei / Noto Sans CJK）只有 Regular 与 Bold 两档，
+     所以不引入 500/600 中间字重，强调一律用字号 + 颜色 + 700 表达。 */
   --font-sans: "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
-  --text-xs: 12px;
-  --text-sm: 13px;
-  --text-md: 14px;
-  --text-lg: 18px;
-  --text-xl: 28px;
+  --fs-caption: 12px;
+  --fs-ui: 13px;
+  --fs-body: 14px;
+  --fs-lead: 16px;
+  --fs-h3: 16px;
+  --fs-h2: 20px;
+  --fs-metric: 24px;
+  --fs-h1: 30px;
+  --lh-caption: 1.5;
+  --lh-body: 1.7;
+  --lh-heading: 1.3;
+  --lh-display: 1.2;
+  --tracking-tight: -0.01em;
+  --tracking-brand: 0.08em;
+
+  /* ---- 动效 ---- */
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --ease-out: cubic-bezier(.2, .7, .3, 1);
+
   --shadow-float: 0 8px 24px rgb(24 51 49 / 10%);
 }
 
@@ -28,12 +84,24 @@
   --ink: #e8f1ed;
   --muted: #a5b8b3;
   --line: #31504b;
+  --line-strong: #548a80;
   --teal: #63c3b7;
   --teal-soft: #1e4642;
   --coral: #ff9a82;
   --coral-soft: #4b2d2a;
   --focus: #8ce1d5;
   --disabled: #71817d;
+  --hover-tint: rgb(99 195 183 / 10%);
   --nav-hover: rgb(29 53 50 / 88%);
+  --toast-action: #8b3f33;
   --shadow-float: 0 8px 24px rgb(0 0 0 / 28%);
+}
+
+/* 宽屏分层：内容列上限随可用宽度提升，超过 960px 的单列阅读宽度不再浪费右侧空间 */
+@media (min-width: 1280px) {
+  :root { --content-measure: 1080px; }
+}
+
+@media (min-width: 1680px) {
+  :root { --content-measure: 1200px; }
 }

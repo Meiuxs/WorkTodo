@@ -1,4 +1,4 @@
-import { toLocalDate } from '../../domain/dates.js';
+import { formatLocalDay, toLocalDate } from '../../domain/dates.js';
 import { runViewAction } from '../../shared/ui.js';
 import { renderTaskList } from '../task-list.js';
 
@@ -12,9 +12,10 @@ function formatMonth(startDate) {
     .format(new Date(`${startDate}T00:00:00`));
 }
 
-function formatDay(date) {
-  const [, month, day] = date.split('-');
-  return `${Number(month)}月${Number(day)}日`;
+const WEEKDAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+function weekdayLabel(date) {
+  return WEEKDAY_LABELS[new Date(`${date}T00:00:00`).getDay()];
 }
 
 export function createMonthView({
@@ -42,11 +43,14 @@ export function createMonthView({
       if (signal?.aborted || requestVersion !== renderVersion) return;
 
       const label = formatMonth(calendar.startDate);
+      const currentDate = today();
+      // 表头直接由第一周的真实日期推出星期，这样无论周起始是哪天，列标题都不会错位。
+      const weekdays = (calendar.weeks[0] ?? []).map(weekdayLabel);
       root.innerHTML = `<section class="view-section" aria-labelledby="month-heading">
         <div class="section-heading">
           <div>
-            <h2 id="month-heading">月历</h2>
-            <p data-month-label>${label}</p>
+            <h2 id="month-heading" data-month-label>${label}</h2>
+            <p>按月查看任务分布，点击标题可编辑，点左侧圆圈直接完成。</p>
           </div>
           <div class="month-nav" role="group" aria-label="月份切换">
             <button type="button" data-month-nav="-1">上个月</button>
@@ -54,11 +58,15 @@ export function createMonthView({
           </div>
         </div>
         <div class="month-grid" role="grid" aria-label="${label}">
+          <div class="month-weekdays" role="row">
+            ${weekdays.map((weekday) => `<span class="month-weekday" role="columnheader">${weekday}</span>`).join('')}
+          </div>
           ${calendar.weeks.map((week) => `<div class="month-week" role="row">
             ${week.map((date) => {
               const inMonth = date >= calendar.startDate && date <= calendar.endDate;
-              return `<section class="month-day${inMonth ? '' : ' month-day--muted'}" role="gridcell" data-date="${date}">
-                <h3>${formatDay(date)}</h3>
+              const isToday = date === currentDate;
+              return `<section class="month-day${inMonth ? '' : ' month-day--muted'}${isToday ? ' month-day--today' : ''}" role="gridcell"${isToday ? ' aria-current="date"' : ''} data-date="${date}">
+                <h3>${formatLocalDay(date)}</h3>
                 <div class="month-day__tasks"></div>
               </section>`;
             }).join('')}

@@ -46,10 +46,17 @@ export function createTodayView({ root, query, statistics, today, onAction, onEd
           emptyMessage: '没有逾期任务。',
         });
       }
-      renderTaskList(root.querySelector('#today-list'), planned, {
-        ...listOptions,
-        emptyMessage: '今天暂时没有待办。先记录一件要做的事。',
-      });
+      // 首屏空状态：不止告诉用户"没有任务"，还要把唯一的下一步动作递到手上。
+      // 这个 [data-focus-quick-add] 按钮此前只存在于下方的事件绑定里、从未被渲染出来。
+      if (planned.length === 0) {
+        root.querySelector('#today-list').innerHTML = `<div class="empty-state">
+          <p class="empty-state__title">今天还没有待办</p>
+          <p class="empty-state__text">在下方输入框记录一件要做的事，按 Enter 保存后就会出现在这里。</p>
+          <button type="button" class="button-primary empty-state__action" data-focus-quick-add>记录第一件事</button>
+        </div>`;
+      } else {
+        renderTaskList(root.querySelector('#today-list'), planned, listOptions);
+      }
       renderTaskList(root.querySelector('#completed-today-list'), completed, {
         ...listOptions,
         emptyMessage: '今天还没有完成记录。',

@@ -2,6 +2,7 @@ import { ValidationError } from './errors.js';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const WEEKDAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 
 export function toLocalDate(date) {
   if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
@@ -101,4 +102,19 @@ export function eachLocalDate(startDate, endDate) {
     result.push(current);
   }
   return result;
+}
+
+/* 展示层统一走下面两个格式化函数。
+   日期在界面上只允许一种写法（9月19日），ISO 形式只保留在数据和导出里，
+   否则同一屏会同时出现 2026-09-19 与 9月19日 两种格式。 */
+
+export function formatLocalDay(date) {
+  const [, month, day] = date.split('-');
+  return `${Number(month)}月${Number(day)}日`;
+}
+
+export function formatLocalDayWithWeekday(date) {
+  const [year, month, day] = date.split('-').map(Number);
+  const weekday = WEEKDAY_LABELS[new Date(year, month - 1, day).getDay()];
+  return `${formatLocalDay(date)} ${weekday}`;
 }

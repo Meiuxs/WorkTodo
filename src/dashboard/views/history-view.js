@@ -1,4 +1,4 @@
-import { addLocalDays, endOfWeek, startOfWeek } from '../../domain/dates.js';
+import { addLocalDays, endOfWeek, formatLocalDay, formatLocalDayWithWeekday, startOfWeek } from '../../domain/dates.js';
 import { renderTaskList } from '../task-list.js';
 import { runViewAction } from '../../shared/ui.js';
 
@@ -49,7 +49,10 @@ export function createHistoryView({
         throw error;
       }
       if (signal?.aborted || requestVersion !== renderVersion) return;
-      const rangeText = requestedMode === 'daily' ? requestedAnchor : `${fromDate} 至 ${toDate}`;
+      // 界面上的范围文案用中文日期；服务层生成的总结文本仍保留 ISO，便于粘贴后机器解析。
+      const rangeText = requestedMode === 'daily'
+        ? formatLocalDayWithWeekday(requestedAnchor)
+        : `${formatLocalDay(fromDate)} 至 ${formatLocalDay(toDate)}`;
       const plannedCompletedLabel = requestedMode === 'weekly' ? '本周计划并完成' : '计划并完成';
       const carriedOverCompletedLabel = requestedMode === 'weekly'
         ? '历史延期到本周完成'
