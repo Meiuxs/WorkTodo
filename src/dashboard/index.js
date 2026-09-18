@@ -1,5 +1,5 @@
 import { formatLocalDay, toLocalDate } from '../domain/dates.js';
-import { applyTheme } from '../shared/theme.js';
+import { applyTheme, THEME_SETTINGS } from '../shared/theme.js';
 import { TaskRepository } from '../data/task-repository.js';
 import { TagRepository } from '../data/tag-repository.js';
 import { SettingsRepository } from '../data/settings-repository.js';
@@ -51,6 +51,7 @@ const tagService = new TagService(tagRepository);
 const root = document.querySelector('#view-root');
 const toast = document.querySelector('#toast');
 const confirmDialog = document.querySelector('#confirm-dialog');
+const app = document.querySelector('.app');
 let controller;
 let toastTimer;
 const undoController = new UndoController();
@@ -312,7 +313,21 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 document.querySelector('#workspace-date').textContent = formatWorkspaceDate(toLocalDate(new Date()));
-settingsRepository.getSettings()
-  .then((settings) => applyTheme(settings?.theme ?? 'system'))
-  .catch(onError);
-navigate('today').catch(onError);
+
+async function initialize() {
+  let settings;
+  try {
+    settings = await settingsRepository.getSettings();
+  } catch (error) {
+    onError(error);
+  }
+  try {
+    const theme = THEME_SETTINGS.includes(settings?.theme) ? settings.theme : 'system';
+    applyTheme(theme);
+  } finally {
+    app.hidden = false;
+  }
+  await navigate('today').catch(onError);
+}
+
+initialize().catch(onError);

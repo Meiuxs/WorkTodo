@@ -1,6 +1,35 @@
 import { readFile } from 'node:fs/promises';
 import { test, expect, openDashboard } from './fixtures.js';
 
+function rgbChannels(color) {
+  const channels = color.match(/[\d.]+/g)?.slice(0, 3).map(Number);
+  if (channels?.length !== 3) throw new Error(`无法解析颜色：${color}`);
+  return channels;
+}
+
+function relativeLuminance(color) {
+  const channels = rgbChannels(color).map((channel) => {
+    const value = channel / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+function contrastRatio(foreground, background) {
+  const foregroundLuminance = relativeLuminance(foreground);
+  const backgroundLuminance = relativeLuminance(background);
+  const lighter = Math.max(foregroundLuminance, backgroundLuminance);
+  const darker = Math.min(foregroundLuminance, backgroundLuminance);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+async function dashboardWithInitScript(extension, initScript) {
+  const page = await extension.context.newPage();
+  await page.addInitScript(initScript);
+  await page.goto(`chrome-extension://${extension.extensionId}/src/dashboard/index.html`);
+  return page;
+}
+
 async function seedTrashedTasks(page, tasks) {
   await page.evaluate(async (records) => {
     const database = await new Promise((resolve, reject) => {
@@ -194,6 +223,106 @@ test('深色模式选择在重新打开设置页后保持', async ({ extension }
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
   await page.reload();
   await page.getByRole('button', { name: '设置' }).click();
+  await expect(page.getByLabel('主题')).toHaveValue('dark');
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+});
+
+test('toast 撤销按钮在浅色和深色主题下都保持可读', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.getByRole('button', { name: '设置' }).click();
+  await page.getByLabel('主题').selectOption('dark');
+  await page.getByRole('button', { name: '今天' }).click();
+  await page.getByLabel('记录一个新事项').fill('检查主题对比度');
+  await page.getByRole('button', { name: '添加', exact: true }).click();
+  await expect(page.locator('#toast').getByRole('button', { name: '撤销' })).toBeVisible();
+
+  const darkColors = await page.locator('#toast').evaluate((toast) => ({
+    background: getComputedStyle(toast).backgroundColor,
+    action: getComputedStyle(toast.querySelector('button')).color,
+  }));
+  expect(contrastRatio(darkColors.action, darkColors.background)).toBeGreaterThanOrEqual(4.5);
+
+  await page.getByRole('button', { name: '设置' }).click();
+  await page.getByLabel('主题').selectOption('light');
+  const lightColors = await page.locator('#toast').evaluate((toast) => ({
+    background: getComputedStyle(toast).backgroundColor,
+    action: getComputedStyle(toast.querySelector('button')).color,
+  }));
+  expect(contrastRatio(lightColors.action, lightColors.background)).toBeGreaterThanOrEqual(4.5);
+});
+
+test('深色主题在应用外壳首次显示前完成解析', async ({ extension }) => {
+  const setupPage = await openDashboard(extension);
+  await setupPage.evaluate(() => chrome.storage.local.set({ settings: { theme: 'dark' } }));
+  await setupPage.close();
+
+  const page = await dashboardWithInitScript(extension, () => {
+    const originalGet = chrome.storage.local.get.bind(chrome.storage.local);
+    chrome.storage.local.get = async (...args) => {
+      if (args[0] === 'settings') {
+        await new Promise((resolve) => {
+          window.__releaseThemeRead = resolve;
+        });
+      }
+      return originalGet(...args);
+    };
+  });
+
+  await expect(page.locator('.app')).toBeHidden();
+  await page.waitForFunction(() => typeof window.__releaseThemeRead === 'function');
+  await page.evaluate(() => window.__releaseThemeRead());
+  await expect(page.locator('.app')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+});
+
+test('主题读取失败时回退 system 并恢复应用外壳', async ({ extension }) => {
+  const page = await extension.context.newPage();
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.addInitScript(() => {
+    const originalGet = chrome.storage.local.get.bind(chrome.storage.local);
+    chrome.storage.local.get = (...args) => {
+      if (args[0] === 'settings') return Promise.reject(new Error('模拟主题读取失败'));
+      return originalGet(...args);
+    };
+  });
+  await page.goto(`chrome-extension://${extension.extensionId}/src/dashboard/index.html`);
+
+  await expect(page.locator('.app')).toBeVisible();
+  await expect(page.locator('#toast')).toContainText('模拟主题读取失败');
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+});
+
+test('非法主题设置在启动时归一为 system', async ({ extension }) => {
+  const setupPage = await openDashboard(extension);
+  await setupPage.evaluate(() => chrome.storage.local.set({ settings: { theme: 'sepia' } }));
+  await setupPage.close();
+
+  const page = await extension.context.newPage();
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto(`chrome-extension://${extension.extensionId}/src/dashboard/index.html`);
+
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+  await page.getByRole('button', { name: '设置' }).click();
+  await expect(page.getByLabel('主题')).toHaveValue('system');
+});
+
+test('主题保存失败时不改变页面主题并恢复选择框', async ({ extension }) => {
+  const setupPage = await openDashboard(extension);
+  await setupPage.evaluate(() => chrome.storage.local.set({ settings: { theme: 'dark' } }));
+  await setupPage.close();
+
+  const page = await openDashboard(extension);
+  await page.getByRole('button', { name: '设置' }).click();
+  await expect(page.getByLabel('主题')).toHaveValue('dark');
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+  await page.evaluate(() => {
+    chrome.storage.local.set = async () => {
+      throw new Error('模拟主题保存失败');
+    };
+  });
+
+  await page.getByLabel('主题').selectOption('light');
+  await expect(page.locator('#toast')).toContainText('模拟主题保存失败');
   await expect(page.getByLabel('主题')).toHaveValue('dark');
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
 });
