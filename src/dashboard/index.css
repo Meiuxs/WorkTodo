@@ -779,6 +779,9 @@ input::placeholder { color: var(--muted); }
   background: var(--line);
 }
 
+.report-metrics { margin-top: var(--sp-5); }
+.report-metrics dd { font-variant-numeric: tabular-nums; }
+
 .metrics div { min-width: 0; background: var(--surface); padding: var(--sp-4) var(--sp-4) var(--sp-5); }
 .metrics dt { color: var(--muted); font-size: var(--fs-caption); line-height: var(--lh-caption); }
 .metrics dd {
@@ -1123,13 +1126,11 @@ input::placeholder { color: var(--muted); }
 .filters, .resource-toolbar { display: flex; flex-wrap: wrap; align-items: end; }
 .filters > label { flex: 1 1 150px; }
 .filters .filter-search { flex: 2 1 260px; }
-.history-report-top { display: flex; flex-wrap: wrap; align-items: stretch; }
-.history-insight { flex: 1 1 360px; }
-.history-rate { flex: 1 1 220px; }
-.history-report-top { gap: var(--sp-8); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: var(--sp-6) 0; }
-.history-insight, .history-rate { border: 0; border-radius: 0; background: transparent; padding: 0; }
-.history-breakdown { border-right: 0; border-left: 0; border-radius: 0; background: transparent; padding-inline: 0; }
-.history-bars, .resources-list, .category-list, .editor-resource-list, .resource-existing-list { display: flex; flex-direction: column; }
+.history-report-top { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(220px, .7fr); gap: var(--sp-5); align-items: stretch; }
+.history-insight, .history-rate { flex: none; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-raised); padding: var(--sp-5); }
+.history-breakdown { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-raised); padding: var(--sp-5); }
+.history-bars { display: grid; }
+.resources-list, .category-list, .editor-resource-list, .resource-existing-list { display: flex; flex-direction: column; }
 .history-bar, .import-mode { display: flex; flex-direction: column; }
 .field-grid { display: flex; flex-wrap: wrap; }
 .field-grid > .field { flex: 1 1 180px; }
@@ -1171,4 +1172,5 @@ input::placeholder { color: var(--muted); }
   .today-summary { flex-basis: 100%; gap: var(--sp-6); }
   .today-summary__next { flex-basis: 100%; min-width: 0; border-top: 1px solid var(--line); border-left: 0; padding-top: var(--sp-5); padding-left: 0; }
   .history-insight, .history-rate { flex-basis: 100%; }
+  .history-report-top { grid-template-columns: 1fr; }
 }
