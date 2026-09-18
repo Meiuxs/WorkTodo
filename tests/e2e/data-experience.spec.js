@@ -236,19 +236,23 @@ test('toast 撤销按钮在浅色和深色主题下都保持可读', async ({ ex
   await page.getByRole('button', { name: '添加', exact: true }).click();
   await expect(page.locator('#toast').getByRole('button', { name: '撤销' })).toBeVisible();
 
-  const darkColors = await page.locator('#toast').evaluate((toast) => ({
-    background: getComputedStyle(toast).backgroundColor,
-    action: getComputedStyle(toast.querySelector('button')).color,
-  }));
-  expect(contrastRatio(darkColors.action, darkColors.background)).toBeGreaterThanOrEqual(4.5);
+  await expect.poll(async () => {
+    const colors = await page.locator('#toast').evaluate((toast) => ({
+      background: getComputedStyle(toast).backgroundColor,
+      action: getComputedStyle(toast.querySelector('button')).color,
+    }));
+    return contrastRatio(colors.action, colors.background);
+  }).toBeGreaterThanOrEqual(4.5);
 
   await page.getByRole('button', { name: '设置' }).click();
   await page.getByLabel('主题').selectOption('light');
-  const lightColors = await page.locator('#toast').evaluate((toast) => ({
-    background: getComputedStyle(toast).backgroundColor,
-    action: getComputedStyle(toast.querySelector('button')).color,
-  }));
-  expect(contrastRatio(lightColors.action, lightColors.background)).toBeGreaterThanOrEqual(4.5);
+  await expect.poll(async () => {
+    const colors = await page.locator('#toast').evaluate((toast) => ({
+      background: getComputedStyle(toast).backgroundColor,
+      action: getComputedStyle(toast.querySelector('button')).color,
+    }));
+    return contrastRatio(colors.action, colors.background);
+  }).toBeGreaterThanOrEqual(4.5);
 });
 
 test('深色主题在应用外壳首次显示前完成解析', async ({ extension }) => {
@@ -268,8 +272,10 @@ test('深色主题在应用外壳首次显示前完成解析', async ({ extensio
     };
   });
 
-  await expect(page.locator('.app')).toBeHidden();
+  // 先显式等待主题读取被挂起（挂起点已注册），再确认外壳在读取期间保持隐藏——
+  // 这才是本条要守的不变式：外壳不能在主题解析完成前显示。
   await page.waitForFunction(() => typeof window.__releaseThemeRead === 'function');
+  await expect(page.locator('.app')).toBeHidden();
   await page.evaluate(() => window.__releaseThemeRead());
   await expect(page.locator('.app')).toBeVisible();
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');

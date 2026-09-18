@@ -858,8 +858,9 @@ input::placeholder { color: var(--muted); }
   .month-day .task { grid-template-columns: 18px minmax(0, 1fr); gap: var(--sp-1); min-height: 30px; }
   .month-day .task__check { width: 16px; height: 16px; }
   .month-day .task__more { display: none; }
-  /* 移动端月历是密度概览，字号压到 11px 已是可读下限；元信息不再回显以免更挤。 */
+  /* 移动端月历是密度概览，但状态须保留非颜色化表达（AGENTS 要求），故恢复元信息显示。 */
   .month-day .task__title { font-size: 11px; }
+  .month-day .task__meta { display: block; font-size: 9px; }
   .task { grid-template-columns: 30px minmax(0, 1fr) auto; gap: var(--sp-3); }
   .task__menu { position: fixed; top: auto; right: 12px; bottom: 12px; left: 12px; max-width: none; }
   .quick-add { grid-template-columns: minmax(0, 1fr) auto; }
