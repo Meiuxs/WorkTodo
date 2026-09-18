@@ -6,7 +6,7 @@ test('导航分组覆盖现有路由并把今天放在计划入口首位', () =>
   assert.deepEqual(NAV_GROUPS.map((group) => group.id), ['today', 'planning', 'tasks', 'review', 'system']);
   assert.deepEqual(NAV_GROUPS[0].routes, ['today']);
   assert.deepEqual(NAV_GROUPS.find((group) => group.id === 'planning').routes, ['tomorrow', 'week', 'month']);
-  assert.deepEqual(NAV_GROUPS.find((group) => group.id === 'tasks').routes, ['inbox', 'all', 'completed', 'trash']);
+  assert.deepEqual(NAV_GROUPS.find((group) => group.id === 'tasks').routes, ['inbox', 'resources', 'all', 'completed', 'trash']);
 });
 
 test('快速新增反馈明确告诉用户任务去了哪里', () => {

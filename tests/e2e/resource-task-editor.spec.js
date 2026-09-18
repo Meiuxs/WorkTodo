@@ -28,4 +28,12 @@ test('任务可以关联网页资料、文本片段和本地文件元数据', as
   await snippetDialog.getByRole('button', { name: '保存资料' }).click();
   await expect(editor.getByText('会议结论')).toBeVisible();
   await expect(editor.getByText('相关资料 2')).toBeVisible();
+
+  await editor.getByRole('button', { name: '添加资料' }).click();
+  const fileDialog = dashboard.getByRole('dialog').last();
+  await fileDialog.getByLabel('资料类型').selectOption('file');
+  await fileDialog.locator('[data-resource-file]').setInputFiles({ name: '评审记录.txt', mimeType: 'text/plain', buffer: Buffer.from('记录') });
+  await fileDialog.getByRole('button', { name: '保存资料' }).click();
+  await expect(editor.getByText('评审记录.txt', { exact: true })).toBeVisible();
+  await expect(editor.getByText('相关资料 3')).toBeVisible();
 });

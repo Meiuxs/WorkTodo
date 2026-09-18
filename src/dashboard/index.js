@@ -75,6 +75,10 @@ let controller;
 let toastTimer;
 const undoController = new UndoController();
 
+async function getResourceCounts(tasks) {
+  return new Map(await Promise.all(tasks.map(async (task) => [task.id, (await resourceService.listTaskIds(task.id)).length])));
+}
+
 function dateOffset(date, days) {
   return toLocalDate(new Date(date.getFullYear(), date.getMonth(), date.getDate() + days));
 }
@@ -212,6 +216,7 @@ const viewOptions = {
   onEdit,
   onError,
   resourceService,
+  getResourceCounts,
 };
 const views = {
   today: createTodayView(viewOptions),

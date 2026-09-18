@@ -9,7 +9,7 @@ function formatDate(date) {
   }).format(new Date(`${date}T00:00:00`));
 }
 
-export function createTodayView({ root, query, statistics, today, onAction, onEdit, onError }) {
+export function createTodayView({ root, query, statistics, today, onAction, onEdit, onError, getResourceCounts }) {
   return {
     async render(signal) {
       const date = today();
@@ -22,6 +22,7 @@ export function createTodayView({ root, query, statistics, today, onAction, onEd
       const overdue = tasks.filter((task) => task.scheduledDate !== null && task.scheduledDate < date);
       const planned = tasks.filter((task) => task.scheduledDate === date);
       const nextTask = overdue[0] ?? planned[0] ?? null;
+      const resourceCounts = await getResourceCounts?.([...tasks, ...completed]) ?? new Map();
       const progress = summary.completionRate === null ? 0 : Math.round(summary.completionRate * 100);
 
       root.innerHTML = `<section class="today-summary" aria-label="今日完成摘要">
@@ -47,7 +48,7 @@ export function createTodayView({ root, query, statistics, today, onAction, onEd
         <div id="completed-today-list"></div>
       </details>`;
 
-      const listOptions = { today: date, onAction, onEdit, onError };
+      const listOptions = { today: date, onAction, onEdit, onError, resourceCounts };
       if (overdue.length > 0) {
         renderTaskList(root.querySelector('#overdue-list'), overdue, {
           ...listOptions,

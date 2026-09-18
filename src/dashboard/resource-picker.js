@@ -62,6 +62,9 @@ export function createResourcePicker({ dialog, resourceService, onChanged, onErr
   }
 
   type.addEventListener('change', updateTypeFields);
+  file.addEventListener('change', () => {
+    if (file.files?.[0]?.name && title.value.trim().length === 0) title.value = file.files[0].name;
+  });
   dialog.querySelector('[data-resource-cancel]').addEventListener('click', close);
   dialog.addEventListener('cancel', (event) => { event.preventDefault(); close(); });
   existingList.addEventListener('click', async (event) => {

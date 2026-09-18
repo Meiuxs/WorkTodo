@@ -47,7 +47,7 @@ function normalizeFile(input) {
   if (!['reference', 'copy'].includes(storageMode)) throw new ValidationError('storageMode 无效');
   const blob = input.blob ?? (storageMode === 'copy' ? input.file : null);
   if (storageMode === 'copy') {
-    if (!(blob instanceof Blob)) throw new ValidationError('保存文件副本需要有效文件');
+    if (!(blob instanceof Blob) && input.copyIncluded !== false) throw new ValidationError('保存文件副本需要有效文件');
     if (size > MAX_RESOURCE_COPY_BYTES) throw new ValidationError('文件副本不能超过 20 MB');
   }
   return {
@@ -56,7 +56,7 @@ function normalizeFile(input) {
     size,
     lastModified: input.lastModified ?? input.file?.lastModified ?? null,
     storageMode,
-    blob: storageMode === 'copy' ? blob : null,
+    blob: storageMode === 'copy' && blob instanceof Blob ? blob : null,
   };
 }
 

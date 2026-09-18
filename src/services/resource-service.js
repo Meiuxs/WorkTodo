@@ -66,6 +66,10 @@ export class ResourceService {
     return this.#repository.list(options);
   }
 
+  async get(id) {
+    return this.#repository.get(id);
+  }
+
   async listForTask(taskId) {
     return this.#repository.listForTask(taskId);
   }

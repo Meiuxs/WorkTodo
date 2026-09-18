@@ -39,7 +39,7 @@ export class DataManagementController {
       this.#state = {
         kind: 'preview',
         canConfirm: true,
-        message: `可以导入 ${preview.taskCount} 个任务、${preview.categoryCount} 个分类和 ${preview.eventCount} 条事件。`,
+        message: `可以导入 ${preview.taskCount} 个任务、${preview.categoryCount} 个分类、${preview.eventCount} 条事件和 ${preview.resourceCount} 条资料。`,
         preview,
         text,
       };
@@ -72,7 +72,7 @@ export class DataManagementController {
       this.#state = {
         kind: 'result',
         canConfirm: false,
-        message: `导入完成：${preview.taskCount} 个任务，${preview.conflicts.length} 项冲突已按较新版本处理。`,
+        message: `导入完成：${preview.taskCount} 个任务、${preview.resourceCount} 条资料，${preview.conflicts.length} 项冲突已按较新版本处理。${preview.omittedFileCopies > 0 ? ` 有 ${preview.omittedFileCopies} 个文件副本未包含，需要重新选择文件。` : ''}`,
         preview,
         text: null,
       };
@@ -131,7 +131,7 @@ export function createSettingsView({
     const preview = state.preview;
     return `<div class="data-state data-state--${state.kind}" role="status">
       <p>${escapeHtml(state.message)}</p>
-      ${state.kind === 'preview' ? `<p class="data-preview">任务 ${preview.taskCount} · 分类 ${preview.categoryCount} · 事件 ${preview.eventCount} · 冲突 ${preview.conflicts.length}</p>` : ''}
+      ${state.kind === 'preview' ? `<p class="data-preview">任务 ${preview.taskCount} · 分类 ${preview.categoryCount} · 事件 ${preview.eventCount} · 资料 ${preview.resourceCount} · 冲突 ${preview.conflicts.length}</p>${preview.omittedFileCopies > 0 ? `<p class="data-warning">有 ${preview.omittedFileCopies} 个文件副本不会包含在 JSON 备份中，导入后需要重新选择文件。</p>` : ''}` : ''}
       ${state.kind === 'preview' ? `<fieldset class="import-mode"><legend>选择导入方式</legend>
         <label><input type="radio" name="import-mode" value="merge" checked> 合并（冲突保留较新版本）</label>
         <label><input type="radio" name="import-mode" value="replace"> 覆盖（先建立本机恢复点）</label>
