@@ -130,7 +130,7 @@ test('合并保留 updatedAt 较新的同 UUID 任务并报告冲突', async () 
   }
 });
 
-test('导出包含 schema v2、V1.1 集合并记录 metadata', async () => {
+test('导出包含 schema v2、V1.1 集合、资料集合并记录 metadata', async () => {
   const storage = new InMemoryStorageArea();
   const { backup, restoreChrome } = createBackupService({
     tags: [TAG],
@@ -151,6 +151,9 @@ test('导出包含 schema v2、V1.1 集合并记录 metadata', async () => {
       'events',
       'tags',
       'recurringTemplates',
+      'resources',
+      'taskResources',
+      'resourceCopyWarnings',
       'settings',
     ]);
     assert.deepEqual(file.tags, [TAG]);
