@@ -290,6 +290,17 @@ test('History 视图在日模式和周模式显示新增指标标签', async () 
         carriedOverCompletedCount: 4,
       };
     },
+    async weeklyDaily() {
+      return [
+        '2026-09-14', '2026-09-15', '2026-09-16', '2026-09-17',
+        '2026-09-18', '2026-09-19', '2026-09-20',
+      ].map((date) => ({
+        date,
+        completedCount: 1,
+        plannedCount: 1,
+        postponedCount: 0,
+      }));
+    },
   };
   const view = createHistoryView({
     root,
@@ -303,7 +314,7 @@ test('History 视图在日模式和周模式显示新增指标标签', async () 
 
   await view.render();
 
-  assert.deepEqual(calls, [['daily', '2026-09-17']]);
+  assert.deepEqual(calls, [['weekly', '2026-09-14']]);
   assert.match(root.innerHTML, /class="history-report-top"/);
   assert.match(root.innerHTML, /class="history-insight"/);
   assert.match(root.innerHTML, /class="history-rate"/);
@@ -314,36 +325,81 @@ test('History 视图在日模式和周模式显示新增指标标签', async () 
   assert.match(root.innerHTML, /<dt>新增任务<\/dt>/);
   assert.match(root.innerHTML, /<dt>延期次数<\/dt>/);
   assert.match(root.innerHTML, /<dt>完成率<\/dt>/);
-  assert.match(root.innerHTML, /<dt>计划并完成<\/dt><dd>7<\/dd>/);
-  assert.match(root.innerHTML, /<dt>历史延期完成<\/dt><dd>2<\/dd>/);
+  assert.match(root.innerHTML, /<dt>本周计划并完成<\/dt><dd>11<\/dd>/);
+  assert.match(root.innerHTML, /<dt>历史延期到本周完成<\/dt><dd>4<\/dd>/);
 
-  await listeners.get('mode:weekly:click')();
+  await listeners.get('mode:daily:click')();
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.deepEqual(calls, [
-    ['daily', '2026-09-17'],
     ['weekly', '2026-09-14'],
+    ['daily', '2026-09-17'],
   ]);
-  assert.match(root.innerHTML, /<dt>本周计划并完成<\/dt><dd>11<\/dd>/);
-  assert.match(root.innerHTML, /<dt>历史延期到本周完成<\/dt><dd>4<\/dd>/);
+  assert.match(root.innerHTML, /<dt>计划并完成<\/dt><dd>7<\/dd>/);
+  assert.match(root.innerHTML, /<dt>历史延期完成<\/dt><dd>2<\/dd>/);
 });
 
 test('History 视图在没有计划时不把完成率读成 0%', async () => {
+  const { root, listeners } = createHistoryRoot();
+  const emptySummary = {
+    completedCount: 0,
+    plannedCount: 0,
+    createdCount: 0,
+    postponedCount: 0,
+    completionRate: null,
+    plannedCompletedCount: 0,
+    carriedOverCompletedCount: 0,
+  };
+  const view = createHistoryView({
+    root,
+    query: { async completed() { return []; } },
+    statistics: {
+      async weekly() { return emptySummary; },
+      async weeklyDaily() { return []; },
+      async daily() { return emptySummary; },
+    },
+    summaryService: {},
+    today: () => '2026-09-17',
+    onAction() {},
+    onEdit() {},
+  });
+
+  await view.render();
+  await listeners.get('mode:daily:click')();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.match(root.innerHTML, /aria-label="完成率暂无计划"/);
+  assert.match(root.innerHTML, /<div class="history-rate__value">—<\/div>/);
+  assert.match(root.innerHTML, /<span>暂无计划<\/span>/);
+});
+
+test('History 视图默认按周显示七天真实完成节奏', async () => {
   const { root } = createHistoryRoot();
   const view = createHistoryView({
     root,
     query: { async completed() { return []; } },
     statistics: {
-      async daily() {
+      async weekly() {
         return {
-          completedCount: 0,
-          plannedCount: 0,
-          createdCount: 0,
-          postponedCount: 0,
-          completionRate: null,
-          plannedCompletedCount: 0,
+          completedCount: 2,
+          plannedCount: 3,
+          createdCount: 2,
+          postponedCount: 1,
+          completionRate: 2 / 3,
+          plannedCompletedCount: 2,
           carriedOverCompletedCount: 0,
         };
+      },
+      async weeklyDaily() {
+        return [
+          '2026-09-14', '2026-09-15', '2026-09-16', '2026-09-17',
+          '2026-09-18', '2026-09-19', '2026-09-20',
+        ].map((date, index) => ({
+          date,
+          completedCount: index === 3 ? 2 : 0,
+          plannedCount: index === 3 ? 3 : 0,
+          postponedCount: index === 3 ? 1 : 0,
+        }));
       },
     },
     summaryService: {},
@@ -354,7 +410,8 @@ test('History 视图在没有计划时不把完成率读成 0%', async () => {
 
   await view.render();
 
-  assert.match(root.innerHTML, /aria-label="完成率暂无计划"/);
-  assert.match(root.innerHTML, /<div class="history-rate__value">—<\/div>/);
-  assert.match(root.innerHTML, /<span>暂无计划<\/span>/);
+  assert.match(root.innerHTML, /aria-label="本周每日完成量"/);
+  assert.equal((root.innerHTML.match(/class="history-day(?: |")/g) ?? []).length, 7);
+  assert.match(root.innerHTML, /class="history-day history-day--today(?: |\")/);
+  assert.match(root.innerHTML, /<strong>2<\/strong>/);
 });

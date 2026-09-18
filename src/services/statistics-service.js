@@ -131,6 +131,14 @@ export class StatisticsService {
     return this.#range(weekStart, addLocalDays(weekStart, 6));
   }
 
+  async weeklyDaily(weekStart) {
+    assertLocalDate(weekStart, 'weekStart');
+    return Promise.all(Array.from({ length: 7 }, (_, index) => {
+      const date = addLocalDays(weekStart, index);
+      return this.daily(date).then((summary) => ({ date, ...summary }));
+    }));
+  }
+
   monthly(anchorDate) {
     assertLocalDate(anchorDate, 'anchorDate');
     return this.#range(startOfMonth(anchorDate), endOfMonth(anchorDate));

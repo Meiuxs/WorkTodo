@@ -365,6 +365,45 @@ test('weekly 聚合 weekStart 起连续七天', async () => {
   assert.equal(weekly.completionRate, 1 / 3);
 });
 
+test('weeklyDaily 按周一到周日返回七天工作记录', async () => {
+  const statistics = createStatistics([
+    task({
+      id: 'monday-completed',
+      scheduledDate: '2026-09-14',
+      firstScheduledDate: '2026-09-14',
+      lifecycle: 'completed',
+      completedAt: localNoon('2026-09-14'),
+    }),
+    task({
+      id: 'wednesday-open',
+      scheduledDate: '2026-09-16',
+      firstScheduledDate: '2026-09-16',
+    }),
+    task({
+      id: 'sunday-completed',
+      scheduledDate: '2026-09-20',
+      firstScheduledDate: '2026-09-20',
+      lifecycle: 'completed',
+      completedAt: localNoon('2026-09-20'),
+    }),
+  ]);
+
+  const days = await statistics.weeklyDaily('2026-09-14');
+
+  assert.deepEqual(days.map((day) => day.date), [
+    '2026-09-14',
+    '2026-09-15',
+    '2026-09-16',
+    '2026-09-17',
+    '2026-09-18',
+    '2026-09-19',
+    '2026-09-20',
+  ]);
+  assert.equal(days[0].completedCount, 1);
+  assert.equal(days[2].plannedCount, 1);
+  assert.equal(days[6].completedCount, 1);
+});
+
 test('完成统计使用系统本地日期而不是 UTC 日期字符串', async () => {
   const completedAt = '2026-09-16T16:30:00.000Z';
   const localDate = toLocalDate(new Date(completedAt));

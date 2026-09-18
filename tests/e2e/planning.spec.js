@@ -273,6 +273,8 @@ test('工作记录可以生成并复制规则模板总结', async ({ extension }
   await expect(page.locator('.history-rate')).toBeVisible();
   await expect(page.locator('.report-metrics')).toBeVisible();
   await expect(page.locator('.history-breakdown')).toBeVisible();
+  await expect(page.locator('.history-days')).toBeVisible();
+  await expect(page.locator('.history-day')).toHaveCount(7);
   await expect(page.getByRole('button', { name: '生成本周总结', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '生成本月总结', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '生成本周总结', exact: true }).click();
@@ -402,6 +404,8 @@ test('工作记录迟到的普通错误不会形成未处理 rejection', async (
   const page = await openDashboard(extension);
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.getByRole('button', { name: '工作记录', exact: true }).click();
+  await expect(page.locator('#history-heading')).toBeVisible();
   await page.evaluate(async () => {
     window.__planningErrors = [];
     window.addEventListener('unhandledrejection', (event) => {
@@ -414,8 +418,6 @@ test('工作记录迟到的普通错误不会形成未处理 rejection', async (
     };
   });
 
-  await page.getByRole('button', { name: '工作记录', exact: true }).click();
-  await expect(page.locator('#history-heading')).toBeVisible();
   await page.getByRole('button', { name: '按周', exact: true }).click();
   await page.getByRole('button', { name: '今天', exact: true }).click();
   await page.waitForTimeout(450);

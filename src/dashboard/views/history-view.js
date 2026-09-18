@@ -7,6 +7,36 @@ function formatRate(rate) {
   return rate === null ? '暂无计划' : `${Math.round(rate * 100)}%`;
 }
 
+function weekdayLabel(date) {
+  return formatLocalDayWithWeekday(date).split(' ').at(-1);
+}
+
+function renderWeeklyDays(days, todayDate) {
+  const maxCompleted = Math.max(1, ...days.map((day) => day.completedCount ?? 0));
+  return days.map((day) => {
+    const completedCount = day.completedCount ?? 0;
+    const plannedCount = day.plannedCount ?? 0;
+    const postponedCount = day.postponedCount ?? 0;
+    const height = completedCount === 0
+      ? 8
+      : Math.max(12, Math.round((completedCount / maxCompleted) * 100));
+    const isToday = day.date === todayDate;
+    const hasAttention = postponedCount > 0 || (plannedCount > completedCount && plannedCount > 0);
+    const classes = [
+      'history-day',
+      isToday ? 'history-day--today' : '',
+      hasAttention ? 'history-day--attention' : '',
+    ].filter(Boolean).join(' ');
+    const label = isToday ? '今天' : weekdayLabel(day.date);
+    const ariaLabel = `${label}：完成 ${completedCount} 项，计划 ${plannedCount} 项，延期 ${postponedCount} 次`;
+    return `<div class="${classes}" aria-label="${ariaLabel}">
+      <div class="history-day__column"><span style="height: ${height}%"></span></div>
+      <strong>${completedCount}</strong>
+      <small>${label}</small>
+    </div>`;
+  }).join('');
+}
+
 export function createHistoryView({
   root,
   query,
@@ -18,7 +48,7 @@ export function createHistoryView({
   onError,
   getResourceCounts,
 }) {
-  let mode = 'daily';
+  let mode = 'weekly';
   let anchor = today();
   let renderVersion = 0;
   let summaryVersion = 0;
@@ -48,10 +78,14 @@ export function createHistoryView({
       const toDate = requestedMode === 'daily' ? requestedAnchor : endOfWeek(requestedAnchor);
       let summary;
       let completed;
+      let weeklyDays;
       try {
-        [summary, completed] = await Promise.all([
+        [summary, completed, weeklyDays] = await Promise.all([
           requestedMode === 'daily' ? statistics.daily(requestedAnchor) : statistics.weekly(fromDate),
           query.completed({ completedFrom: fromDate, completedTo: toDate }),
+          requestedMode === 'weekly' && typeof statistics.weeklyDaily === 'function'
+            ? statistics.weeklyDaily(fromDate)
+            : [],
         ]);
       } catch (error) {
         if (signal?.aborted || requestVersion !== renderVersion) return;
@@ -71,8 +105,13 @@ export function createHistoryView({
       const completionLabel = summary.completionRate === null
         ? '完成率暂无计划'
         : `完成率 ${completionPercent}%`;
-      const plannedPercent = summary.plannedCount === 0 ? 0 : Math.min(100, Math.round((summary.plannedCompletedCount / summary.plannedCount) * 100));
-      const createdPercent = summary.plannedCount === 0 ? 0 : Math.min(100, Math.round((summary.createdCount / summary.plannedCount) * 100));
+      const todayDate = today();
+      const breakdown = requestedMode === 'weekly'
+        ? `<div class="history-breakdown__heading"><h3 id="history-breakdown-heading">工作节奏</h3><span>用每天的完成量看变化，不只看一个百分比。</span></div>
+          <div class="history-days" aria-label="本周每日完成量">${renderWeeklyDays(weeklyDays, todayDate)}</div>
+          <div class="history-legend"><span>已完成</span><span>有延期或待处理</span></div>`
+        : `<div class="history-breakdown__heading"><h3 id="history-breakdown-heading">今日回顾</h3><span>日视图优先查看完成事项，不强行展示趋势。</span></div>
+          <p class="history-day-summary">${summary.completedCount === 0 ? '今天还没有完成记录，先完成一件小事，再回来看看进度。' : `今天完成 ${summary.completedCount} 项，计划任务 ${summary.plannedCount} 项。`}</p>`;
       root.innerHTML = `<section class="view-section" aria-labelledby="history-heading">
         <div class="section-heading">
           <div><h2 id="history-heading">工作记录</h2><p>完成记录按实际完成日期统计；计划任务按计划日期统计。</p></div>
@@ -92,21 +131,20 @@ export function createHistoryView({
         <dl class="metrics report-metrics">
           <div><dt>实际完成</dt><dd>${summary.completedCount}</dd></div>
           <div><dt>计划任务</dt><dd>${summary.plannedCount}</dd></div>
-          <div><dt>新增任务</dt><dd>${summary.createdCount}</dd></div>
-          <div><dt>延期次数</dt><dd>${summary.postponedCount}</dd></div>
           <div><dt>${plannedCompletedLabel}</dt><dd>${summary.plannedCompletedCount}</dd></div>
-          <div><dt>${carriedOverCompletedLabel}</dt><dd>${summary.carriedOverCompletedCount}</dd></div>
-          <div><dt>完成率</dt><dd>${formatRate(summary.completionRate)}</dd></div>
+          <div><dt>延期次数</dt><dd>${summary.postponedCount}</dd></div>
         </dl>
+        <details class="history-extra-metrics">
+          <summary>更多统计</summary>
+          <dl>
+            <div><dt>新增任务</dt><dd>${summary.createdCount}</dd></div>
+            <div><dt>${carriedOverCompletedLabel}</dt><dd>${summary.carriedOverCompletedCount}</dd></div>
+            <div><dt>完成率</dt><dd>${formatRate(summary.completionRate)}</dd></div>
+          </dl>
+        </details>
         <section class="history-breakdown" aria-labelledby="history-breakdown-heading">
-          <div class="history-breakdown__heading"><h3 id="history-breakdown-heading">工作节奏</h3><span>用数量看变化，不只看完成率</span></div>
-          <div class="history-bars">
-            <div class="history-bar"><div><span>计划并完成</span><strong>${summary.plannedCompletedCount}</strong></div><div class="history-bar__track"><span style="width: ${plannedPercent}%"></span></div></div>
-            <div class="history-bar"><div><span>新增任务</span><strong>${summary.createdCount}</strong></div><div class="history-bar__track"><span style="width: ${createdPercent}%"></span></div></div>
-            <div class="history-bar"><div><span>延期次数</span><strong>${summary.postponedCount}</strong></div><div class="history-bar__track history-bar__track--coral"><span style="width: ${summary.plannedCount === 0 ? 0 : Math.min(100, Math.round((summary.postponedCount / summary.plannedCount) * 100))}%"></span></div></div>
-          </div>
+          ${breakdown}
         </section>
-        <p class="history-conclusion" data-history-conclusion>这段时间实际完成 ${summary.completedCount} 项，完成率 ${formatRate(summary.completionRate)}。</p>
         <section class="summary-panel" aria-labelledby="history-summary-heading">
           <div>
             <h3 id="history-summary-heading">规则模板总结</h3>
@@ -120,8 +158,10 @@ export function createHistoryView({
           <textarea id="history-summary-text" aria-label="总结文本" readonly hidden></textarea>
           <button type="button" class="button-secondary summary-copy" data-summary-copy disabled hidden>复制总结</button>
         </section>
-        <h3>实际完成明细</h3>
-        <div id="history-list"></div>
+        <section class="history-details" aria-labelledby="history-details-heading">
+          <div class="history-details__heading"><h3 id="history-details-heading">实际完成明细</h3><span>${completed.length} 项</span></div>
+          <div class="history-details__card"><div id="history-list"></div></div>
+        </section>
       </section>`;
       root.querySelectorAll('[data-history-mode]').forEach((button) => {
         button.addEventListener('click', () => {
