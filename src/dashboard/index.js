@@ -27,6 +27,9 @@ import { createSettingsView } from './views/settings-view.js';
 import { RecurringService } from '../services/recurring-service.js';
 import { generateId } from '../shared/ids.js';
 import { createShortcutHandler } from './shortcuts.js';
+import { ResourceRepository } from '../data/resource-repository.js';
+import { ResourceService } from '../services/resource-service.js';
+import { createResourcePicker } from './resource-picker.js';
 
 const routeMeta = {
   today: ['今日工作', '现在最需要推进的事项'],
@@ -56,7 +59,9 @@ const recurringService = new RecurringService({
 const query = new TaskQueryService(repository);
 const statistics = new StatisticsService(repository);
 const summaryService = new SummaryService({ statistics, query });
-const backupService = new BackupService(repository, { settingsRepository });
+const resourceRepository = new ResourceRepository();
+const resourceService = new ResourceService(resourceRepository);
+const backupService = new BackupService(repository, { settingsRepository, resourceRepository });
 const csvService = new CsvExportService();
 const tagRepository = new TagRepository();
 const tagService = new TagService(tagRepository);
@@ -204,6 +209,7 @@ const viewOptions = {
   onAction,
   onEdit,
   onError,
+  resourceService,
 };
 const views = {
   today: createTodayView(viewOptions),
@@ -235,6 +241,13 @@ controller = new DashboardController({
   sendMessage: (message) => chrome.runtime.sendMessage(message),
 });
 
+const resourcePicker = createResourcePicker({
+  dialog: document.querySelector('#resource-dialog'),
+  resourceService,
+  onChanged: () => controller.refresh(),
+  onError,
+});
+
 const taskEditor = createTaskEditor({
   dialog: document.querySelector('#task-editor'),
   getCategories: () => taskService.listCategories(),
@@ -250,6 +263,8 @@ const taskEditor = createTaskEditor({
   }),
   onCopy: (taskId) => controller.handleTaskAction('copy', taskId),
   onReload: (taskId) => taskService.getTask(taskId),
+  resourceService,
+  openResourcePicker: (taskId, source) => resourcePicker.openForTask(taskId, source),
 });
 
 async function navigate(route) {
