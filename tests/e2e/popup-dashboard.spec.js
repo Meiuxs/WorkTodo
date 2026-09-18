@@ -15,3 +15,9 @@ test('Popup 快速新增任务后 Dashboard 收集箱可见且刷新后仍存在
   await dashboard.getByRole('button', { name: '收集箱' }).click();
   await expect(dashboard.getByRole('button', { name: '联系客户' })).toBeVisible();
 });
+
+test('Dashboard 导航按旅程分组且新增反馈提供工作台入口', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await expect(dashboard.getByRole('navigation', { name: '工作台导航' }).getByText('计划', { exact: true })).toBeVisible();
+  await expect(dashboard.getByRole('navigation', { name: '工作台导航' }).getByText('任务', { exact: true })).toBeVisible();
+});
