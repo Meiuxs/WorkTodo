@@ -268,6 +268,11 @@ test('工作记录可以生成并复制规则模板总结', async ({ extension }
   await page.getByRole('checkbox', { name: '完成任务', exact: true }).first().click();
   await page.getByRole('button', { name: '工作记录', exact: true }).click();
 
+  await expect(page.locator('.history-report-top')).toBeVisible();
+  await expect(page.locator('.history-insight')).toBeVisible();
+  await expect(page.locator('.history-rate')).toBeVisible();
+  await expect(page.locator('.report-metrics')).toBeVisible();
+  await expect(page.locator('.history-breakdown')).toBeVisible();
   await expect(page.getByRole('button', { name: '生成本周总结', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '生成本月总结', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '生成本周总结', exact: true }).click();

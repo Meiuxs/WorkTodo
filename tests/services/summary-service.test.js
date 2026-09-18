@@ -304,6 +304,11 @@ test('History 视图在日模式和周模式显示新增指标标签', async () 
   await view.render();
 
   assert.deepEqual(calls, [['daily', '2026-09-17']]);
+  assert.match(root.innerHTML, /class="history-report-top"/);
+  assert.match(root.innerHTML, /class="history-insight"/);
+  assert.match(root.innerHTML, /class="history-rate"/);
+  assert.match(root.innerHTML, /class="metrics report-metrics"/);
+  assert.match(root.innerHTML, /class="history-breakdown"/);
   assert.match(root.innerHTML, /<dt>实际完成<\/dt>/);
   assert.match(root.innerHTML, /<dt>计划任务<\/dt>/);
   assert.match(root.innerHTML, /<dt>新增任务<\/dt>/);
@@ -321,4 +326,35 @@ test('History 视图在日模式和周模式显示新增指标标签', async () 
   ]);
   assert.match(root.innerHTML, /<dt>本周计划并完成<\/dt><dd>11<\/dd>/);
   assert.match(root.innerHTML, /<dt>历史延期到本周完成<\/dt><dd>4<\/dd>/);
+});
+
+test('History 视图在没有计划时不把完成率读成 0%', async () => {
+  const { root } = createHistoryRoot();
+  const view = createHistoryView({
+    root,
+    query: { async completed() { return []; } },
+    statistics: {
+      async daily() {
+        return {
+          completedCount: 0,
+          plannedCount: 0,
+          createdCount: 0,
+          postponedCount: 0,
+          completionRate: null,
+          plannedCompletedCount: 0,
+          carriedOverCompletedCount: 0,
+        };
+      },
+    },
+    summaryService: {},
+    today: () => '2026-09-17',
+    onAction() {},
+    onEdit() {},
+  });
+
+  await view.render();
+
+  assert.match(root.innerHTML, /aria-label="完成率暂无计划"/);
+  assert.match(root.innerHTML, /<div class="history-rate__value">—<\/div>/);
+  assert.match(root.innerHTML, /<span>暂无计划<\/span>/);
 });

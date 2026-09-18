@@ -68,6 +68,9 @@ export function createHistoryView({
         ? '历史延期到本周完成'
         : '历史延期完成';
       const completionPercent = summary.completionRate === null ? 0 : Math.round(summary.completionRate * 100);
+      const completionLabel = summary.completionRate === null
+        ? '完成率暂无计划'
+        : `完成率 ${completionPercent}%`;
       const plannedPercent = summary.plannedCount === 0 ? 0 : Math.min(100, Math.round((summary.plannedCompletedCount / summary.plannedCount) * 100));
       const createdPercent = summary.plannedCount === 0 ? 0 : Math.min(100, Math.round((summary.createdCount / summary.plannedCount) * 100));
       root.innerHTML = `<section class="view-section" aria-labelledby="history-heading">
@@ -83,8 +86,8 @@ export function createHistoryView({
           <span class="filter-count">${rangeText}</span>
         </div>
         <div class="history-report-top">
-          <div class="history-insight"><span class="eyebrow">本段结论</span><strong>${summary.completedCount === 0 ? '先完成一件小事' : `已完成 ${summary.completedCount} 项`}</strong><span>${rangeText} · ${summary.completionRate === null ? '暂无可计算完成率' : `完成率 ${completionPercent}%`}</span></div>
-          <div class="history-rate" aria-label="完成率 ${completionPercent}%"><div class="history-rate__value">${summary.completionRate === null ? '—' : `${completionPercent}%`}</div><div class="history-rate__track"><span style="width: ${completionPercent}%"></span></div><span>计划任务完成进度</span></div>
+          <div class="history-insight"><span class="eyebrow">本段结论</span><strong>${summary.completedCount === 0 ? '还没有完成记录' : `已完成 ${summary.completedCount} 项`}</strong><span>${rangeText} · ${summary.completionRate === null ? '暂无可计算完成率' : `完成率 ${completionPercent}%`}</span></div>
+          <div class="history-rate" aria-label="${completionLabel}"><div class="history-rate__value">${summary.completionRate === null ? '—' : `${completionPercent}%`}</div><div class="history-rate__track"><span style="width: ${completionPercent}%"></span></div><span>${summary.completionRate === null ? '暂无计划' : '计划任务完成进度'}</span></div>
         </div>
         <dl class="metrics report-metrics">
           <div><dt>实际完成</dt><dd>${summary.completedCount}</dd></div>
