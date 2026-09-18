@@ -1,4 +1,4 @@
-# WorkTodo 1.3.0 UX 评审入口
+# WorkTodo 1.3.1 UX 评审入口
 
 ## 评审目标
 
@@ -98,7 +98,7 @@
 - [src/popup/popup.css](../src/popup/popup.css)：Popup 记录优先的视觉层级。
 - [src/popup/popup.html](../src/popup/popup.html)：Popup 文案和结构。
 - [tests/e2e/ux-refactor.spec.js](../tests/e2e/ux-refactor.spec.js)：新增 UX 回归测试。
-- [manifest.json](../manifest.json)：版本号升级到 `1.3.0`。
+- [manifest.json](../manifest.json)：版本号升级到 `1.3.1`。
 
 ## 验证结果
 
@@ -106,7 +106,7 @@
 - 端到端测试：53/53 通过。
 - 390px 响应式检查通过。
 - 月历键盘交互与七列结构检查通过。
-- 扩展打包成功：`dist/WorkTodo-v1.3.0.zip`。
+- 扩展打包成功：`dist/WorkTodo-v1.3.1.zip`。
 
 ## Git 版本信息
 
