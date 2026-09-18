@@ -33,6 +33,8 @@ export function createTaskEditor({
   onUpdate,
   onCopy,
   onReload,
+  resourceService,
+  openResourcePicker,
   onClose = () => {},
 }) {
   const form = dialog.querySelector('form');
@@ -56,6 +58,24 @@ export function createTaskEditor({
   const recurring = field(form, 'recurring');
   const recurringFields = dialog.querySelector('[data-recurring-fields]');
   const recurringPicker = dialog.querySelector('[data-recurring-picker]');
+  const resources = dialog.querySelector('[data-editor-resources]');
+  const resourceCount = dialog.querySelector('[data-resource-count]');
+  const resourceList = dialog.querySelector('[data-resource-list]');
+
+  async function renderResources() {
+    if (currentTask === null || resourceService === undefined) {
+      resources.hidden = true;
+      resourceList.replaceChildren();
+      resourceCount.textContent = '0';
+      return;
+    }
+    const items = await resourceService.listForTask(currentTask.id);
+    resources.hidden = false;
+    resourceCount.textContent = String(items.length);
+    resourceList.innerHTML = items.length === 0
+      ? '<p class="muted">还没有关联资料。</p>'
+      : items.map((resource) => `<div class="editor-resource-row"><span><strong>${escapeHtml(resource.title)}</strong><small>${resource.type === 'url' ? '网页链接' : resource.type === 'file' ? `本地文件 · ${escapeHtml(resource.fileName)}` : '文本片段'}</small></span><button type="button" data-resource-detach="${escapeHtml(resource.id)}">解除关联</button></div>`).join('');
+  }
 
   function populateCategories(categories, selectedId) {
     category.innerHTML = '<option value="">未分类</option>'
@@ -148,6 +168,7 @@ export function createTaskEditor({
     conflict.hidden = true;
     showMessage('');
     await renderSubtasks();
+    await renderResources();
     if (!dialog.open) dialog.showModal();
     requestAnimationFrame(() => field(form, 'title').focus());
   }
@@ -174,6 +195,7 @@ export function createTaskEditor({
     conflict.hidden = true;
     showMessage('');
     await renderSubtasks();
+    await renderResources();
     if (!dialog.open) dialog.showModal();
     requestAnimationFrame(() => field(form, 'title').focus());
   }
@@ -297,6 +319,17 @@ export function createTaskEditor({
     if (row === null) return;
     const latest = await onReload(row.dataset.subtaskId);
     await openTask(latest, trigger);
+  });
+  dialog.querySelector('[data-resource-add]').addEventListener('click', async (event) => {
+    if (currentTask === null || openResourcePicker === undefined) return;
+    await openResourcePicker(currentTask.id, event.currentTarget);
+    await renderResources();
+  });
+  resourceList.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-resource-detach]');
+    if (button === null || currentTask === null) return;
+    await resourceService.detach(currentTask.id, button.dataset.resourceDetach);
+    await renderResources();
   });
 
   return { openNew, openTask, close };

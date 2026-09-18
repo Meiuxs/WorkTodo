@@ -8,12 +8,12 @@ test('Popup 快速新增任务后 Dashboard 收集箱可见且刷新后仍存在
   await expect(popup.getByRole('button', { name: '打开工作台' })).toBeVisible();
 
   const dashboard = await openDashboard(extension);
-  await dashboard.getByRole('button', { name: '收集箱' }).click();
+  await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
   await expect(dashboard.getByRole('heading', { name: '收集箱 · 1' })).toBeVisible();
   await expect(dashboard.getByRole('button', { name: '联系客户' })).toBeVisible();
 
   await dashboard.reload();
-  await dashboard.getByRole('button', { name: '收集箱' }).click();
+  await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
   await expect(dashboard.getByRole('button', { name: '联系客户' })).toBeVisible();
 });
 

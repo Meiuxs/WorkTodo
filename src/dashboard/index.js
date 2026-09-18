@@ -27,6 +27,10 @@ import { createSettingsView } from './views/settings-view.js';
 import { RecurringService } from '../services/recurring-service.js';
 import { generateId } from '../shared/ids.js';
 import { createShortcutHandler } from './shortcuts.js';
+import { ResourceRepository } from '../data/resource-repository.js';
+import { ResourceService } from '../services/resource-service.js';
+import { createResourcePicker } from './resource-picker.js';
+import { createResourcesView } from './views/resources-view.js';
 
 const routeMeta = {
   today: ['今日工作', '现在最需要推进的事项'],
@@ -34,6 +38,7 @@ const routeMeta = {
   week: ['本周', '按天查看这一周的计划'],
   month: ['月历', '按月查看计划和任务分布'],
   inbox: ['收集箱', '先记录，再整理'],
+  resources: ['资料收集箱', '先保存上下文，再决定归属'],
   all: ['全部任务', '查找、筛选和调整工作'],
   completed: ['已完成', '回看已经结束的任务'],
   trash: ['回收站', '恢复或永久删除已删除任务'],
@@ -56,7 +61,9 @@ const recurringService = new RecurringService({
 const query = new TaskQueryService(repository);
 const statistics = new StatisticsService(repository);
 const summaryService = new SummaryService({ statistics, query });
-const backupService = new BackupService(repository, { settingsRepository });
+const resourceRepository = new ResourceRepository();
+const resourceService = new ResourceService(resourceRepository);
+const backupService = new BackupService(repository, { settingsRepository, resourceRepository });
 const csvService = new CsvExportService();
 const tagRepository = new TagRepository();
 const tagService = new TagService(tagRepository);
@@ -67,6 +74,10 @@ const app = document.querySelector('.app');
 let controller;
 let toastTimer;
 const undoController = new UndoController();
+
+async function getResourceCounts(tasks) {
+  return new Map(await Promise.all(tasks.map(async (task) => [task.id, (await resourceService.listTaskIds(task.id)).length])));
+}
 
 function dateOffset(date, days) {
   return toLocalDate(new Date(date.getFullYear(), date.getMonth(), date.getDate() + days));
@@ -204,6 +215,8 @@ const viewOptions = {
   onAction,
   onEdit,
   onError,
+  resourceService,
+  getResourceCounts,
 };
 const views = {
   today: createTodayView(viewOptions),
@@ -211,6 +224,7 @@ const views = {
   week: createWeekView(viewOptions),
   month: createMonthView(viewOptions),
   inbox: createInboxView(viewOptions),
+  resources: createResourcesView({ ...viewOptions, resourceService }),
   all: createAllTasksView(viewOptions),
   completed: createCompletedView(viewOptions),
   trash: createTrashView(viewOptions),
@@ -235,6 +249,13 @@ controller = new DashboardController({
   sendMessage: (message) => chrome.runtime.sendMessage(message),
 });
 
+const resourcePicker = createResourcePicker({
+  dialog: document.querySelector('#resource-dialog'),
+  resourceService,
+  onChanged: () => controller.refresh(),
+  onError,
+});
+
 const taskEditor = createTaskEditor({
   dialog: document.querySelector('#task-editor'),
   getCategories: () => taskService.listCategories(),
@@ -250,6 +271,8 @@ const taskEditor = createTaskEditor({
   }),
   onCopy: (taskId) => controller.handleTaskAction('copy', taskId),
   onReload: (taskId) => taskService.getTask(taskId),
+  resourceService,
+  openResourcePicker: (taskId, source) => resourcePicker.openForTask(taskId, source),
 });
 
 async function navigate(route) {
@@ -257,7 +280,7 @@ async function navigate(route) {
   const [title, subtitle] = routeMeta[nextRoute];
   document.querySelector('#page-title').textContent = title;
   document.querySelector('#page-subtitle').textContent = subtitle;
-  document.querySelector('#quick-add').hidden = ['history', 'settings'].includes(nextRoute);
+  document.querySelector('#quick-add').hidden = ['history', 'settings', 'resources'].includes(nextRoute);
   document.querySelector('#quick-add-message').textContent = '';
   await controller.navigate(nextRoute);
 }

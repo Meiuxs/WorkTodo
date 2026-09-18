@@ -633,6 +633,34 @@ input::placeholder { color: var(--muted); }
 .summary-empty { margin: var(--sp-4) 0 0; color: var(--muted); font-size: var(--fs-ui); }
 .summary-copy { margin-top: var(--sp-3); }
 
+.editor-section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.editor-section-heading h3 { margin: 0; }
+.editor-section-count { color: var(--teal); font-size: var(--fs-caption); }
+.editor-resource-list { display: grid; gap: var(--sp-2); margin-top: var(--sp-3); }
+.editor-resource-row, .resource-existing-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-align: left; }
+.editor-resource-row span { display: grid; gap: var(--sp-1); min-width: 0; }
+.editor-resource-row small { color: var(--muted); }
+.editor-resource-row button { flex: 0 0 auto; }
+.resource-existing { margin-top: var(--sp-5); border-top: 1px solid var(--line); padding-top: var(--sp-4); }
+.resource-existing h3 { margin-top: 0; }
+.resource-existing-list { display: grid; gap: var(--sp-2); }
+.resource-existing-row { width: 100%; cursor: pointer; }
+.resource-existing-row span { color: var(--muted); font-size: var(--fs-caption); }
+.resource-existing-row:hover { border-color: var(--teal); background: var(--teal-soft); }
+.resource-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-4); margin: var(--sp-5) 0; }
+.resource-toolbar label { display: grid; gap: var(--sp-2); color: var(--muted); font-size: var(--fs-caption); }
+.resources-list { display: grid; gap: var(--sp-3); }
+.resource-card { display: flex; justify-content: space-between; gap: var(--sp-5); border-top: 1px solid var(--line); padding: var(--sp-4) 0; }
+.resource-card h3 { margin: var(--sp-1) 0; }
+.resource-card__type, .resource-card__source, .resource-card__note { margin: var(--sp-1) 0 0; color: var(--muted); font-size: var(--fs-caption); }
+.resource-card__type { color: var(--teal); font-weight: 700; }
+.resource-card__actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); color: var(--muted); font-size: var(--fs-caption); }
+@media (max-width: 700px) {
+  .resource-toolbar { grid-template-columns: 1fr; }
+  .resource-card { display: grid; }
+  .resource-card__actions { justify-content: flex-start; }
+}
+
 /* ============ 指标条 ============ */
 /* 列数自适应：指标数量变化时不再换行错位；分隔线用 1px 间隙绘制，任何列数都不会出现断口 */
 .metrics {

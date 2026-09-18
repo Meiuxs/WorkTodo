@@ -6,6 +6,7 @@ import { SettingsRepository } from '../data/settings-repository.js';
 const SCHEMA_VERSION = 2;
 const V1_TOP_LEVEL_FIELDS = ['schemaVersion', 'appVersion', 'exportedAt', 'tasks', 'categories', 'events', 'settings'];
 const V2_TOP_LEVEL_FIELDS = [...V1_TOP_LEVEL_FIELDS, 'tags', 'recurringTemplates'];
+const RESOURCE_TOP_LEVEL_FIELDS = [...V2_TOP_LEVEL_FIELDS, 'resources', 'taskResources', 'resourceCopyWarnings'];
 const TASK_RELATIONSHIP_FIELDS = ['parentId', 'tagIds', 'seriesId', 'occurrenceKey'];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -57,8 +58,11 @@ function validateTopLevel(backup, schemaVersion) {
   assertPlainObject(backup, 'backup');
   const expectedFields = schemaVersion === 1 ? V1_TOP_LEVEL_FIELDS : V2_TOP_LEVEL_FIELDS;
   const keys = Object.keys(backup).sort();
-  const expected = [...expectedFields].sort();
-  if (keys.length !== expected.length || keys.some((key, index) => key !== expected[index])) {
+  const accepted = schemaVersion === 1 ? [V1_TOP_LEVEL_FIELDS] : [V2_TOP_LEVEL_FIELDS, RESOURCE_TOP_LEVEL_FIELDS];
+  if (!accepted.some((fields) => {
+    const expected = [...fields].sort();
+    return keys.length === expected.length && keys.every((key, index) => key === expected[index]);
+  })) {
     throw new ValidationError(`备份顶层字段必须固定为 ${expectedFields.join(', ')}`);
   }
   if (typeof backup.appVersion !== 'string' || backup.appVersion.length === 0) {
@@ -71,6 +75,13 @@ function validateTopLevel(backup, schemaVersion) {
   if (schemaVersion === 2) {
     assertArray(backup.tags, 'tags');
     assertArray(backup.recurringTemplates, 'recurringTemplates');
+    if (Object.hasOwn(backup, 'resources')) {
+      assertArray(backup.resources, 'resources');
+      assertArray(backup.taskResources, 'taskResources');
+      if (!Number.isInteger(backup.resourceCopyWarnings) || backup.resourceCopyWarnings < 0) {
+        throw new ValidationError('resourceCopyWarnings 必须是非负整数');
+      }
+    }
   }
   assertPlainObject(backup.settings, 'settings');
 }
@@ -90,6 +101,17 @@ function upgradeBackup(backup) {
   }));
   upgraded.tags = [];
   upgraded.recurringTemplates = [];
+  upgraded.resources = [];
+  upgraded.taskResources = [];
+  upgraded.resourceCopyWarnings = 0;
+  return upgraded;
+}
+
+function normalizeResourceBackup(backup) {
+  const upgraded = clone(backup);
+  upgraded.resources ??= [];
+  upgraded.taskResources ??= [];
+  upgraded.resourceCopyWarnings ??= 0;
   return upgraded;
 }
 
@@ -179,6 +201,35 @@ function validateEvents(events, taskIds) {
   }
 }
 
+function validateResources(resources, taskResources, taskIds) {
+  assertUniqueUuid(resources, 'resource');
+  const resourceIds = new Set(resources.map((resource) => resource.id));
+  for (const resource of resources) {
+    if (!['url', 'file', 'snippet'].includes(resource.type)) throw new ValidationError('resource.type 无效');
+    if (typeof resource.title !== 'string' || resource.title.trim().length === 0) throw new ValidationError('resource.title 不能为空');
+    assertIsoString(resource.createdAt, 'resource.createdAt');
+    assertIsoString(resource.updatedAt, 'resource.updatedAt');
+    if (!Number.isInteger(resource.revision) || resource.revision < 0) throw new ValidationError('resource.revision 无效');
+    if (resource.type === 'url' && (typeof resource.url !== 'string' || !/^https?:\/\//i.test(resource.url))) {
+      throw new ValidationError('resource.url 只支持 http 或 https');
+    }
+    if (resource.type === 'snippet' && (typeof resource.content !== 'string' || resource.content.length === 0)) {
+      throw new ValidationError('resource.content 不能为空');
+    }
+    if (resource.type === 'file' && resource.storageMode === 'copy' && resource.copyIncluded !== false) {
+      throw new ValidationError('JSON 备份中的文件副本必须标记为未包含');
+    }
+  }
+  const relationKeys = new Set();
+  for (const relation of taskResources) {
+    const key = `${relation.taskId}:${relation.resourceId}`;
+    if (relationKeys.has(key)) throw new ValidationError('taskResources 不能重复');
+    relationKeys.add(key);
+    if (!taskIds.has(relation.taskId)) throw new ValidationError('taskResources.taskId 必须引用备份中的任务');
+    if (!resourceIds.has(relation.resourceId)) throw new ValidationError('taskResources.resourceId 必须引用备份中的资料');
+  }
+}
+
 function parseBackup(text) {
   if (typeof text !== 'string') {
     throw new ValidationError('备份内容必须是字符串');
@@ -215,6 +266,7 @@ function allConflicts(current, backup) {
     ...conflictsFor('events', current.events, backup.events),
     ...conflictsFor('tags', current.tags ?? [], backup.tags),
     ...conflictsFor('recurringTemplates', current.recurringTemplates ?? [], backup.recurringTemplates),
+    ...conflictsFor('resources', current.resources ?? [], backup.resources ?? []),
   ];
 }
 
@@ -227,27 +279,39 @@ function mergeById(localItems, incomingItems, timeField) {
   return [...items.values()];
 }
 
+function mergeRelations(localItems, incomingItems) {
+  const relations = new Map(localItems.map((item) => [`${item.taskId}:${item.resourceId}`, item]));
+  for (const item of incomingItems) relations.set(`${item.taskId}:${item.resourceId}`, item);
+  return [...relations.values()];
+}
+
 function importResult(snapshot, conflicts) {
   return {
     taskCount: snapshot.tasks.length,
     categoryCount: snapshot.categories.length,
     eventCount: snapshot.events.length,
+    resourceCount: snapshot.resources?.length ?? 0,
+    taskResourceCount: snapshot.taskResources?.length ?? 0,
+    omittedFileCopies: snapshot.resourceCopyWarnings ?? 0,
     conflicts: conflicts.map((conflict) => clone(conflict)),
   };
 }
 
 export class BackupService {
   #repository;
+  #resourceRepository;
   #settingsRepository;
   #now;
   #appVersion;
 
   constructor(repository, {
+    resourceRepository = null,
     settingsRepository = new SettingsRepository(),
     now = defaultNow,
     appVersion = '0.1.0',
   } = {}) {
     this.#repository = repository;
+    this.#resourceRepository = resourceRepository;
     this.#settingsRepository = settingsRepository;
     this.#now = now;
     this.#appVersion = appVersion;
@@ -265,7 +329,7 @@ export class BackupService {
       throw new ValidationError('schemaVersion 不受支持');
     }
     validateTopLevel(backup, backup.schemaVersion);
-    const upgraded = upgradeBackup(backup);
+    const upgraded = normalizeResourceBackup(upgradeBackup(backup));
     validateCategories(upgraded.categories);
     const categoryIds = new Set(upgraded.categories.map((category) => category.id));
     upgraded.tags = validateTags(upgraded.tags);
@@ -274,6 +338,7 @@ export class BackupService {
     validateTasks(upgraded.tasks, categoryIds, tagIds);
     const taskIds = new Set(upgraded.tasks.map((task) => task.id));
     validateEvents(upgraded.events, taskIds);
+    validateResources(upgraded.resources, upgraded.taskResources, taskIds);
     return clone(upgraded);
   }
 
@@ -283,6 +348,14 @@ export class BackupService {
 
   async createBackup() {
     const snapshot = await this.#repository.exportAll();
+    const resourceSnapshot = this.#resourceRepository?.exportAll
+      ? await this.#resourceRepository.exportAll()
+      : { resources: [], taskResources: [] };
+    const resources = resourceSnapshot.resources.map((resource) => ({
+      ...resource,
+      blob: null,
+      copyIncluded: resource.storageMode === 'copy' ? false : null,
+    }));
     const backup = {
       schemaVersion: SCHEMA_VERSION,
       appVersion: this.#appVersion,
@@ -292,6 +365,9 @@ export class BackupService {
       events: snapshot.events,
       tags: snapshot.tags ?? [],
       recurringTemplates: snapshot.recurringTemplates ?? [],
+      resources,
+      taskResources: resourceSnapshot.taskResources ?? [],
+      resourceCopyWarnings: resources.filter((resource) => resource.storageMode === 'copy').length,
       settings: (await this.#settingsRepository.getSettings()) ?? {},
     };
     await this.#saveMetadata({ lastExportedAt: backup.exportedAt });
@@ -318,6 +394,9 @@ export class BackupService {
 
   async #mergeImport(backup) {
     const current = await this.#repository.exportAll();
+    const currentResources = this.#resourceRepository?.exportAll
+      ? await this.#resourceRepository.exportAll()
+      : { resources: [], taskResources: [] };
     const conflicts = allConflicts(current, backup);
     const snapshot = {
       tasks: mergeById(current.tasks, backup.tasks, 'updatedAt'),
@@ -330,13 +409,21 @@ export class BackupService {
         'updatedAt',
       ),
     };
+    const resourceSnapshot = {
+      resources: mergeById(currentResources.resources, backup.resources, 'updatedAt'),
+      taskResources: mergeRelations(currentResources.taskResources, backup.taskResources),
+    };
     await this.#repository.replaceAll(snapshot);
+    if (this.#resourceRepository?.replaceAll) await this.#resourceRepository.replaceAll(resourceSnapshot);
     await this.#saveMetadata({ lastImportedAt: this.#now() });
     return importResult(snapshot, conflicts);
   }
 
   async #replaceImport(backup) {
     const recovery = await this.#repository.exportAll();
+    const resourceRecovery = this.#resourceRepository?.exportAll
+      ? await this.#resourceRepository.exportAll()
+      : null;
     const previousSettings = await this.#settingsRepository.getSettings();
     const previousMetadata = await this.#settingsRepository.getMetadata();
     const snapshot = {
@@ -346,12 +433,17 @@ export class BackupService {
       tags: backup.tags,
       recurringTemplates: backup.recurringTemplates,
     };
+    const resourceSnapshot = { resources: backup.resources, taskResources: backup.taskResources };
     try {
       await this.#repository.replaceAll(snapshot);
+      if (this.#resourceRepository?.replaceAll) await this.#resourceRepository.replaceAll(resourceSnapshot);
       await this.#settingsRepository.saveSettings(backup.settings);
       await this.#saveMetadata({ lastImportedAt: this.#now() });
     } catch (error) {
       await this.#repository.replaceAll(recovery);
+      if (resourceRecovery !== null && this.#resourceRepository?.replaceAll) {
+        await this.#resourceRepository.replaceAll(resourceRecovery);
+      }
       await this.#settingsRepository.saveSettings(previousSettings);
       await this.#settingsRepository.saveMetadata(previousMetadata);
       throw error;

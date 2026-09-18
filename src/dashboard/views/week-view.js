@@ -8,6 +8,7 @@ export function createWeekView({
   onAction,
   onEdit,
   onError,
+  getResourceCounts,
   singleDate = false,
 }) {
   return {
@@ -24,6 +25,8 @@ export function createWeekView({
         : await query.week(anchor);
 
       if (signal?.aborted) return;
+      const allTasks = result.days.flatMap((date) => result.byDate[date] ?? []);
+      const resourceCounts = await getResourceCounts?.(allTasks) ?? new Map();
       // 起止同日时只写一次日期，避免出现「9月19日 至 9月19日」。
       const range = result.startDate === result.endDate
         ? formatLocalDay(result.startDate)
@@ -50,6 +53,7 @@ export function createWeekView({
           onAction,
           onEdit,
           onError,
+          resourceCounts,
           emptyMessage: '这一天没有计划。',
         });
       }

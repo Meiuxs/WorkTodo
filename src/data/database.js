@@ -1,7 +1,7 @@
 import { createSearchIndexRecord } from './search-index.js';
 
 export const DATABASE_NAME = 'worktodo';
-export const DATABASE_VERSION = 3;
+export const DATABASE_VERSION = 4;
 const TASK_RELATIONSHIP_FIELDS = ['parentId', 'tagIds', 'seriesId', 'occurrenceKey'];
 
 const TASK_INDEXES = [
@@ -22,6 +22,11 @@ const EVENT_INDEXES = [
 ];
 const TAG_INDEXES = [['name', 'name', { unique: true }]];
 const TEMPLATE_INDEXES = [['active', 'active']];
+const RESOURCE_INDEXES = [
+  ['type', 'type'],
+  ['updatedAt', 'updatedAt'],
+  ['storageMode', 'storageMode'],
+];
 const SEARCH_INDEX_INDEXES = [
   ['grams', 'grams', { multiEntry: true }],
 ];
@@ -75,6 +80,20 @@ export function upgradeDatabase(database, transaction = database.transaction) {
 
   if (!database.objectStoreNames.contains('categories')) {
     database.createObjectStore('categories', { keyPath: 'id' });
+  }
+  const resources = database.objectStoreNames.contains('resources')
+    ? transaction.objectStore('resources')
+    : database.createObjectStore('resources', { keyPath: 'id' });
+  ensureIndexes(resources, RESOURCE_INDEXES);
+  const taskResources = database.objectStoreNames.contains('taskResources')
+    ? transaction.objectStore('taskResources')
+    : database.createObjectStore('taskResources', { keyPath: ['taskId', 'resourceId'] });
+  ensureIndexes(taskResources, [
+    ['taskId', 'taskId'],
+    ['resourceId', 'resourceId'],
+  ]);
+  if (!database.objectStoreNames.contains('resourceBlobs')) {
+    database.createObjectStore('resourceBlobs', { keyPath: 'id' });
   }
   const events = database.objectStoreNames.contains('events')
     ? transaction.objectStore('events')

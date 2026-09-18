@@ -28,7 +28,7 @@ const LEGACY_TASKS = [
   LEGACY_TASK,
 ];
 
-test('Chromium 中 v1 实库升级到 v3 会物化关系字段并按 ID 返回搜索结果', async ({ extension }) => {
+test('Chromium 中 v1 实库升级到 v4 会物化关系字段并按 ID 返回搜索结果', async ({ extension }) => {
   const runner = await openExtensionPage(extension.context, extension.extensionId, 'manifest.json');
   await runner.evaluate(async (legacyTasks) => {
     await new Promise((resolve, reject) => {
@@ -68,7 +68,7 @@ test('Chromium 中 v1 实库升级到 v3 会物化关系字段并按 ID 返回�
   await expect(dashboard.getByRole('heading', { name: '今日工作' })).toBeVisible();
   const upgraded = await dashboard.evaluate(async () => {
     const database = await new Promise((resolve, reject) => {
-      const request = indexedDB.open('worktodo', 3);
+      const request = indexedDB.open('worktodo', 4);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -104,7 +104,7 @@ test('Chromium 中 v1 实库升级到 v3 会物化关系字段并按 ID 返回�
     };
   });
 
-  expect(upgraded.version).toBe(3);
+  expect(upgraded.version).toBe(4);
   expect(upgraded.hasSearchIndex).toBe(true);
   expect(upgraded.hasGramsIndex).toBe(true);
   expect(upgraded.stored).toHaveLength(2);

@@ -118,7 +118,7 @@ test('ensureIndexes 透传索引选项', () => {
   ]);
 });
 
-test('schema v3 创建搜索索引、创建时间索引、标签与重复模板 store', () => {
+test('schema v4 创建搜索索引、资料与关联 store', () => {
   const stores = new Map([
     ['tasks', createStore('tasks')],
     ['categories', createStore('categories')],
@@ -140,7 +140,7 @@ test('schema v3 创建搜索索引、创建时间索引、标签与重复模板 
 
   upgradeDatabase(database);
 
-  assert.equal(DATABASE_VERSION, 3);
+  assert.equal(DATABASE_VERSION, 4);
   assert.ok(database.objectStoreNames.contains('searchIndex'));
   assert.deepEqual(stores.get('searchIndex').options, { keyPath: 'taskId' });
   assert.ok(database.objectStoreNames.contains('tags'));
@@ -149,6 +149,13 @@ test('schema v3 创建搜索索引、创建时间索引、标签与重复模板 
   assert.deepEqual(stores.get('recurringTemplates').options, {
     keyPath: 'id',
   });
+  assert.deepEqual(stores.get('resources').options, { keyPath: 'id' });
+  assert.deepEqual(stores.get('taskResources').options, { keyPath: ['taskId', 'resourceId'] });
+  assert.deepEqual(stores.get('resourceBlobs').options, { keyPath: 'id' });
+  assert.deepEqual(stores.get('taskResources').createdIndexes, [
+    { name: 'taskId', keyPath: 'taskId', options: undefined },
+    { name: 'resourceId', keyPath: 'resourceId', options: undefined },
+  ]);
   assert.deepEqual(
     stores.get('tasks').createdIndexes.map(({ name, keyPath, options }) => ({
       name,
@@ -191,7 +198,7 @@ test('schema v3 创建搜索索引、创建时间索引、标签与重复模板 
   ]);
 });
 
-test('schema v3 复用现有 store 并补建缺失索引', () => {
+test('schema v4 复用现有 store、补建缺失索引并新增资料 store', () => {
   const tasks = createStore('tasks');
   tasks.createIndex('scheduledDate', 'scheduledDate');
   const stores = new Map([
@@ -206,8 +213,11 @@ test('schema v3 复用现有 store 并补建缺失索引', () => {
     objectStoreNames: {
       contains: (name) => stores.has(name),
     },
-    createObjectStore: () => {
-      assert.fail('升级时不应重建已有 store');
+    createObjectStore: (name, options) => {
+      assert.equal(['resources', 'taskResources', 'resourceBlobs'].includes(name), true);
+      const store = createStore(name, options);
+      stores.set(name, store);
+      return store;
     },
     transaction: {
       objectStore: (name) => stores.get(name),
@@ -231,6 +241,8 @@ test('schema v3 复用现有 store 并补建缺失索引', () => {
       'tagIds',
     ],
   );
+  assert.ok(stores.has('resources'));
+  assert.ok(stores.has('taskResources'));
 });
 
 test('schema v3 游标迁移幂等补齐关系字段、保留旧字段并重建搜索索引', async () => {

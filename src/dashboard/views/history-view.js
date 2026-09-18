@@ -16,6 +16,7 @@ export function createHistoryView({
   onAction,
   onEdit,
   onError,
+  getResourceCounts,
 }) {
   let mode = 'daily';
   let anchor = today();
@@ -57,6 +58,7 @@ export function createHistoryView({
         throw error;
       }
       if (signal?.aborted || requestVersion !== renderVersion) return;
+      const resourceCounts = await getResourceCounts?.(completed) ?? new Map();
       // 界面上的范围文案用中文日期；服务层生成的总结文本仍保留 ISO，便于粘贴后机器解析。
       const rangeText = requestedMode === 'daily'
         ? formatLocalDayWithWeekday(requestedAnchor)
@@ -169,6 +171,7 @@ export function createHistoryView({
         onAction,
         onEdit,
         onError,
+        resourceCounts,
         emptyMessage: '这个区间还没有实际完成记录。',
       });
     },

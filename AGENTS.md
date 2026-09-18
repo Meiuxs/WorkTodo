@@ -30,3 +30,11 @@
 - 不声明与功能无关的权限，不读取网页内容、浏览历史、密码、Cookie 或剪贴板。
 - 任务主数据使用 IndexedDB；`chrome.storage.local` 仅保存设置和轻量元数据。
 - 所有核心流程必须支持离线、键盘操作和非颜色化状态表达。
+
+## Packaging
+
+- 使用 `npm run package` 生成可导入 Chromium 的扩展压缩包。
+- 打包脚本读取 `manifest.json` 的版本号，输出到 `dist/WorkTodo-v<version>.zip`。
+- 发布包只包含 `manifest.json` 和 `src/`，不包含测试、文档、`node_modules` 或开发工具。
+- 生成的压缩包解压后，在 Chromium 的扩展管理页开启“开发者模式”，选择“加载已解压的扩展程序”，指向解压目录即可安装。
+- 修改运行时代码或 `manifest.json` 后，先运行 `npm test`，再运行 `npm run package`。

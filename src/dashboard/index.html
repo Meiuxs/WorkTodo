@@ -20,6 +20,7 @@
           <button type="button" data-route="month">月历</button>
           <p class="nav__label">任务</p>
           <button type="button" data-route="inbox">收集箱</button>
+          <button type="button" data-route="resources">资料收集箱</button>
           <button type="button" data-route="all">全部任务</button>
           <button type="button" data-route="completed">已完成</button>
           <button type="button" data-route="trash">回收站</button>
@@ -91,6 +92,10 @@
             </div>
             <p class="form-message" data-tag-message role="alert"></p>
           </fieldset>
+          <section class="editor-resources" data-editor-resources hidden>
+            <div class="editor-section-heading"><h3>相关资料 <span class="editor-section-count" data-resource-count>0</span></h3><button type="button" class="button-secondary" data-resource-add>添加资料</button></div>
+            <div class="editor-resource-list" data-resource-list></div>
+          </section>
           <label class="check-field"><input name="starred" type="checkbox"> 标记为星标</label>
           <details class="editor-more">
             <summary>更多信息</summary>
@@ -120,6 +125,24 @@
           <button type="button" data-editor-close>取消</button>
           <button type="submit" class="button-primary">保存任务</button>
         </footer>
+      </form>
+    </dialog>
+
+    <dialog class="modal resource-dialog" id="resource-dialog">
+      <form method="dialog" data-resource-form>
+        <h2>添加资料</h2>
+        <label class="field">资料类型<select data-resource-type aria-label="资料类型"><option value="url">网页链接</option><option value="snippet">文本片段</option><option value="file">本地文件</option></select></label>
+        <label class="field">资料名称<input data-resource-title aria-label="资料名称" maxlength="200" required></label>
+        <label class="field" data-resource-url-field>网页链接<input data-resource-url aria-label="网页链接" type="url" placeholder="https://" required></label>
+        <label class="field" data-resource-snippet-field hidden>文本片段<textarea data-resource-content aria-label="文本片段" maxlength="20000"></textarea></label>
+        <label class="field" data-resource-file-field hidden>本地文件<input data-resource-file type="file" aria-label="本地文件"></label>
+        <label class="check-field" data-resource-copy-field hidden><input data-resource-save-copy type="checkbox"> 保存一份副本到本地（单个文件不超过 20 MB）</label>
+        <label class="field">备注<textarea data-resource-note aria-label="资料备注" maxlength="2000" rows="2"></textarea></label>
+        <p class="form-message" data-resource-message role="alert"></p>
+        <div class="dialog-actions"><button type="button" data-resource-cancel>取消</button><button type="submit" class="button-primary">保存资料</button></div>
+        <section class="resource-existing" data-resource-existing hidden>
+          <h3>关联已有资料</h3><div data-resource-existing-list></div>
+        </section>
       </form>
     </dialog>
 

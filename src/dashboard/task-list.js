@@ -96,7 +96,7 @@ export function taskTagLabel(task, tags) {
     .join(' ');
 }
 
-function taskMarkup(task, today, tags) {
+function taskMarkup(task, today, tags, resourceCounts) {
   const trashed = task.trashedAt !== null;
   const canRestore = trashed || task.lifecycle === 'completed' || task.lifecycle === 'cancelled';
   const checkboxAction = trashed ? 'untrash' : canRestore ? 'restore' : 'complete';
@@ -109,11 +109,13 @@ function taskMarkup(task, today, tags) {
   const overdue = task.scheduledDate !== null
     && task.scheduledDate < today
     && ACTIVE_LIFECYCLES.has(task.lifecycle);
+  const resourceCount = resourceCounts.get(task.id) ?? 0;
+  const resourceLabel = resourceCount > 0 ? ` · 资料 ${resourceCount}` : '';
   return `<article class="task task--${escapeHtml(task.lifecycle)}${overdue ? ' task--overdue' : ''}" data-task-id="${escapeHtml(task.id)}" data-revision="${task.revision}" role="listitem">
     <button class="task__check" type="button" role="checkbox" aria-checked="${checked}" data-action="${checkboxAction}" aria-label="${canRestore ? '恢复任务' : '完成任务'}">${checked ? '✓' : ''}</button>
     <div class="task__body">
       <button class="task__title" type="button" data-action="edit">${escapeHtml(task.title)}</button>
-      <span class="task__meta"><span class="task__status">${status}</span> · ${escapeHtml(taskMeta(task, today))}${task.starred ? ' · 已星标' : ''}${tagMarkup}</span>
+      <span class="task__meta"><span class="task__status">${status}</span> · ${escapeHtml(taskMeta(task, today))}${task.starred ? ' · 已星标' : ''}${tagMarkup}${resourceLabel}</span>
     </div>
     <details class="task__more">
       <summary aria-label="更多任务操作">更多</summary>
@@ -132,6 +134,7 @@ export function renderTaskList(container, tasks, {
   onError = () => {},
   emptyMessage = '这里暂时没有任务。',
   tags = [],
+  resourceCounts = new Map(),
 } = {}) {
   if (!Array.isArray(tasks) || tasks.length === 0) {
     // 月历格传空字符串表示"这一格不需要占位文案"。此时必须什么都不渲染，
@@ -141,7 +144,7 @@ export function renderTaskList(container, tasks, {
     return;
   }
 
-  container.innerHTML = `<div class="task-list" role="list">${tasks.map((task) => taskMarkup(task, today, tags)).join('')}</div>`;
+  container.innerHTML = `<div class="task-list" role="list">${tasks.map((task) => taskMarkup(task, today, tags, resourceCounts)).join('')}</div>`;
   container.onclick = async (event) => {
     const button = event.target.closest('button[data-action]');
     if (button === null) return;

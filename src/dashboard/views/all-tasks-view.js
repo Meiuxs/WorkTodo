@@ -10,6 +10,7 @@ const EMPTY_FILTERS = Object.freeze({
   tagId: '',
   priority: '',
   starred: '',
+  hasResources: '',
 });
 
 function categoryOptions(categories, selected) {
@@ -40,7 +41,7 @@ function queryFilters(filters) {
   };
 }
 
-export function createAllTasksView({ root, query, taskService, tagService, today, onAction, onEdit, onError }) {
+export function createAllTasksView({ root, query, taskService, tagService, today, onAction, onEdit, onError, getResourceCounts, resourceService }) {
   let filters = { ...EMPTY_FILTERS };
   let categories = [];
   let tags = [];
@@ -60,17 +61,24 @@ export function createAllTasksView({ root, query, taskService, tagService, today
       throw error;
     }
     if (signal?.aborted || !listRoot.isConnected || requestedVersion !== listVersion) return;
+    const resourceCounts = await getResourceCounts?.(tasks) ?? new Map();
+    const visibleTasks = filters.hasResources === 'true'
+      ? tasks.filter((task) => (resourceCounts.get(task.id) ?? 0) > 0)
+      : filters.hasResources === 'false'
+        ? tasks.filter((task) => (resourceCounts.get(task.id) ?? 0) === 0)
+        : tasks;
     const filterCount = root.querySelector('#filter-count');
     if (filterCount === null) return;
-    renderTaskList(listRoot, tasks, {
+    renderTaskList(listRoot, visibleTasks, {
       today: today(),
       onAction,
       onEdit,
       onError,
       tags,
+      resourceCounts,
       emptyMessage: '没有符合当前筛选条件的任务。',
     });
-    filterCount.textContent = `显示 ${tasks.length} 项`;
+    filterCount.textContent = `显示 ${visibleTasks.length} 项`;
   }
 
   function readFilters() {
@@ -103,6 +111,7 @@ export function createAllTasksView({ root, query, taskService, tagService, today
             <option value="">全部</option><option value="high" ${filters.priority === 'high' ? 'selected' : ''}>高</option><option value="medium" ${filters.priority === 'medium' ? 'selected' : ''}>中</option><option value="low" ${filters.priority === 'low' ? 'selected' : ''}>低</option><option value="none" ${filters.priority === 'none' ? 'selected' : ''}>无</option>
           </select></label>
           <label>星标<select name="starred"><option value="">全部</option><option value="true" ${filters.starred === 'true' ? 'selected' : ''}>仅星标</option><option value="false" ${filters.starred === 'false' ? 'selected' : ''}>未星标</option></select></label>
+          <label>资料<select name="hasResources"><option value="">全部</option><option value="true" ${filters.hasResources === 'true' ? 'selected' : ''}>有资料</option><option value="false" ${filters.hasResources === 'false' ? 'selected' : ''}>无资料</option></select></label>
           <button type="button" class="button-secondary" id="clear-filters">清空筛选</button>
         </form>
         <div id="all-tasks-list"></div>
