@@ -18,15 +18,24 @@ export class DashboardController {
   #subtaskService;
   #recurringService;
   #sendMessage;
+  #onRendered;
   #route = 'today';
   #renderAbortController = null;
 
-  constructor({ views, taskService = null, subtaskService = null, recurringService = null, sendMessage = async () => {} }) {
+  constructor({
+    views,
+    taskService = null,
+    subtaskService = null,
+    recurringService = null,
+    sendMessage = async () => {},
+    onRendered = null,
+  }) {
     this.#views = views;
     this.#taskService = taskService;
     this.#subtaskService = subtaskService;
     this.#recurringService = recurringService;
     this.#sendMessage = sendMessage;
+    this.#onRendered = onRendered;
   }
 
   get route() {
@@ -64,6 +73,11 @@ export class DashboardController {
     } catch (error) {
       if (renderAbortController.signal.aborted || error?.name === 'AbortError') return;
       throw error;
+    }
+    // 渲染成功后顺带刷新外壳上的附属信息（如侧栏数量角标）。
+    // 不 await：附属信息失败或变慢都不应该拖住导航。
+    if (this.#onRendered !== null) {
+      Promise.resolve().then(() => this.#onRendered()).catch(() => {});
     }
   }
 

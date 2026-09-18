@@ -27,6 +27,7 @@ import { createSettingsView } from './views/settings-view.js';
 import { RecurringService } from '../services/recurring-service.js';
 import { generateId } from '../shared/ids.js';
 import { createShortcutHandler } from './shortcuts.js';
+import { createNavBadges } from './nav-badges.js';
 import { ResourceRepository } from '../data/resource-repository.js';
 import { ResourceService } from '../services/resource-service.js';
 import { createResourcePicker } from './resource-picker.js';
@@ -241,12 +242,18 @@ const views = {
     onError,
   }),
 };
+const navBadges = createNavBadges({
+  container: document.querySelector('.sidebar'),
+  query,
+  today: () => toLocalDate(new Date()),
+});
 controller = new DashboardController({
   views,
   taskService,
   subtaskService,
   recurringService,
   sendMessage: (message) => chrome.runtime.sendMessage(message),
+  onRendered: () => navBadges.refresh(),
 });
 
 const resourcePicker = createResourcePicker({
