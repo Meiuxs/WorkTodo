@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WorkTodo · 工作记录卡片报表原型</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #e8f1ed;
+      --surface: #fbfaf7;
+      --surface-raised: #fffdf9;
+      --ink: #183331;
+      --muted: #596a67;
+      --line: #cfded8;
+      --line-strong: #6d9b89;
+      --teal: #276b6c;
+      --teal-soft: #e5f0ec;
+      --coral: #c23f22;
+      --coral-soft: #fae9e4;
+      --shadow-card: 0 1px 0 rgb(24 51 49 / 4%);
+      --shadow-float: 0 10px 28px rgb(24 51 49 / 10%);
+      --sidebar-w: 216px;
+      --radius: 10px;
+      --radius-sm: 7px;
+      --sp-1: 4px;
+      --sp-2: 8px;
+      --sp-3: 12px;
+      --sp-4: 16px;
+      --sp-5: 20px;
+      --sp-6: 24px;
+      --sp-7: 32px;
+      --font: "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible, summary:focus-visible {
+      outline: 3px solid rgb(27 100 102 / 28%);
+      outline-offset: 2px;
+    }
+    .app { display: flex; min-height: 100vh; }
+    .sidebar {
+      display: flex;
+      flex: 0 0 var(--sidebar-w);
+      flex-direction: column;
+      min-height: 100vh;
+      border-right: 1px solid var(--line);
+      background: rgb(232 241 237 / 78%);
+      padding: 24px 16px;
+    }
+    .brand { margin: 0 8px 28px; color: var(--teal); font-size: 20px; letter-spacing: .08em; }
+    .nav-group { margin-bottom: 24px; }
+    .nav-label { margin: 0 8px 6px; color: var(--muted); font-size: 12px; }
+    .nav-button {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-height: 42px;
+      border: 0;
+      border-left: 3px solid transparent;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      background: transparent;
+      color: var(--ink);
+      padding: 8px 10px;
+      text-align: left;
+    }
+    .nav-button:hover { background: var(--surface-raised); }
+    .nav-button[aria-current="page"] {
+      border-left-color: var(--teal);
+      background: var(--surface-raised);
+      color: var(--teal);
+      font-weight: 700;
+    }
+    .sidebar-footer { margin-top: auto; }
+    .content { flex: 1; min-width: 0; padding: 40px 48px 72px; }
+    .content-inner { width: min(100%, 1080px); margin: 0 auto; }
+    .page-kicker { margin: 0 0 2px; color: var(--teal); font-weight: 700; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 4px; font-size: 30px; letter-spacing: -.025em; line-height: 1.2; }
+    h2 { margin-bottom: 6px; font-size: 20px; line-height: 1.3; }
+    h3 { margin-bottom: 4px; font-size: 16px; line-height: 1.3; }
+    .page-description { margin-bottom: 28px; color: var(--muted); }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding: 16px 0;
+    }
+    .toolbar-label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
+    input[type="date"] {
+      min-height: 38px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-sm);
+      background: var(--surface-raised);
+      color: var(--ink);
+      padding: 6px 10px;
+    }
+    .segmented {
+      display: inline-flex;
+      overflow: hidden;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-sm);
+      background: var(--surface-raised);
+    }
+    .segmented button {
+      min-height: 38px;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      padding: 6px 16px;
+    }
+    .segmented button + button { border-left: 1px solid var(--line-strong); }
+    .segmented button[aria-pressed="true"] { background: var(--teal-soft); color: var(--teal); font-weight: 700; }
+    .range-text { color: var(--muted); white-space: nowrap; }
+    .report-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr);
+      gap: 16px;
+      margin-top: 24px;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface-raised);
+      box-shadow: var(--shadow-card);
+    }
+    .insight-card { display: grid; align-content: center; min-height: 186px; padding: 24px; }
+    .eyebrow { margin-bottom: 8px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+    .insight-card strong { display: block; margin-bottom: 6px; font-size: 24px; line-height: 1.25; }
+    .insight-card p { margin-bottom: 0; color: var(--muted); }
+    .rate-card { display: grid; align-content: center; gap: 10px; min-height: 186px; padding: 24px; }
+    .rate-value { color: var(--teal); font-size: 38px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+    .rate-track, .bar-track { height: 8px; overflow: hidden; border-radius: 999px; background: var(--line); }
+    .rate-track span, .bar-track span { display: block; height: 100%; border-radius: inherit; background: var(--teal); transition: width 180ms ease-out; }
+    .rate-note { color: var(--muted); font-size: 12px; }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      overflow: hidden;
+      margin-top: 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--line);
+    }
+    .metric { min-width: 0; background: var(--surface-raised); padding: 16px; }
+    .metric dt { color: var(--muted); font-size: 12px; }
+    .metric dd { margin: 2px 0 0; color: var(--teal); font-size: 24px; font-weight: 700; line-height: 1.25; font-variant-numeric: tabular-nums; }
+    .metric--alert dd { color: var(--coral); }
+    .section { margin-top: 32px; }
+    .section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+    .section-heading p { margin-bottom: 0; color: var(--muted); font-size: 12px; }
+    .rhythm-card { padding: 20px; }
+    .bars { display: grid; grid-template-columns: repeat(7, minmax(32px, 1fr)); gap: 12px; align-items: end; min-height: 178px; }
+    .day { display: grid; grid-template-rows: 1fr auto auto; gap: 6px; min-width: 0; text-align: center; }
+    .day-column { display: flex; align-items: end; justify-content: center; height: 120px; border-bottom: 1px solid var(--line); }
+    .day-column span { display: block; width: min(34px, 75%); min-height: 8px; border-radius: 6px 6px 0 0; background: var(--teal); }
+    .day--today .day-column span { background: var(--teal); }
+    .day--attention .day-column span { background: var(--coral); }
+    .day strong { font-size: 13px; font-variant-numeric: tabular-nums; }
+    .day small { color: var(--muted); font-size: 11px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 16px; color: var(--muted); font-size: 12px; }
+    .legend span::before { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--teal); content: ""; }
+    .legend span:last-child::before { background: var(--coral); }
+    .task-list { overflow: hidden; }
+    .task-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; }
+    .task-row + .task-row { border-top: 1px solid var(--line); }
+    .task-title { min-width: 0; }
+    .task-title strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .task-title small { color: var(--muted); }
+    .task-tag { flex: 0 0 auto; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); padding: 2px 8px; font-size: 11px; }
+    details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; color: var(--muted); font-size: 12px; }
+    summary { cursor: pointer; color: var(--ink); font-weight: 700; }
+    .empty-note { display: none; margin: 0; color: var(--muted); }
+    .daily-only { display: none; }
+    body[data-mode="daily"] .weekly-only { display: none; }
+    body[data-mode="daily"] .daily-only { display: block; }
+    body[data-mode="daily"] .daily-only.task-list { display: block; }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+    @media (max-width: 800px) {
+      .app { display: block; }
+      .sidebar { min-height: auto; padding: 16px; }
+      .brand { margin-bottom: 14px; }
+      .nav-group { display: inline; margin: 0; }
+      .nav-label, .sidebar-footer { display: none; }
+      .nav { display: flex; flex-wrap: wrap; gap: 4px; }
+      .nav-button { width: auto; min-height: 38px; border: 0; border-bottom: 2px solid transparent; border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+      .nav-button[aria-current="page"] { border-bottom-color: var(--teal); }
+      .content { padding: 28px 20px 48px; }
+    }
+    @media (max-width: 620px) {
+      .report-grid, .metrics { grid-template-columns: 1fr 1fr; }
+      .insight-card { grid-column: 1 / -1; min-height: 150px; }
+      .rate-card { min-height: 150px; }
+      .metric { padding: 12px; }
+      .metric dd { font-size: 20px; }
+      .toolbar { align-items: stretch; }
+      .toolbar > * { width: 100%; }
+      .segmented { display: flex; }
+      .segmented button { flex: 1; }
+      .range-text { text-align: right; }
+    }
+    @media (max-width: 430px) {
+      .report-grid, .metrics { grid-template-columns: 1fr; }
+      .rate-card { min-height: 140px; }
+      .bars { gap: 6px; }
+      .day-column span { width: 60%; }
+      .task-row { align-items: flex-start; }
+      .task-tag { display: none; }
+    }
+  </style>
+</head>
+<body data-mode="weekly">
+  <div class="app">
+    <aside class="sidebar" aria-label="主导航">
+      <p class="brand">WORKTODO</p>
+      <nav class="nav">
+        <div class="nav-group">
+          <p class="nav-label">今天</p>
+          <button class="nav-button" type="button">今天</button>
+        </div>
+        <div class="nav-group">
+          <p class="nav-label">计划</p>
+          <button class="nav-button" type="button">明天</button>
+          <button class="nav-button" type="button">本周</button>
+          <button class="nav-button" type="button">月历</button>
+        </div>
+        <div class="nav-group">
+          <p class="nav-label">回顾</p>
+          <button class="nav-button" type="button" aria-current="page">工作记录</button>
+        </div>
+      </nav>
+      <div class="sidebar-footer"><button class="nav-button" type="button">设置</button></div>
+    </aside>
+
+    <main class="content">
+      <div class="content-inner">
+        <p class="page-kicker">2026 年 9 月 · 第 3 周</p>
+        <h1>工作记录</h1>
+        <p class="page-description">先看这段时间的结论，再回到具体完成事项。</p>
+
+        <div class="toolbar">
+          <label class="toolbar-label">
+            <span>查看范围</span>
+            <input type="date" value="2026-09-18" aria-label="查看日期">
+          </label>
+          <div class="segmented" role="group" aria-label="记录范围">
+            <button type="button" data-mode="daily" aria-pressed="false">按日</button>
+            <button type="button" data-mode="weekly" aria-pressed="true">按周</button>
+          </div>
+          <span class="range-text" data-range>9 月 14 日至 9 月 20 日</span>
+        </div>
+
+        <section class="report-grid" aria-label="本段结论">
+          <article class="card insight-card">
+            <span class="eyebrow">本段结论</span>
+            <strong data-insight>已完成 6 项，工作在向前推进</strong>
+            <p data-insight-note>计划任务 8 项 · 其中 5 项按计划完成 · 延期 1 次</p>
+          </article>
+          <article class="card rate-card" aria-label="完成率 75%">
+            <span class="eyebrow">计划任务完成进度</span>
+            <span class="rate-value" data-rate>75%</span>
+            <div class="rate-track" aria-hidden="true"><span data-rate-bar style="width: 75%"></span></div>
+            <span class="rate-note" data-rate-note>按计划完成 5 / 8 项</span>
+          </article>
+        </section>
+
+        <dl class="metrics" aria-label="核心指标">
+          <div class="metric"><dt>实际完成</dt><dd data-metric="completed">6</dd></div>
+          <div class="metric"><dt>计划任务</dt><dd data-metric="planned">8</dd></div>
+          <div class="metric"><dt>计划完成</dt><dd data-metric="plannedCompleted">5</dd></div>
+          <div class="metric metric--alert"><dt>延期次数</dt><dd data-metric="postponed">1</dd></div>
+        </dl>
+
+        <section class="section weekly-only" aria-labelledby="rhythm-heading">
+          <div class="section-heading">
+            <div><h2 id="rhythm-heading">工作节奏</h2><p>用每天的完成量看变化，不只看一个百分比。</p></div>
+          </div>
+          <article class="card rhythm-card">
+            <div class="bars" aria-label="本周每日完成量">
+              <div class="day"><div class="day-column"><span style="height: 42%"></span></div><strong>2</strong><small>周一</small></div>
+              <div class="day"><div class="day-column"><span style="height: 22%"></span></div><strong>1</strong><small>周二</small></div>
+              <div class="day day--today"><div class="day-column"><span style="height: 62%"></span></div><strong>3</strong><small>今天</small></div>
+              <div class="day"><div class="day-column"><span style="height: 22%"></span></div><strong>1</strong><small>周四</small></div>
+              <div class="day day--attention"><div class="day-column"><span style="height: 8%"></span></div><strong>0</strong><small>周五</small></div>
+              <div class="day"><div class="day-column"><span style="height: 8%"></span></div><strong>0</strong><small>周六</small></div>
+              <div class="day"><div class="day-column"><span style="height: 8%"></span></div><strong>0</strong><small>周日</small></div>
+            </div>
+            <div class="legend"><span>已完成</span><span>有延期或待处理</span></div>
+          </article>
+        </section>
+
+        <section class="section daily-only" aria-labelledby="today-heading">
+          <div class="section-heading"><div><h2 id="today-heading">今日回顾</h2><p>日视图优先看完成事项，不强行展示趋势。</p></div></div>
+          <article class="card rhythm-card">
+            <p class="empty-note" data-daily-empty>今天还没有完成记录，先完成一件小事，再回来看看进度。</p>
+            <div data-daily-summary>今天完成 2 项，计划任务 3 项，其中 1 项延期。</div>
+          </article>
+        </section>
+
+        <section class="section" aria-labelledby="detail-heading">
+          <div class="section-heading">
+            <div><h2 id="detail-heading">实际完成明细</h2><p data-detail-count>本周共 6 项</p></div>
+          </div>
+          <article class="card task-list" data-task-list>
+            <div class="task-row"><div class="task-title"><strong>整理项目评审意见</strong><small>9 月 18 日 · 10:42 完成</small></div><span class="task-tag">项目</span></div>
+            <div class="task-row"><div class="task-title"><strong>确认下周会议材料</strong><small>9 月 18 日 · 09:18 完成</small></div><span class="task-tag">沟通</span></div>
+            <div class="task-row"><div class="task-title"><strong>补充季度工作记录</strong><small>9 月 17 日 · 16:30 完成</small></div><span class="task-tag">回顾</span></div>
+            <div class="task-row"><div class="task-title"><strong>更新产品问题清单</strong><small>9 月 16 日 · 15:06 完成</small></div><span class="task-tag">产品</span></div>
+            <div class="task-row"><div class="task-title"><strong>整理资料收集箱</strong><small>9 月 15 日 · 11:25 完成</small></div><span class="task-tag">整理</span></div>
+            <div class="task-row"><div class="task-title"><strong>准备周会同步内容</strong><small>9 月 14 日 · 17:12 完成</small></div><span class="task-tag">沟通</span></div>
+          </article>
+        </section>
+
+        <details>
+          <summary>查看统计口径</summary>
+          <p>实际完成按任务完成日期统计；计划任务按计划日期统计；计划完成指首次计划日期或当前计划日期落在本段内的完成任务。</p>
+        </details>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const data = {
+      weekly: { range: '9 月 14 日至 9 月 20 日', insight: '已完成 6 项，工作在向前推进', note: '计划任务 8 项 · 其中 5 项按计划完成 · 延期 1 次', rate: '75%', rateNote: '按计划完成 5 / 8 项', completed: '6', planned: '8', plannedCompleted: '5', postponed: '1', count: '本周共 6 项' },
+      daily: { range: '9 月 18 日 · 星期五', insight: '今天完成 2 项', note: '计划任务 3 项 · 有 1 项延期', rate: '67%', rateNote: '按计划完成 2 / 3 项', completed: '2', planned: '3', plannedCompleted: '2', postponed: '1', count: '今天共 2 项' },
+    };
+    const body = document.body;
+    const setText = (selector, value) => { const node = document.querySelector(selector); if (node) node.textContent = value; };
+    const update = (mode) => {
+      body.dataset.mode = mode;
+      const current = data[mode];
+      document.querySelectorAll('[data-mode]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.mode === mode)));
+      setText('[data-range]', current.range);
+      setText('[data-insight]', current.insight);
+      setText('[data-insight-note]', current.note);
+      setText('[data-rate]', current.rate);
+      setText('[data-rate-note]', current.rateNote);
+      setText('[data-detail-count]', current.count);
+      document.querySelector('[data-rate-bar]').style.width = current.rate;
+      setText('[data-metric="completed"]', current.completed);
+      setText('[data-metric="planned"]', current.planned);
+      setText('[data-metric="plannedCompleted"]', current.plannedCompleted);
+      setText('[data-metric="postponed"]', current.postponed);
+    };
+    document.querySelectorAll('[data-mode]').forEach((button) => button.addEventListener('click', () => update(button.dataset.mode)));
+  </script>
+</body>
+</html>
