@@ -12,7 +12,8 @@
         <span id="today-label">今日</span>
         <button class="popup__open-dashboard" id="open-dashboard" type="button">↗ 工作台</button>
       </header>
-      <h1>今天要做什么</h1>
+      <h1>记下下一件事</h1>
+      <p class="popup__capture-label">快速记录 <span>只写标题，稍后再整理</span></p>
       <div class="popup__summary" aria-label="今日完成摘要">
         <span id="summary-text">正在加载…</span><span class="progress" aria-hidden="true"><span id="progress-bar"></span></span>
       </div>
@@ -20,13 +21,13 @@
         <h2 id="overdue-heading"></h2><ul class="task-list" id="overdue-list"></ul>
       </section>
       <section class="task-section" aria-labelledby="focus-heading">
-        <h2 id="focus-heading">重点事项</h2><ul class="task-list" id="focus-list"></ul>
+        <h2 id="focus-heading">今天要推进</h2><ul class="task-list" id="focus-list"></ul>
         <p class="empty" id="empty-state" hidden>今天暂时没有待办，先记录一件要做的事。</p>
       </section>
       <form class="popup__form" id="quick-create-form">
         <label class="sr-only" for="quick-title">记录一个新事项</label>
         <div class="popup__input-row">
-          <input id="quick-title" name="title" autocomplete="off" maxlength="200" placeholder="记录一个新事项，按 Enter 保存……" required>
+          <input id="quick-title" name="title" autocomplete="off" maxlength="200" placeholder="写下下一件要推进的事……" required>
           <button class="popup__submit" type="submit" aria-label="添加任务">＋</button>
         </div>
         <div class="popup__date-options" aria-label="计划日期">

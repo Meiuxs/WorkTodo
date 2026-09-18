@@ -10,24 +10,38 @@
     <a class="skip-link" href="#view-root">跳到主要内容</a>
     <div class="app" hidden>
       <aside class="sidebar">
-        <p class="brand">WORKTODO</p>
+        <div class="brand-lockup">
+          <p class="brand">WORKTODO</p>
+          <p class="brand-note">记录 · 推进 · 回看</p>
+        </div>
         <nav class="nav" aria-label="工作台导航">
-          <p class="nav__label">今天</p>
-          <button type="button" data-route="today" aria-current="page">今天</button>
-          <p class="nav__label">计划</p>
-          <button type="button" data-route="tomorrow">明天</button>
-          <button type="button" data-route="week">本周</button>
-          <button type="button" data-route="month">月历</button>
-          <p class="nav__label">任务</p>
-          <button type="button" data-route="inbox">收集箱</button>
-          <button type="button" data-route="resources">资料收集箱</button>
-          <button type="button" data-route="all">全部任务</button>
-          <button type="button" data-route="completed">已完成</button>
-          <button type="button" data-route="trash">回收站</button>
-          <p class="nav__label">回顾</p>
-          <button type="button" data-route="history">工作记录</button>
+          <div class="nav__group">
+            <p class="nav__label">今天</p>
+            <button type="button" data-route="today" aria-current="page">今天</button>
+          </div>
+          <div class="nav__group">
+            <p class="nav__label">计划</p>
+            <button type="button" data-route="tomorrow">明天</button>
+            <button type="button" data-route="week">本周</button>
+            <button type="button" data-route="month">月历</button>
+          </div>
+          <div class="nav__group">
+            <p class="nav__label">任务</p>
+            <button type="button" data-route="inbox">收集箱</button>
+            <button type="button" data-route="resources">资料收集箱</button>
+            <button type="button" data-route="all">全部任务</button>
+            <button type="button" data-route="completed">已完成</button>
+            <button type="button" data-route="trash">回收站</button>
+          </div>
+          <div class="nav__group">
+            <p class="nav__label">回顾</p>
+            <button type="button" data-route="history">工作记录</button>
+          </div>
         </nav>
-        <button class="nav__settings" type="button" data-route="settings">设置</button>
+        <div class="nav__footer">
+          <p class="nav__label">系统</p>
+          <button class="nav__settings" type="button" data-route="settings">设置</button>
+        </div>
       </aside>
 
       <main class="content">
@@ -39,23 +53,31 @@
           </div>
         </header>
 
-        <section class="view-root" id="view-root" tabindex="-1" aria-live="polite"></section>
-
         <form class="quick-add" id="quick-add">
-          <label class="sr-only" for="quick-add-title">记录一个新事项</label>
-          <input id="quick-add-title" maxlength="200" autocomplete="off" placeholder="记录一个新事项，按 Enter 保存……" required>
-          <label class="sr-only" for="quick-add-date">计划日期</label>
-          <select id="quick-add-date">
-            <option value="inbox">收集箱</option>
-            <option value="today">今天</option>
-            <option value="tomorrow">明天</option>
-            <option value="custom">指定日期</option>
-          </select>
-          <input class="quick-add__custom" id="quick-add-custom" type="date" hidden aria-label="指定计划日期">
-          <button type="submit" class="button-primary">添加</button>
-          <button type="button" class="button-secondary" id="quick-add-more">更多字段</button>
+          <div class="quick-add__lead">
+            <p class="eyebrow">快速记录</p>
+            <span>只写标题，稍后再整理</span>
+          </div>
+          <div class="quick-add__row">
+            <label class="sr-only" for="quick-add-title">记录一个新事项</label>
+            <input id="quick-add-title" maxlength="200" autocomplete="off" placeholder="写下下一件要推进的事……" required>
+            <button type="submit" class="button-primary" aria-label="添加">记录</button>
+          </div>
+          <div class="quick-add__options">
+            <label class="sr-only" for="quick-add-date">计划日期</label>
+            <select id="quick-add-date">
+              <option value="inbox">先放收集箱</option>
+              <option value="today">安排今天</option>
+              <option value="tomorrow">安排明天</option>
+              <option value="custom">指定日期</option>
+            </select>
+            <input class="quick-add__custom" id="quick-add-custom" type="date" hidden aria-label="指定计划日期">
+            <button type="button" class="button-secondary" id="quick-add-more" aria-label="更多字段">补充详情</button>
+          </div>
         </form>
         <p class="form-message" id="quick-add-message" role="alert"></p>
+
+        <section class="view-root" id="view-root" tabindex="-1" aria-live="polite"></section>
       </main>
     </div>
 
@@ -66,12 +88,14 @@
           <button type="button" class="icon-button" data-editor-close aria-label="关闭任务编辑器">×</button>
         </header>
         <div class="drawer-body">
+          <p class="drawer-section-label">先确定</p>
           <label class="field">任务名称<input name="title" maxlength="200" required autofocus></label>
           <p class="field-hint">先填标题和计划日期，其他可以稍后补。</p>
           <div class="field-grid">
             <label class="field">计划日期<input name="scheduledDate" type="date"></label>
             <label class="field">优先级<select name="priority"><option value="none">无</option><option value="low">低</option><option value="medium">中</option><option value="high">高</option></select></label>
           </div>
+          <p class="drawer-section-label drawer-section-label--spaced">组织任务</p>
           <label class="field">分类<select name="categoryId"></select></label>
           <fieldset class="recurring-picker" data-recurring-picker>
             <legend>重复任务</legend>
@@ -97,6 +121,7 @@
             <div class="editor-resource-list" data-resource-list></div>
           </section>
           <label class="check-field"><input name="starred" type="checkbox"> 标记为星标</label>
+          <p class="drawer-section-label drawer-section-label--spaced">需要时再补充</p>
           <details class="editor-more">
             <summary>更多信息</summary>
             <label class="field">描述<textarea name="description" rows="4" maxlength="10000"></textarea></label>

@@ -987,3 +987,121 @@ input::placeholder { color: var(--muted); }
 @media (min-width: 1600px) {
   .task-editor { width: min(460px, 100%); }
 }
+
+/* ============ 线性工作台重构 ============
+   以阅读顺序和动作优先级组织页面：主骨架、快速记录、摘要和任务列表都采用
+   单列流与 Flex 排列，不使用规则卡片矩阵，减少首屏扫描成本。 */
+.app { display: flex; align-items: stretch; }
+.sidebar { flex: 0 0 var(--sidebar-w); }
+.content { flex: 1 1 auto; }
+
+.brand-lockup { display: flex; flex-direction: column; gap: var(--sp-1); margin: 0 var(--sp-3); }
+.brand { margin: 0; }
+.brand-note { margin: 0; color: var(--muted); font-size: var(--fs-caption); }
+.nav { display: flex; flex-direction: column; gap: var(--sp-6); }
+.nav__group { display: flex; flex-direction: column; gap: var(--sp-1); }
+.nav__label { margin: 0 var(--sp-3) var(--sp-2); }
+.nav__footer { margin-top: auto; }
+.nav__footer .nav__label { margin-top: 0; }
+
+.workspace-header { margin-bottom: var(--sp-5); }
+.workspace-header h1 { letter-spacing: -.025em; }
+
+.quick-add {
+  position: static;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-top: 0;
+  margin-bottom: var(--sp-7);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface-raised);
+  box-shadow: none;
+  padding: var(--sp-4) var(--sp-5);
+}
+.quick-add__lead { display: flex; flex: 0 0 auto; flex-direction: column; gap: var(--sp-1); min-width: 132px; }
+.quick-add__lead span { color: var(--muted); font-size: var(--fs-caption); }
+.quick-add__row { display: flex; flex: 1 1 340px; min-width: min(100%, 280px); gap: var(--sp-3); }
+.quick-add__row input { flex: 1 1 auto; min-width: 0; background: var(--surface); }
+.quick-add__row .button-primary { flex: 0 0 auto; min-width: 72px; }
+.quick-add__options { display: flex; align-items: center; flex: 0 0 auto; gap: var(--sp-2); }
+.quick-add__options select { width: auto; min-width: 120px; background: var(--surface); }
+.quick-add__options .quick-add__custom { width: 148px; }
+.quick-add__options .button-secondary { white-space: nowrap; }
+
+.today-focus {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: var(--sp-7);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: var(--sp-6) 0;
+}
+.today-summary { display: flex; flex: 1 1 420px; align-items: stretch; gap: clamp(var(--sp-6), 5vw, var(--sp-10)); border: 0; padding: 0; }
+.today-summary__metric { display: flex; flex: 0 0 auto; flex-direction: column; gap: var(--sp-1); }
+.today-summary__metric strong { margin-top: var(--sp-1); }
+.progress-block { display: flex; flex: 1 1 220px; flex-direction: column; justify-content: center; gap: var(--sp-3); min-width: 180px; max-width: none; }
+.today-summary__next { display: flex; flex: 1 1 260px; flex-direction: column; justify-content: center; gap: var(--sp-2); min-width: 240px; border-left: 1px solid var(--line); padding-left: var(--sp-7); }
+.today-summary__next strong { color: var(--ink); font-size: var(--fs-lead); }
+.today-summary__next > span:last-child { color: var(--muted); }
+
+.view-section { margin-top: var(--sp-8); padding-top: var(--sp-6); }
+.section-heading { margin-bottom: var(--sp-5); }
+.task-list { background: transparent; }
+.task { min-height: 64px; }
+.task__body { padding: var(--sp-4) 0; }
+.task__check { width: 26px; height: 26px; }
+.completed-fold { margin-top: var(--sp-8); }
+
+.week-grid { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-7); }
+.week-day { flex: 1 1 340px; }
+.week-grid--single { display: block; }
+
+.filters, .resource-toolbar { display: flex; flex-wrap: wrap; align-items: end; }
+.filters > label { flex: 1 1 150px; }
+.filters .filter-search { flex: 2 1 260px; }
+.history-report-top { display: flex; flex-wrap: wrap; align-items: stretch; }
+.history-insight { flex: 1 1 360px; }
+.history-rate { flex: 1 1 220px; }
+.history-report-top { gap: var(--sp-8); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: var(--sp-6) 0; }
+.history-insight, .history-rate { border: 0; border-radius: 0; background: transparent; padding: 0; }
+.history-breakdown { border-right: 0; border-left: 0; border-radius: 0; background: transparent; padding-inline: 0; }
+.history-bars, .resources-list, .category-list, .editor-resource-list, .resource-existing-list { display: flex; flex-direction: column; }
+.history-bar, .import-mode { display: flex; flex-direction: column; }
+.field-grid { display: flex; flex-wrap: wrap; }
+.field-grid > .field { flex: 1 1 180px; }
+.subtask-create { display: flex; flex-wrap: wrap; align-items: end; }
+.subtask-create label { flex: 0 0 100%; }
+.subtask-create input { flex: 1 1 200px; }
+.drawer-body { display: block; }
+.task-editor form { display: flex; flex-direction: column; }
+.drawer-body { flex: 1 1 auto; }
+.drawer-section-label { margin: 0 0 var(--sp-3); color: var(--teal); font-size: var(--fs-caption); font-weight: 700; letter-spacing: .04em; }
+.drawer-section-label--spaced { margin-top: var(--sp-7); }
+.drawer-section-label + .field { margin-top: 0; }
+.drawer-section-label + .field-grid { margin-top: var(--sp-4); }
+.drawer-section-label ~ .editor-more { margin-top: var(--sp-3); }
+
+@media (max-width: 680px) {
+  .app { display: block; }
+  .sidebar { flex: none; }
+  .brand-lockup { margin: 0 0 var(--sp-2); }
+  .nav { flex-direction: row; flex-wrap: wrap; gap: var(--sp-2); }
+  .nav__group { flex: 1 1 140px; }
+  .nav__group .nav__label, .nav__footer .nav__label { display: none; }
+  .nav button { flex: 1 1 auto; border-left: 0; border-bottom: 2px solid transparent; border-radius: var(--r-sm) var(--r-sm) 0 0; padding: var(--sp-2) var(--sp-3); text-align: center; }
+  .nav__footer { margin-top: var(--sp-2); }
+  .nav__settings { width: 100%; margin-top: 0; text-align: center; }
+  .content { padding: var(--sp-7) var(--sp-5) var(--sp-7); }
+  .quick-add { align-items: stretch; padding: var(--sp-4); }
+  .quick-add__lead, .quick-add__row, .quick-add__options { flex-basis: 100%; }
+  .quick-add__options { flex-wrap: wrap; }
+  .quick-add__options select, .quick-add__options .quick-add__custom, .quick-add__options .button-secondary { flex: 1 1 140px; width: auto; }
+  .today-focus { gap: var(--sp-5); }
+  .today-summary { flex-basis: 100%; gap: var(--sp-6); }
+  .today-summary__next { flex-basis: 100%; min-width: 0; border-top: 1px solid var(--line); border-left: 0; padding-top: var(--sp-5); padding-left: 0; }
+  .history-insight, .history-rate { flex-basis: 100%; }
+}
