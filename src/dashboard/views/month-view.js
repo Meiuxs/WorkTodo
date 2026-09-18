@@ -65,8 +65,9 @@ export function createMonthView({
             ${week.map((date) => {
               const inMonth = date >= calendar.startDate && date <= calendar.endDate;
               const isToday = date === currentDate;
-              return `<section class="month-day${inMonth ? '' : ' month-day--muted'}${isToday ? ' month-day--today' : ''}" role="gridcell"${isToday ? ' aria-current="date"' : ''} data-date="${date}">
-                <h3>${formatLocalDay(date)}</h3>
+              const taskCount = (calendar.byDate[date] ?? []).length;
+              return `<section class="month-day${inMonth ? '' : ' month-day--muted'}${isToday ? ' month-day--today' : ''}${taskCount > 0 ? ' month-day--planned' : ''}" role="gridcell"${isToday ? ' aria-current="date"' : ''} data-date="${date}">
+                <div class="month-day__header"><h3>${formatLocalDay(date)}</h3>${taskCount > 0 ? `<span class="month-day__count">${taskCount}</span>` : ''}</div>
                 <div class="month-day__tasks"></div>
               </section>`;
             }).join('')}

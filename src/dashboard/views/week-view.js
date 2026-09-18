@@ -26,6 +26,7 @@ export function createWeekView({
 
       if (signal?.aborted) return;
       const allTasks = result.days.flatMap((date) => result.byDate[date] ?? []);
+      const plannedDays = result.days.filter((date) => (result.byDate[date] ?? []).length > 0);
       const resourceCounts = await getResourceCounts?.(allTasks) ?? new Map();
       // 起止同日时只写一次日期，避免出现「9月19日 至 9月19日」。
       const range = result.startDate === result.endDate
@@ -35,20 +36,26 @@ export function createWeekView({
         <div class="section-heading">
           <div>
             <h2 id="week-heading">${singleDate ? '明天计划' : '本周计划'} · ${range}</h2>
-            <p>只显示有计划的日期。完成、取消和删除规则与今天页一致。</p>
+            <p>${plannedDays.length === 0 ? '当前没有安排，先记录一件要推进的事。' : `显示 ${plannedDays.length} 个有计划的日期，共 ${allTasks.length} 项。`}完成、取消和删除规则与今天页一致。</p>
           </div>
         </div>
-        <div class="week-grid"></div>
+        <div class="week-grid${plannedDays.length === 0 ? ' week-grid--empty' : ''}"></div>
       </section>`;
 
       const grid = root.querySelector('.week-grid');
-      if (result.days.length === 1) grid.classList.add('week-grid--single');
-      for (const date of result.days) {
+      if (plannedDays.length === 0) {
+        grid.innerHTML = `<div class="week-empty" role="status"><strong>${singleDate ? '明天还没有计划' : '本周还没有计划'}</strong><span>用下方快速记录，先把下一步写下来。</span></div>`;
+        return;
+      }
+      if (plannedDays.length === 1) grid.classList.add('week-grid--single');
+      for (const date of plannedDays) {
+        const tasks = result.byDate[date] ?? [];
+        const isToday = date === anchor;
         const section = document.createElement('section');
-        section.className = 'week-day';
-        section.innerHTML = `<h3>${formatLocalDayWithWeekday(date)}</h3><div class="week-day__tasks"></div>`;
+        section.className = `week-day${isToday ? ' week-day--today' : ''}`;
+        section.innerHTML = `<div class="week-day__header"><div><h3>${formatLocalDayWithWeekday(date)}</h3><span class="week-day__count">${tasks.length} 项计划</span></div>${isToday ? '<span class="week-day__focus">今天</span>' : ''}</div><div class="week-day__tasks"></div>`;
         grid.append(section);
-        renderTaskList(section.querySelector('.week-day__tasks'), result.byDate[date] ?? [], {
+        renderTaskList(section.querySelector('.week-day__tasks'), tasks, {
           today: anchor,
           onAction,
           onEdit,

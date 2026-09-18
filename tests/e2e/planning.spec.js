@@ -123,6 +123,18 @@ test('本周视图展示今天所在周的计划任务', async ({ extension }) =
   await expect(page.getByRole('button', { name: '本周计划事项' })).toBeVisible();
 });
 
+test('本周视图只展示有计划的日期卡片', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.getByLabel('记录一个新事项').fill('只展示计划日期');
+  await page.locator('#quick-add-date').selectOption('today');
+  await page.getByRole('button', { name: '添加', exact: true }).click();
+
+  await page.getByRole('button', { name: '本周', exact: true }).click();
+  await expect(page.locator('.week-day')).toHaveCount(1);
+  await expect(page.locator('.week-empty')).toHaveCount(0);
+  await expect(page.getByText('这一天没有计划。')).toHaveCount(0);
+});
+
 test('月历展示当前月份任务并支持切换月份', async ({ extension }) => {
   const page = await openDashboard(extension);
   await page.getByLabel('记录一个新事项').fill('月历任务');
