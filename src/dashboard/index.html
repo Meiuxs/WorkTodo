@@ -3,6 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#e8f1ed" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#10201f" media="(prefers-color-scheme: dark)">
     <title>WorkTodo 工作台</title>
     <link rel="stylesheet" href="./index.css">
   </head>
@@ -15,19 +17,20 @@
           <p class="brand-note">记录 · 推进 · 回看</p>
         </div>
         <nav class="nav" aria-label="工作台导航">
-          <div class="nav__group">
-            <p class="nav__label">今天</p>
-            <button type="button" data-route="today" aria-current="page">今天</button>
+          <div class="nav__group nav__group--primary">
+            <button type="button" data-route="today" aria-current="page" aria-keyshortcuts="t" aria-describedby="nav-badge-today-desc">今天<span class="nav__aside"><span class="nav__badge" data-nav-badge="today" data-tone="alert" hidden aria-hidden="true"></span><kbd class="nav__kbd" aria-hidden="true">T</kbd></span></button>
+            <span class="sr-only" id="nav-badge-today-desc" data-nav-badge-desc="today"></span>
           </div>
           <div class="nav__group">
             <p class="nav__label">计划</p>
             <button type="button" data-route="tomorrow">明天</button>
-            <button type="button" data-route="week">本周</button>
-            <button type="button" data-route="month">月历</button>
+            <button type="button" data-route="week" aria-keyshortcuts="w">本周<span class="nav__aside"><kbd class="nav__kbd" aria-hidden="true">W</kbd></span></button>
+            <button type="button" data-route="month" aria-keyshortcuts="m">月历<span class="nav__aside"><kbd class="nav__kbd" aria-hidden="true">M</kbd></span></button>
           </div>
           <div class="nav__group">
             <p class="nav__label">任务</p>
-            <button type="button" data-route="inbox">收集箱</button>
+            <button type="button" data-route="inbox" aria-describedby="nav-badge-inbox-desc">收集箱<span class="nav__aside"><span class="nav__badge" data-nav-badge="inbox" hidden aria-hidden="true"></span></span></button>
+            <span class="sr-only" id="nav-badge-inbox-desc" data-nav-badge-desc="inbox"></span>
             <button type="button" data-route="resources">资料收集箱</button>
             <button type="button" data-route="all">全部任务</button>
             <button type="button" data-route="completed">已完成</button>

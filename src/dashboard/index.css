@@ -33,24 +33,31 @@
 }
 
 /* 导航项多、视口矮时侧边栏内部滚动，不然底部条目点不到。 */
+/* 列布局在下方"线性工作台重构"里定义，这里只管滚动与溢出。 */
 .nav {
-  display: grid;
-  gap: var(--sp-1);
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   scrollbar-gutter: stable;
 }
 
+/* 分组标签（计划 / 任务 / 回顾）是目录级信息：
+   比条目更小、更轻、更灰，只负责分隔，不与条目争视觉重量。 */
 .nav__label {
-  margin: var(--sp-5) var(--sp-3) var(--sp-2);
+  margin: 0 var(--sp-3) var(--sp-2);
   color: var(--muted);
   font-size: var(--fs-nav-label);
-  font-weight: 700;
-  letter-spacing: 0;
+  font-weight: 400;
+  letter-spacing: var(--tracking-caps);
 }
 
+/* 未选中的条目用常规字重：侧栏十来个条目全部加粗会互相抵消，
+   700 留给"当前所在页面"，与令牌里"强调专属 700"的约定一致。 */
 .nav button,
 .nav__settings {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
   min-height: 44px;
   border: 0;
   border-left: 3px solid transparent;
@@ -59,8 +66,7 @@
   color: var(--ink);
   padding: var(--sp-3) var(--sp-3);
   font-size: var(--fs-nav-item);
-  font-weight: 700;
-  text-align: left;
+  font-weight: 400;
 }
 
 .nav button:hover,
@@ -68,15 +74,49 @@
 .nav button[aria-current="page"],
 .nav__settings[aria-current="page"] {
   border-left-color: var(--teal);
-  background: var(--teal-soft);
+  background: var(--nav-active);
   color: var(--teal);
   font-weight: 700;
 }
 
-.nav__settings {
-  margin-top: auto;
-  border-left: 0;
+/* 条目尾部成组靠右：数量角标在前，快捷键在后。 */
+.nav__aside { display: flex; align-items: center; gap: var(--sp-2); margin-left: auto; }
+
+/* 数量角标：只做"扫一眼"的提示。数字本身已在目标页面标题里播报，
+   所以视觉上是装饰，读屏靠按钮上的 aria-describedby 取到同一句话。 */
+.nav__badge {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--badge-bg);
+  color: var(--badge-ink);
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.nav__badge[data-tone="alert"] { background: var(--badge-alert-bg); color: var(--badge-alert-ink); }
+
+/* 快捷键提示：只标已有键盘快捷键的入口，不占可访问名称（按钮上用 aria-keyshortcuts）。 */
+.nav__kbd {
+  display: inline-grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 1px solid var(--line);
   border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0 var(--sp-1);
+  font-family: inherit;
+  font-size: var(--fs-micro);
+}
+
+/* 设置与普通条目共用同一条左侧选中标记（吸底由 .nav__footer 负责）。 */
+.nav__settings {
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
   padding-inline: var(--sp-3);
 }
 
@@ -113,7 +153,7 @@
   margin: 0;
   font-size: var(--fs-h1);
   line-height: var(--lh-display);
-  letter-spacing: var(--tracking-tight);
+  letter-spacing: var(--tracking-display);
 }
 .content__subtitle {
   margin: var(--sp-2) 0 0;
@@ -201,7 +241,7 @@
 .progress-block progress {
   display: block;
   width: 100%;
-  height: 8px;
+  height: var(--track-h);
   border: 0;
   border-radius: var(--r-pill);
   background: var(--line);
@@ -287,7 +327,7 @@
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   background: var(--surface-raised);
-  box-shadow: 0 2px 0 rgb(24 51 49 / 3%);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
 }
 .week-day__header {
@@ -304,11 +344,13 @@
   font-size: var(--fs-h3);
   line-height: var(--lh-heading);
 }
-.week-day__count { display: block; margin-top: var(--sp-1); color: var(--muted); font-size: var(--fs-caption); }
+.week-day__count { display: block; margin-top: var(--sp-1); color: var(--muted); font-size: var(--fs-caption); font-variant-numeric: tabular-nums; }
 .week-day__focus { border-radius: var(--r-pill); background: var(--teal-soft); color: var(--teal); padding: var(--sp-1) var(--sp-3); font-size: var(--fs-caption); font-weight: 700; white-space: nowrap; }
 .week-day--today { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal-soft); }
 .week-day__tasks { padding: 0 var(--sp-5); }
 .week-day__tasks .task-list { border-top: 0; }
+/* 卡片内最后一行不再画线：它和卡片自身的下边框贴在一起会叠成 2px。 */
+.week-day__tasks .task:last-child { border-bottom: 0; }
 .week-grid--empty { display: block; }
 .week-empty { display: grid; gap: var(--sp-2); border: 1px dashed var(--line-strong); border-radius: var(--r-md); background: var(--surface-raised); padding: var(--sp-8); }
 .week-empty strong { font-size: var(--fs-lead); }
@@ -355,14 +397,14 @@
 .month-day--muted .task__title { color: var(--muted); }
 .month-day__header { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); min-height: 24px; margin-bottom: var(--sp-2); }
 .month-day h3 { margin: 0; color: currentColor; font-size: var(--fs-caption); }
-.month-day__count { display: inline-grid; min-width: 20px; height: 20px; place-items: center; border-radius: var(--r-pill); background: var(--teal-soft); color: var(--teal); font-size: 11px; font-weight: 700; }
+.month-day__count { display: inline-grid; min-width: 20px; height: 20px; place-items: center; border-radius: var(--r-pill); background: var(--teal-soft); color: var(--teal); font-size: var(--fs-micro); font-weight: 700; font-variant-numeric: tabular-nums; }
 .month-day--planned { box-shadow: inset 0 2px 0 var(--teal-soft); }
 /* 今天：整格染色 + 内描边，30 天里一眼能找到当天。 */
 .month-day--today { background: var(--teal-soft); box-shadow: inset 0 0 0 2px var(--teal); }
 .month-day--today h3 { color: var(--teal); font-weight: 700; }
 .month-day .task-list { border-top: 0; }
 .month-day .task { position: relative; grid-template-columns: 18px minmax(0, 1fr); gap: var(--sp-1); min-height: 34px; }
-.month-day .task__check { width: 18px; height: 18px; border-width: 1px; font-size: 11px; }
+.month-day .task__check { width: 18px; height: 18px; border-width: 1px; font-size: var(--fs-micro); }
 .month-day .task__body { padding: var(--sp-1) 0; }
 /* 格子只有 140px 左右，"更多"若占一列，标题就只剩两个字的位置。
    把它移出文档流、悬停或键盘聚焦时浮出，标题拿回整行宽度。 */
@@ -398,7 +440,7 @@
 .task__more > summary {
   display: inline-flex;
   align-items: center;
-  min-height: 30px;
+  min-height: var(--control-h-sm);
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   color: var(--muted);
@@ -414,15 +456,17 @@
 .task__menu {
   position: absolute;
   z-index: 8;
-  top: calc(100% + 6px);
+  top: calc(100% + var(--sp-2));
   right: 0;
   display: grid;
   width: max-content;
   min-width: 184px;
   max-width: min(330px, calc(100vw - 32px));
-  /* 菜单加日期输入后接近一屏高，必须限高可滚，否则底部"自定义日期"点不到。 */
+  /* 菜单加日期输入后接近一屏高，必须限高可滚，否则底部"自定义日期"点不到。
+     contain 让菜单内滚动到头后不再带着整个页面一起滚。 */
   max-height: min(70vh, 520px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   gap: var(--sp-1);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
@@ -550,6 +594,18 @@ input::placeholder { color: var(--muted); }
 .button-danger { background: var(--coral); color: var(--surface-raised); }
 .button-danger:hover { background: var(--coral); filter: brightness(.92); }
 
+/* 实心/描边按钮的禁用态：退回表层底色并降到 muted，文字依然看得清。
+   不用半透明是因为半透明会把底色和文字一起压低，深色主题下糊成一团。 */
+.button-primary:disabled,
+.button-secondary:disabled,
+.button-danger:disabled,
+.quick-add button:disabled {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  opacity: 1;
+}
+
 /* 与输入框同排的按钮统一高度，否则 38px 的输入框旁边站着一个 30px 的按钮。 */
 .category-create button,
 .tag-picker__create button,
@@ -567,8 +623,12 @@ input::placeholder { color: var(--muted); }
 .form-message:empty { display: none; }
 
 /* ============ 标签选择 ============ */
-.tag-picker { margin: var(--sp-5) 0 0; border: 0; padding: 0; }
-.tag-picker legend {
+/* 重复任务和标签都是"分组选项"，统一去掉浏览器默认 fieldset 边框，
+   靠 legend 标题和间距分层，避免抽屉里出现两种分组外观。 */
+.tag-picker,
+.recurring-picker { margin: var(--sp-5) 0 0; border: 0; padding: 0; }
+.tag-picker legend,
+.recurring-picker legend {
   margin-bottom: var(--sp-2);
   color: var(--ink);
   font-size: var(--fs-ui);
@@ -662,7 +722,7 @@ input::placeholder { color: var(--muted); }
 .history-insight strong { font-size: var(--fs-h2); line-height: var(--lh-heading); }
 .history-insight > span:last-child, .history-rate > span:last-child { color: var(--muted); font-size: var(--fs-caption); }
 .history-rate__value { color: var(--teal); font-size: var(--fs-h1); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-.history-rate__track, .history-bar__track { height: 8px; overflow: hidden; border-radius: var(--r-pill); background: var(--line); }
+.history-rate__track, .history-bar__track { height: var(--track-h); overflow: hidden; border-radius: var(--r-pill); background: var(--line); }
 .history-rate__track span, .history-bar__track span { display: block; height: 100%; border-radius: inherit; background: var(--teal); }
 .history-breakdown { margin-top: var(--sp-6); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-raised); padding: var(--sp-5); }
 .history-breakdown__heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-4); }
@@ -695,7 +755,9 @@ input::placeholder { color: var(--muted); }
 .resources-list { display: grid; gap: var(--sp-3); }
 .resource-card { display: flex; justify-content: space-between; gap: var(--sp-5); border-top: 1px solid var(--line); padding: var(--sp-4) 0; }
 .resource-card h3 { margin: var(--sp-1) 0; }
-.resource-card__type, .resource-card__source, .resource-card__note { margin: var(--sp-1) 0 0; color: var(--muted); font-size: var(--fs-caption); }
+/* 长链接和长文件名必须能换行，否则资料卡片会把整页撑出横向滚动条。 */
+.resource-card > div { min-width: 0; }
+.resource-card__type, .resource-card__source, .resource-card__note { margin: var(--sp-1) 0 0; color: var(--muted); font-size: var(--fs-caption); overflow-wrap: anywhere; }
 .resource-card__type { color: var(--teal); font-weight: 700; }
 .resource-card__actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); color: var(--muted); font-size: var(--fs-caption); }
 @media (max-width: 700px) {
@@ -717,7 +779,7 @@ input::placeholder { color: var(--muted); }
   background: var(--line);
 }
 
-.metrics div { background: var(--surface); padding: var(--sp-4) var(--sp-4) var(--sp-5); }
+.metrics div { min-width: 0; background: var(--surface); padding: var(--sp-4) var(--sp-4) var(--sp-5); }
 .metrics dt { color: var(--muted); font-size: var(--fs-caption); line-height: var(--lh-caption); }
 .metrics dd {
   margin: var(--sp-2) 0 0;
@@ -779,7 +841,7 @@ input::placeholder { color: var(--muted); }
 }
 
 .task-editor::backdrop,
-.modal::backdrop { background: rgb(24 51 49 / 28%); }
+.modal::backdrop { background: var(--overlay); }
 .task-editor form { display: grid; grid-template-rows: auto 1fr auto; height: 100%; }
 .drawer-header,
 .drawer-actions {
@@ -806,10 +868,10 @@ input::placeholder { color: var(--muted); }
   background: var(--surface-raised);
   color: var(--ink);
   padding: 0;
-  font-size: var(--sp-6);
+  font-size: var(--fs-h2);
   line-height: 1;
 }
-.drawer-body { overflow: auto; padding: var(--sp-6); }
+.drawer-body { overflow: auto; overscroll-behavior: contain; padding: var(--sp-6); }
 .field { display: grid; gap: var(--sp-2); color: var(--muted); font-size: var(--fs-caption); }
 .field-hint { margin: var(--sp-2) 0 0; color: var(--muted); font-size: var(--fs-caption); }
 .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); margin-top: var(--sp-5); }
@@ -936,10 +998,9 @@ input::placeholder { color: var(--muted); }
     border-radius: var(--r-sm) var(--r-sm) 0 0;
     padding: var(--sp-2) var(--sp-3);
     font-size: var(--fs-body);
-    text-align: center;
   }
   .nav button[aria-current="page"] { border-bottom-color: var(--teal); }
-  .nav__settings { margin-top: var(--sp-2); padding-inline: var(--sp-3); text-align: center; }
+  .nav__settings { margin-top: var(--sp-2); padding-inline: var(--sp-3); }
   /* 底部要给两行高的快速记录栏让位，否则最后一条任务会被压在下面。 */
   .content { padding: var(--sp-7) var(--sp-5) 140px; }
   .workspace-header h1 { font-size: var(--fs-metric); }
@@ -955,7 +1016,7 @@ input::placeholder { color: var(--muted); }
   .month-day .task__more { display: none; }
   /* 移动端月历是密度概览，但状态须保留非颜色化表达（AGENTS 要求），故恢复元信息显示。 */
   .month-day .task__title { font-size: var(--fs-micro); }
-  .month-day .task__meta { display: block; font-size: var(--fs-micro); line-height: 1.35; }
+  .month-day .task__meta { display: block; font-size: var(--fs-micro); line-height: var(--lh-micro); }
   .task { grid-template-columns: 30px minmax(0, 1fr) auto; gap: var(--sp-3); }
   .task__menu { position: fixed; top: auto; right: 12px; bottom: 12px; left: 12px; max-width: none; }
   .quick-add { grid-template-columns: minmax(0, 1fr) auto; }
@@ -1000,12 +1061,11 @@ input::placeholder { color: var(--muted); }
 .brand-note { margin: 0; color: var(--muted); font-size: var(--fs-caption); }
 .nav { display: flex; flex-direction: column; gap: var(--sp-6); }
 .nav__group { display: flex; flex-direction: column; gap: var(--sp-1); }
-.nav__label { margin: 0 var(--sp-3) var(--sp-2); }
+/* 今天是没有分组标签的主入口，与品牌区之间额外空出一档。 */
+.nav__group--primary { margin-top: var(--sp-4); }
 .nav__footer { margin-top: auto; }
-.nav__footer .nav__label { margin-top: 0; }
 
 .workspace-header { margin-bottom: var(--sp-5); }
-.workspace-header h1 { letter-spacing: -.025em; }
 
 .quick-add {
   position: static;
@@ -1079,7 +1139,7 @@ input::placeholder { color: var(--muted); }
 .drawer-body { display: block; }
 .task-editor form { display: flex; flex-direction: column; }
 .drawer-body { flex: 1 1 auto; }
-.drawer-section-label { margin: 0 0 var(--sp-3); color: var(--teal); font-size: var(--fs-caption); font-weight: 700; letter-spacing: .04em; }
+.drawer-section-label { margin: 0 0 var(--sp-3); color: var(--teal); font-size: var(--fs-caption); font-weight: 700; letter-spacing: var(--tracking-caps); }
 .drawer-section-label--spaced { margin-top: var(--sp-7); }
 .drawer-section-label + .field { margin-top: 0; }
 .drawer-section-label + .field-grid { margin-top: var(--sp-4); }
@@ -1089,12 +1149,19 @@ input::placeholder { color: var(--muted); }
   .app { display: block; }
   .sidebar { flex: none; }
   .brand-lockup { margin: 0 0 var(--sp-2); }
-  .nav { flex-direction: row; flex-wrap: wrap; gap: var(--sp-2); }
+  /* flex-start 必需：默认伸展会把只有一条目的分组拉成和最长分组等高，
+     使"今天"变成一个一百多像素高的方块。 */
+  .nav { flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-2); }
   .nav__group { flex: 1 1 140px; }
+  .nav__group--primary { margin-top: 0; }
   .nav__group .nav__label, .nav__footer .nav__label { display: none; }
-  .nav button { flex: 1 1 auto; border-left: 0; border-bottom: 2px solid transparent; border-radius: var(--r-sm) var(--r-sm) 0 0; padding: var(--sp-2) var(--sp-3); text-align: center; }
+  /* 条目在窄屏不自适应居中：尾部还有角标和快捷键提示，
+     居中会让每行文字起点参差；统一左对齐后整列起点一致，尾部靠右成组。 */
+  .nav button { flex: 1 1 auto; border-left: 0; border-bottom: 2px solid transparent; border-radius: var(--r-sm) var(--r-sm) 0 0; padding: var(--sp-2) var(--sp-3); }
   .nav__footer { margin-top: var(--sp-2); }
-  .nav__settings { width: 100%; margin-top: 0; text-align: center; }
+  /* 窄屏选中标记从左侧竖条换成下边框。 */
+  .nav__settings { width: 100%; margin-top: 0; border-left: 0; border-bottom: 2px solid transparent; border-radius: var(--r-sm) var(--r-sm) 0 0; }
+  .nav__settings[aria-current="page"] { border-bottom-color: var(--teal); }
   .content { padding: var(--sp-7) var(--sp-5) var(--sp-7); }
   .quick-add { align-items: stretch; padding: var(--sp-4); }
   .quick-add__lead, .quick-add__row, .quick-add__options { flex-basis: 100%; }
