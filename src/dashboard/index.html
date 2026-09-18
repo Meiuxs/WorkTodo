@@ -66,12 +66,13 @@
         </header>
         <div class="drawer-body">
           <label class="field">任务名称<input name="title" maxlength="200" required autofocus></label>
+          <p class="field-hint">先填标题和计划日期，其他可以稍后补。</p>
           <div class="field-grid">
             <label class="field">计划日期<input name="scheduledDate" type="date"></label>
             <label class="field">优先级<select name="priority"><option value="none">无</option><option value="low">低</option><option value="medium">中</option><option value="high">高</option></select></label>
           </div>
           <label class="field">分类<select name="categoryId"></select></label>
-          <fieldset class="recurring-picker">
+          <fieldset class="recurring-picker" data-recurring-picker>
             <legend>重复任务</legend>
             <label class="check-field"><input name="recurring" type="checkbox"> 按规则自动创建下一项</label>
             <div class="field-grid" data-recurring-fields hidden>

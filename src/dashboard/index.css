@@ -733,6 +733,7 @@ input::placeholder { color: var(--muted); }
 }
 .drawer-body { overflow: auto; padding: var(--sp-6); }
 .field { display: grid; gap: var(--sp-2); color: var(--muted); font-size: var(--fs-caption); }
+.field-hint { margin: var(--sp-2) 0 0; color: var(--muted); font-size: var(--fs-caption); }
 .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); margin-top: var(--sp-5); }
 .drawer-body > .field,
 .drawer-body > .check-field { margin-top: var(--sp-5); }

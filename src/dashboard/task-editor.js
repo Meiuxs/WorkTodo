@@ -55,6 +55,7 @@ export function createTaskEditor({
   let subtaskBusy = false;
   const recurring = field(form, 'recurring');
   const recurringFields = dialog.querySelector('[data-recurring-fields]');
+  const recurringPicker = dialog.querySelector('[data-recurring-picker]');
 
   function populateCategories(categories, selectedId) {
     category.innerHTML = '<option value="">未分类</option>'
@@ -137,6 +138,7 @@ export function createTaskEditor({
     title.textContent = '新增任务';
     form.reset();
     recurring.checked = false;
+    recurringPicker.hidden = false;
     updateRecurringVisibility();
     populateCategories(await getCategories(), defaults.categoryId ?? null);
     await loadTags(defaults.tagIds ?? []);
@@ -158,6 +160,7 @@ export function createTaskEditor({
     title.textContent = task.title;
     form.reset();
     recurring.checked = false;
+    recurringPicker.hidden = true;
     updateRecurringVisibility();
     populateCategories(await getCategories(), task.categoryId);
     await loadTags(task.tagIds ?? []);

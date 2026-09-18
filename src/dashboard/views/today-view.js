@@ -31,7 +31,7 @@ export function createTodayView({ root, query, statistics, today, onAction, onEd
           <span class="eyebrow">下一步</span>
           ${nextTask === null
             ? '<strong>记录第一件事</strong><span>从下方快速新增开始</span>'
-            : `<button type="button" class="today-summary__task" data-next-task="${escapeHtml(nextTask.id)}">${escapeHtml(nextTask.title)}</button><span>${overdue.length > 0 ? '先处理逾期事项' : '今天可以推进'}</span>`}
+            : `<button type="button" class="today-summary__task" aria-label="下一步任务" data-next-task="${escapeHtml(nextTask.id)}">${escapeHtml(nextTask.title)}</button><span>${overdue.length > 0 ? '先处理逾期事项' : '今天可以推进'}</span>`}
         </div>
       </section>
       ${overdue.length > 0 ? `<section class="view-section view-section--overdue" aria-labelledby="overdue-heading">
