@@ -7,7 +7,13 @@ import { TagRepository } from '../../src/data/tag-repository.js';
 import { SettingsRepository } from '../../src/data/settings-repository.js';
 import { ValidationError } from '../../src/domain/errors.js';
 import { BackupService } from '../../src/services/backup-service.js';
-import { InMemoryStorageArea, InMemoryTaskRepository } from '../helpers/fakes.js';
+import { RecurringService } from '../../src/services/recurring-service.js';
+import { TaskService } from '../../src/services/task-service.js';
+import {
+  InMemoryRecurringTemplateRepository,
+  InMemoryStorageArea,
+  InMemoryTaskRepository,
+} from '../helpers/fakes.js';
 
 const NOW = '2026-09-17T08:30:00.000Z';
 const TASK_ID = '11111111-1111-4111-8111-111111111111';
@@ -362,6 +368,32 @@ test('exportAll 返回独立快照', async () => {
   const snapshot = await repo.exportAll();
   snapshot.tasks[0].title = '外部修改';
   assert.equal((await repo.get(BASE_TASK.id)).title, BASE_TASK.title);
+});
+
+test('模板和首个实例在同一个仓库边界内可导出和替换', async () => {
+  let sequence = 0;
+  const now = () => NOW;
+  const generateId = () => `recurring-${++sequence}`;
+  const repo = new InMemoryTaskRepository();
+  const templates = new InMemoryRecurringTemplateRepository();
+  const service = new RecurringService({
+    taskService: new TaskService(repo, { now, generateId }),
+    taskRepository: repo,
+    templateRepository: templates,
+    now,
+    generateId,
+    subtaskService: null,
+  });
+
+  const created = await service.createTemplate({
+    title: '每日站会',
+    scheduledDate: '2026-09-17',
+    recurrence: { frequency: 'daily', interval: 1 },
+  });
+
+  const snapshot = await templates.exportAll();
+  assert.equal(snapshot.templates.length, 1);
+  assert.equal((await repo.get(created.task.id)).id, created.task.id);
 });
 
 test('create、get 与 list 返回独立快照', async () => {

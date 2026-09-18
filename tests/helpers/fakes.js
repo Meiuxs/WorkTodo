@@ -1,5 +1,6 @@
 import { createTaskEvent } from '../../src/domain/task-event.js';
 import { ValidationError } from '../../src/domain/errors.js';
+import { validateRecurringTemplate } from '../../src/domain/recurring-template.js';
 import { validateTask } from '../../src/domain/task.js';
 import { ConflictError } from '../../src/data/task-repository.js';
 import { materializeTaskRelationships } from '../../src/data/database.js';
@@ -11,6 +12,8 @@ import {
 function clone(value) {
   return structuredClone(value);
 }
+
+let latestTaskRepository = null;
 
 function prepareTask(task) {
   const copy = clone(task);
@@ -76,6 +79,7 @@ export class InMemoryTaskRepository {
     this.#events = events.map((event) => createTaskEvent(event));
     this.#tags = clone(tags);
     this.#recurringTemplates = clone(recurringTemplates);
+    latestTaskRepository = this;
   }
 
   #addEvent(event) {
@@ -328,6 +332,47 @@ export class InMemoryTaskRepository {
     this.#events = events;
     this.#tags = clone(snapshot.tags ?? []);
     this.#recurringTemplates = clone(snapshot.recurringTemplates ?? []);
+  }
+}
+
+export class InMemoryRecurringTemplateRepository {
+  #templates;
+  #taskRepository;
+
+  constructor(templates = [], taskRepository = latestTaskRepository) {
+    this.#templates = new Map(templates.map((template) => {
+      validateRecurringTemplate(template);
+      return [template.id, clone(template)];
+    }));
+    this.#taskRepository = taskRepository;
+  }
+
+  async createWithTask(template, task, event) {
+    validateRecurringTemplate(template);
+    if (this.#templates.has(template.id)) throw new Error(`重复模板 ${template.id} 已存在`);
+    if (this.#taskRepository !== null) await this.#taskRepository.create(task, event);
+    this.#templates.set(template.id, clone(template));
+    return { template: clone(template), task: clone(task) };
+  }
+
+  async get(id) {
+    const template = this.#templates.get(id);
+    return template === undefined ? undefined : clone(template);
+  }
+
+  async list() {
+    return clone([...this.#templates.values()]);
+  }
+
+  async update(template) {
+    validateRecurringTemplate(template);
+    if (!this.#templates.has(template.id)) throw new ValidationError(`重复模板 ${template.id} 不存在`);
+    this.#templates.set(template.id, clone(template));
+    return clone(template);
+  }
+
+  async exportAll() {
+    return { templates: await this.list() };
   }
 }
 
