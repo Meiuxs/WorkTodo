@@ -44,9 +44,9 @@
 .nav__label {
   margin: var(--sp-5) var(--sp-3) var(--sp-2);
   color: var(--muted);
-  font-size: var(--fs-caption);
+  font-size: var(--fs-nav-label);
   font-weight: 700;
-  letter-spacing: .04em;
+  letter-spacing: 0;
 }
 
 .nav button,
@@ -58,7 +58,7 @@
   background: transparent;
   color: var(--ink);
   padding: var(--sp-3) var(--sp-3);
-  font-size: 15px;
+  font-size: var(--fs-nav-item);
   font-weight: 700;
   text-align: left;
 }
@@ -954,8 +954,8 @@ input::placeholder { color: var(--muted); }
   .month-day .task__check { width: 16px; height: 16px; }
   .month-day .task__more { display: none; }
   /* 移动端月历是密度概览，但状态须保留非颜色化表达（AGENTS 要求），故恢复元信息显示。 */
-  .month-day .task__title { font-size: 11px; }
-  .month-day .task__meta { display: block; font-size: 9px; }
+  .month-day .task__title { font-size: var(--fs-micro); }
+  .month-day .task__meta { display: block; font-size: var(--fs-micro); line-height: 1.35; }
   .task { grid-template-columns: 30px minmax(0, 1fr) auto; gap: var(--sp-3); }
   .task__menu { position: fixed; top: auto; right: 12px; bottom: 12px; left: 12px; max-width: none; }
   .quick-add { grid-template-columns: minmax(0, 1fr) auto; }
