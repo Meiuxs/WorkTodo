@@ -11,6 +11,8 @@
 - `node --test tests/domain/dates.test.js tests/domain/recurring-template.test.js`：6 个测试通过，0 个失败。
 - `npm run test:unit`：167 个测试通过，0 个失败。
 
+边界审查补充：新增年重复、跨周工作日、自定义日/周/月，以及间隔 0/91/非整数和非法自定义单位测试；当前实现已覆盖，`node --test tests/domain/recurring-template.test.js` 为 3/3 通过。
+
 ## 已知疑问
 
 - R1 只覆盖领域模型和日期规则；模板持久化、实例生成、编辑器与系列生命周期由后续 R2-R6 任务实现。
