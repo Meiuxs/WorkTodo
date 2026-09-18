@@ -15,14 +15,16 @@ export class DashboardController {
   #views;
   #taskService;
   #subtaskService;
+  #recurringService;
   #sendMessage;
   #route = 'today';
   #renderAbortController = null;
 
-  constructor({ views, taskService = null, subtaskService = null, sendMessage = async () => {} }) {
+  constructor({ views, taskService = null, subtaskService = null, recurringService = null, sendMessage = async () => {} }) {
     this.#views = views;
     this.#taskService = taskService;
     this.#subtaskService = subtaskService;
+    this.#recurringService = recurringService;
     this.#sendMessage = sendMessage;
   }
 
@@ -94,7 +96,10 @@ export class DashboardController {
       copy: 'copy',
     };
     let result;
-    if (action === 'complete' && this.#subtaskService !== null) {
+    if (action === 'complete' && this.#recurringService !== null) {
+      const force = value?.force === true;
+      result = await this.#recurringService.complete(taskId, revision, { force });
+    } else if (action === 'complete' && this.#subtaskService !== null) {
       const force = value?.force === true;
       result = await this.#subtaskService.completeParent(taskId, revision, { force });
     } else if (action === 'postpone' || action === 'reschedule') {

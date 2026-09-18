@@ -69,6 +69,15 @@
             <label class="field">优先级<select name="priority"><option value="none">无</option><option value="low">低</option><option value="medium">中</option><option value="high">高</option></select></label>
           </div>
           <label class="field">分类<select name="categoryId"></select></label>
+          <fieldset class="recurring-picker">
+            <legend>重复任务</legend>
+            <label class="check-field"><input name="recurring" type="checkbox"> 按规则自动创建下一项</label>
+            <div class="field-grid" data-recurring-fields hidden>
+              <label class="field">重复方式<select name="recurrenceFrequency"><option value="daily">每天</option><option value="weekdays">每个工作日</option><option value="weekly">每周</option><option value="monthly">每月</option><option value="yearly">每年</option><option value="custom">自定义间隔</option></select></label>
+              <label class="field">间隔<input name="recurrenceInterval" type="number" min="1" max="90" value="1"></label>
+              <label class="field" data-recurrence-unit>自定义单位<select name="recurrenceUnit"><option value="day">天</option><option value="week">周</option><option value="month">月</option></select></label>
+            </div>
+          </fieldset>
           <fieldset class="tag-picker" data-tag-picker>
             <legend>标签</legend>
             <div class="tag-picker__options" data-tag-options></div>

@@ -1,6 +1,7 @@
 import { formatLocalDay, toLocalDate } from '../domain/dates.js';
 import { applyTheme, THEME_SETTINGS } from '../shared/theme.js';
 import { TaskRepository } from '../data/task-repository.js';
+import { RecurringTemplateRepository } from '../data/recurring-template-repository.js';
 import { TagRepository } from '../data/tag-repository.js';
 import { SettingsRepository } from '../data/settings-repository.js';
 import { TaskService } from '../services/task-service.js';
@@ -23,6 +24,9 @@ import { createCompletedView } from './views/completed-view.js';
 import { createTrashView } from './views/trash-view.js';
 import { createHistoryView } from './views/history-view.js';
 import { createSettingsView } from './views/settings-view.js';
+import { RecurringService } from '../services/recurring-service.js';
+import { generateId } from '../shared/ids.js';
+import { createShortcutHandler } from './shortcuts.js';
 
 const routeMeta = {
   today: ['今日工作', '现在最需要推进的事项'],
@@ -41,6 +45,14 @@ const repository = new TaskRepository();
 const settingsRepository = new SettingsRepository();
 const taskService = new TaskService(repository);
 const subtaskService = new SubtaskService(taskService, repository);
+const recurringTemplateRepository = new RecurringTemplateRepository();
+const recurringService = new RecurringService({
+  taskService,
+  taskRepository: repository,
+  templateRepository: recurringTemplateRepository,
+  subtaskService,
+  generateId,
+});
 const query = new TaskQueryService(repository);
 const statistics = new StatisticsService(repository);
 const summaryService = new SummaryService({ statistics, query });
@@ -184,6 +196,7 @@ const viewOptions = {
   root,
   query,
   taskService,
+  recurringService,
   tagService,
   statistics,
   summaryService,
@@ -218,6 +231,7 @@ controller = new DashboardController({
   views,
   taskService,
   subtaskService,
+  recurringService,
   sendMessage: (message) => chrome.runtime.sendMessage(message),
 });
 
@@ -229,6 +243,11 @@ const taskEditor = createTaskEditor({
   subtaskService,
   onCreate: (input) => controller.createTask(input),
   onUpdate: (taskId, changes, revision) => controller.editTask(taskId, changes, revision),
+  onCreateRecurring: (input) => recurringService.createTemplate(input).then(async (result) => {
+    await chrome.runtime.sendMessage({ type: 'TASK_CHANGED', taskId: result.task.id });
+    await controller.refresh();
+    return result;
+  }),
   onCopy: (taskId) => controller.handleTaskAction('copy', taskId),
   onReload: (taskId) => taskService.getTask(taskId),
 });
@@ -307,6 +326,16 @@ document.querySelector('#quick-add').addEventListener('submit', async (event) =>
     input.focus();
   }
 });
+
+document.addEventListener('keydown', createShortcutHandler({
+  navigate,
+  isBlocked: () => Boolean(document.querySelector('dialog[open]')),
+  focusQuickAdd: () => {
+    if (document.querySelector('#quick-add')?.hidden) return;
+    document.querySelector('#quick-add-title')?.focus();
+  },
+  focusSearch: () => document.querySelector('input[type="search"]')?.focus(),
+}));
 
 chrome.runtime.onMessage.addListener((message) => {
   controller.onMessage(message).catch(onError);

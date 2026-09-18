@@ -1,5 +1,49 @@
 import { test, expect, openDashboard } from './fixtures.js';
 
+test('页面快捷键可以导航并聚焦快速新增', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.locator('#page-title').click();
+  await page.keyboard.press('w');
+  await expect(page.locator('#page-title')).toHaveText('本周');
+  await page.keyboard.press('n');
+  await expect(page.getByLabel('记录一个新事项')).toBeFocused();
+  await page.keyboard.press('a');
+  await page.keyboard.press('f');
+  await expect(page.locator('#page-title')).toHaveText('本周');
+  await page.getByRole('button', { name: '全部任务', exact: true }).click();
+  await page.keyboard.press('f');
+  await expect(page.getByLabel('搜索')).toBeFocused();
+});
+
+test('任务编辑器可以创建重复任务模板和首个实例', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.getByRole('button', { name: '更多字段', exact: true }).click();
+  await page.getByLabel('任务名称').fill('每周复盘');
+  const scheduledDate = await page.evaluate(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    return date.toISOString().slice(0, 10);
+  });
+  await page.locator('#task-editor input[name="scheduledDate"]').fill(scheduledDate);
+  await page.getByLabel('按规则自动创建下一项').check();
+  await page.locator('#task-editor select[name="recurrenceFrequency"]').selectOption('weekly');
+  await page.locator('#task-editor input[name="recurrenceInterval"]').fill('1');
+  await page.getByRole('button', { name: '保存任务', exact: true }).click();
+
+  const snapshot = await page.evaluate(async () => {
+    const { RecurringTemplateRepository } = await import('../data/recurring-template-repository.js');
+    const { TaskRepository } = await import('../data/task-repository.js');
+    return {
+      templates: await new RecurringTemplateRepository().list(),
+      tasks: await new TaskRepository().list(),
+    };
+  });
+  expect(snapshot.templates).toHaveLength(1);
+  expect(snapshot.templates[0].recurrence).toEqual({ frequency: 'weekly', interval: 1 });
+  expect(snapshot.templates[0].title).toBe('每周复盘');
+  expect(snapshot.tasks.some((task) => task.title === '每周复盘' && task.seriesId === snapshot.templates[0].id)).toBe(true);
+});
+
 test('真实 IndexedDB 10,000 条任务可正确搜索和统计', async ({ extension }) => {
   test.setTimeout(120_000);
   const page = await openDashboard(extension);

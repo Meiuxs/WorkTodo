@@ -1,4 +1,5 @@
 import { escapeHtml } from '../shared/ui.js';
+import { readRecurringForm } from './recurring-form.js';
 
 function field(form, name) {
   return form.elements.namedItem(name);
@@ -28,6 +29,7 @@ export function createTaskEditor({
   onCreateTag,
   subtaskService,
   onCreate,
+  onCreateRecurring = onCreate,
   onUpdate,
   onCopy,
   onReload,
@@ -51,6 +53,8 @@ export function createTaskEditor({
   let trigger = null;
   let anchorTaskId = null;
   let subtaskBusy = false;
+  const recurring = field(form, 'recurring');
+  const recurringFields = dialog.querySelector('[data-recurring-fields]');
 
   function populateCategories(categories, selectedId) {
     category.innerHTML = '<option value="">未分类</option>'
@@ -105,6 +109,12 @@ export function createTaskEditor({
     };
   }
 
+  function updateRecurringVisibility() {
+    recurringFields.hidden = !recurring.checked;
+    dialog.querySelector('[data-recurrence-unit]').hidden = !recurring.checked
+      || field(form, 'recurrenceFrequency').value !== 'custom';
+  }
+
   function errorMessage(error) {
     if (error?.name === 'ValidationError') return error.message;
     return '任务没有保存。你的输入还在，请重试。';
@@ -126,6 +136,8 @@ export function createTaskEditor({
     trigger = document.activeElement;
     title.textContent = '新增任务';
     form.reset();
+    recurring.checked = false;
+    updateRecurringVisibility();
     populateCategories(await getCategories(), defaults.categoryId ?? null);
     await loadTags(defaults.tagIds ?? []);
     field(form, 'title').value = defaults.title ?? '';
@@ -145,6 +157,8 @@ export function createTaskEditor({
     trigger = sourceElement;
     title.textContent = task.title;
     form.reset();
+    recurring.checked = false;
+    updateRecurringVisibility();
     populateCategories(await getCategories(), task.categoryId);
     await loadTags(task.tagIds ?? []);
     field(form, 'title').value = task.title;
@@ -190,7 +204,9 @@ export function createTaskEditor({
     submit.disabled = true;
     try {
       const result = currentTask === null
-        ? await onCreate(readChanges())
+        ? (readRecurringForm(form) === null
+          ? await onCreate(readChanges())
+          : await onCreateRecurring({ ...readChanges(), ...readRecurringForm(form) }))
         : await onUpdate(currentTask.id, readChanges(), currentTask.revision);
       close();
       return result;
@@ -271,6 +287,8 @@ export function createTaskEditor({
     event.preventDefault();
     createSubtask();
   });
+  recurring.addEventListener('change', updateRecurringVisibility);
+  field(form, 'recurrenceFrequency').addEventListener('change', updateRecurringVisibility);
   subtaskList.addEventListener('click', async (event) => {
     const row = event.target.closest('[data-subtask-id]');
     if (row === null) return;

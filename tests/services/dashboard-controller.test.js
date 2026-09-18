@@ -224,6 +224,28 @@ test('任务操作调用服务、广播并刷新当前视图', async () => {
   assert.equal(view.renderCount, 2);
 });
 
+test('完成重复任务通过重复服务生成下一实例', async () => {
+  const calls = [];
+  const controller = new DashboardController({
+    views: { today: { async render() {} } },
+    taskService: { async getTask() {} },
+    recurringService: {
+      async complete(taskId, revision, options) {
+        calls.push([taskId, revision, options]);
+        return { task: { id: taskId, revision: revision + 1 }, nextTask: { id: 'next' } };
+      },
+    },
+    sendMessage: async (message) => calls.push(message),
+  });
+
+  const result = await controller.handleTaskAction('complete', 'repeat-1', 2, { force: true });
+  assert.deepEqual(result.nextTask, { id: 'next' });
+  assert.deepEqual(calls, [
+    ['repeat-1', 2, { force: true }],
+    { type: 'TASK_CHANGED', taskId: 'repeat-1' },
+  ]);
+});
+
 test('完成父任务时通过 SubtaskService 并传递确认结果', async () => {
   const calls = [];
   const view = { async render() {} };
