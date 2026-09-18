@@ -4,6 +4,7 @@ import test from 'node:test';
 import { ValidationError } from '../../src/domain/errors.js';
 import {
   addLocalDays,
+  addLocalMonthsClamped,
   assertTimeRange,
   eachLocalDate,
   endOfMonth,
@@ -46,4 +47,10 @@ test('本地日期范围工具跨月跨年且周一作为默认周起点', () =>
   assert.deepEqual(eachLocalDate('2026-09-28', '2026-10-02'), [
     '2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02',
   ]);
+});
+
+test('月份偏移在目标月份天数不足时钳制到月末', () => {
+  assert.equal(addLocalMonthsClamped('2026-01-31', 1), '2026-02-28');
+  assert.equal(addLocalMonthsClamped('2024-01-31', 1), '2024-02-29');
+  assert.equal(addLocalMonthsClamped('2026-12-15', 1), '2027-01-15');
 });

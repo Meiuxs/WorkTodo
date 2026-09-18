@@ -54,6 +54,22 @@ export function addLocalDays(date, days) {
   return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`;
 }
 
+export function addLocalMonthsClamped(date, months) {
+  assertLocalDate(date);
+  if (!Number.isInteger(months)) {
+    throw new ValidationError('months 必须是整数');
+  }
+  const [year, month, day] = date.split('-').map(Number);
+  const target = new Date(Date.UTC(year, month - 1 + months, 1));
+  const lastDay = new Date(Date.UTC(
+    target.getUTCFullYear(),
+    target.getUTCMonth() + 1,
+    0,
+  )).getUTCDate();
+  const targetDay = Math.min(day, lastDay);
+  return `${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
+}
+
 export function startOfWeek(date, weekStartsOn = 1) {
   assertLocalDate(date);
   const [year, month, day] = date.split('-').map(Number);
