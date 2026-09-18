@@ -30,6 +30,7 @@ import { createShortcutHandler } from './shortcuts.js';
 import { ResourceRepository } from '../data/resource-repository.js';
 import { ResourceService } from '../services/resource-service.js';
 import { createResourcePicker } from './resource-picker.js';
+import { createResourcesView } from './views/resources-view.js';
 
 const routeMeta = {
   today: ['今日工作', '现在最需要推进的事项'],
@@ -37,6 +38,7 @@ const routeMeta = {
   week: ['本周', '按天查看这一周的计划'],
   month: ['月历', '按月查看计划和任务分布'],
   inbox: ['收集箱', '先记录，再整理'],
+  resources: ['资料收集箱', '先保存上下文，再决定归属'],
   all: ['全部任务', '查找、筛选和调整工作'],
   completed: ['已完成', '回看已经结束的任务'],
   trash: ['回收站', '恢复或永久删除已删除任务'],
@@ -217,6 +219,7 @@ const views = {
   week: createWeekView(viewOptions),
   month: createMonthView(viewOptions),
   inbox: createInboxView(viewOptions),
+  resources: createResourcesView({ ...viewOptions, resourceService }),
   all: createAllTasksView(viewOptions),
   completed: createCompletedView(viewOptions),
   trash: createTrashView(viewOptions),
@@ -272,7 +275,7 @@ async function navigate(route) {
   const [title, subtitle] = routeMeta[nextRoute];
   document.querySelector('#page-title').textContent = title;
   document.querySelector('#page-subtitle').textContent = subtitle;
-  document.querySelector('#quick-add').hidden = ['history', 'settings'].includes(nextRoute);
+  document.querySelector('#quick-add').hidden = ['history', 'settings', 'resources'].includes(nextRoute);
   document.querySelector('#quick-add-message').textContent = '';
   await controller.navigate(nextRoute);
 }

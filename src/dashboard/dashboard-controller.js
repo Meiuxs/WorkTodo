@@ -4,6 +4,7 @@ const ROUTES = new Set([
   'week',
   'month',
   'inbox',
+  'resources',
   'all',
   'completed',
   'trash',

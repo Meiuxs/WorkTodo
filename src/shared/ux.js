@@ -3,7 +3,7 @@ import { formatLocalDay } from '../domain/dates.js';
 export const NAV_GROUPS = Object.freeze([
   Object.freeze({ id: 'today', label: '今天', routes: ['today'] }),
   Object.freeze({ id: 'planning', label: '计划', routes: ['tomorrow', 'week', 'month'] }),
-  Object.freeze({ id: 'tasks', label: '任务', routes: ['inbox', 'all', 'completed', 'trash'] }),
+  Object.freeze({ id: 'tasks', label: '任务', routes: ['inbox', 'resources', 'all', 'completed', 'trash'] }),
   Object.freeze({ id: 'review', label: '回顾', routes: ['history'] }),
   Object.freeze({ id: 'system', label: '系统', routes: ['settings'] }),
 ]);

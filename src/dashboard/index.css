@@ -647,6 +647,19 @@ input::placeholder { color: var(--muted); }
 .resource-existing-row { width: 100%; cursor: pointer; }
 .resource-existing-row span { color: var(--muted); font-size: var(--fs-caption); }
 .resource-existing-row:hover { border-color: var(--teal); background: var(--teal-soft); }
+.resource-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-4); margin: var(--sp-5) 0; }
+.resource-toolbar label { display: grid; gap: var(--sp-2); color: var(--muted); font-size: var(--fs-caption); }
+.resources-list { display: grid; gap: var(--sp-3); }
+.resource-card { display: flex; justify-content: space-between; gap: var(--sp-5); border-top: 1px solid var(--line); padding: var(--sp-4) 0; }
+.resource-card h3 { margin: var(--sp-1) 0; }
+.resource-card__type, .resource-card__source, .resource-card__note { margin: var(--sp-1) 0 0; color: var(--muted); font-size: var(--fs-caption); }
+.resource-card__type { color: var(--teal); font-weight: 700; }
+.resource-card__actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); color: var(--muted); font-size: var(--fs-caption); }
+@media (max-width: 700px) {
+  .resource-toolbar { grid-template-columns: 1fr; }
+  .resource-card { display: grid; }
+  .resource-card__actions { justify-content: flex-start; }
+}
 
 /* ============ 指标条 ============ */
 /* 列数自适应：指标数量变化时不再换行错位；分隔线用 1px 间隙绘制，任何列数都不会出现断口 */
