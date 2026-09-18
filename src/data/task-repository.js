@@ -103,6 +103,31 @@ export class TaskRepository {
     return clone(taskToSave);
   }
 
+  async findByOccurrenceKey(occurrenceKey) {
+    if (occurrenceKey === null || occurrenceKey === undefined) return undefined;
+    const database = await this.#getDatabase();
+    const transaction = database.transaction('tasks', 'readonly');
+    const task = await requestResult(
+      transaction.objectStore('tasks').index('occurrenceKey').get(occurrenceKey),
+    );
+    await transactionResult(transaction);
+    return task === undefined ? undefined : clone(materializeTaskRelationships(task));
+  }
+
+  async createIfOccurrenceAbsent(task, event) {
+    const existing = await this.findByOccurrenceKey(task.occurrenceKey);
+    if (existing !== undefined) return { created: false, task: existing };
+    try {
+      const saved = await this.create(task, event);
+      return { created: true, task: saved };
+    } catch (error) {
+      if (error?.name !== 'ConstraintError') throw error;
+      const fallback = await this.findByOccurrenceKey(task.occurrenceKey);
+      if (fallback === undefined) throw error;
+      return { created: false, task: fallback };
+    }
+  }
+
   async get(id) {
     const database = await this.#getDatabase();
     const transaction = database.transaction('tasks', 'readonly');

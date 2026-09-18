@@ -93,9 +93,32 @@ export class InMemoryTaskRepository {
     const taskToSave = prepareTask(task);
     const eventToSave = prepareEvent(taskToSave.id, event);
     if (this.#tasks.has(taskToSave.id)) throw new Error(`任务 ${taskToSave.id} 已存在`);
+    if (taskToSave.occurrenceKey !== null
+      && taskToSave.occurrenceKey !== undefined
+      && [...this.#tasks.values()].some((item) => item.occurrenceKey === taskToSave.occurrenceKey)) {
+      const error = new Error(`occurrenceKey ${taskToSave.occurrenceKey} 已存在`);
+      error.name = 'ConstraintError';
+      throw error;
+    }
     this.#tasks.set(taskToSave.id, taskToSave);
     this.#addEvent(eventToSave);
     return clone(taskToSave);
+  }
+
+  async findByOccurrenceKey(occurrenceKey) {
+    if (occurrenceKey === null || occurrenceKey === undefined) return undefined;
+    const task = [...this.#tasks.values()].find((item) => item.occurrenceKey === occurrenceKey);
+    return task === undefined ? undefined : clone(materializeTaskRelationships(task));
+  }
+
+  async createIfOccurrenceAbsent(task, event) {
+    const existing = await this.findByOccurrenceKey(task.occurrenceKey);
+    if (existing !== undefined) return { created: false, task: existing };
+    if (task.occurrenceKey !== null && task.occurrenceKey !== undefined) {
+      const conflict = await this.findByOccurrenceKey(task.occurrenceKey);
+      if (conflict !== undefined) return { created: false, task: conflict };
+    }
+    return { created: true, task: await this.create(task, event) };
   }
 
   async get(id) {

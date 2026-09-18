@@ -923,6 +923,26 @@ test('InMemoryTaskRepository 与真实仓库的新增查询语义一致', async 
   );
 });
 
+test('任务仓库按 occurrenceKey 查询并幂等创建', async () => {
+  const task = indexedTask({
+    id: 'occurrence-task',
+    seriesId: 'template-1',
+    occurrenceKey: 'template-1:2026-09-18',
+  });
+  const event = { ...EVENT, id: 'occurrence-event', taskId: task.id, type: 'CREATE' };
+  const memory = new InMemoryTaskRepository();
+  assert.equal(await memory.findByOccurrenceKey(task.occurrenceKey), undefined);
+  const first = await memory.createIfOccurrenceAbsent(task, event);
+  const second = await memory.createIfOccurrenceAbsent(
+    { ...task, id: 'other-task' },
+    { ...event, id: 'other-event', taskId: 'other-task' },
+  );
+  assert.equal(first.created, true);
+  assert.equal(second.created, false);
+  assert.equal(second.task.id, task.id);
+  assert.equal((await memory.findByOccurrenceKey(task.occurrenceKey)).id, task.id);
+});
+
 test('TagRepository.deleteAndDetach 在同一事务同步搜索索引 revision', async () => {
   const database = new IndexedDbFake({
     tasks: [{ ...BASE_TASK, tagIds: [TAG_ID] }],
