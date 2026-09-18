@@ -118,6 +118,7 @@ class IndexedDbFake {
           categoryId: { keyPath: 'categoryId' },
           trashedAt: { keyPath: 'trashedAt' },
           tagIds: { keyPath: 'tagIds', multiEntry: true },
+          occurrenceKey: { keyPath: 'occurrenceKey' },
           taskId: { keyPath: 'taskId' },
           occurredAt: { keyPath: 'occurredAt' },
         };
@@ -175,6 +176,9 @@ class IndexedDbFake {
             ));
         };
         return {
+          get(range) {
+            return asyncRequest(matching(range).at(0)?.record);
+          },
           getAll(range) {
             return asyncRequest(matching(range).map(({ record }) => record));
           },
@@ -212,6 +216,44 @@ function indexedTask(overrides = {}) {
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   };
+}
+
+class ConstraintRaceDatabase {
+  #tasks = new Map();
+  #reads = 0;
+
+  constructor(task = null) {
+    if (task !== null) this.#tasks.set(task.id, structuredClone(task));
+  }
+
+  transaction(names, mode = 'readonly') {
+    const database = this;
+    const transaction = {};
+    setTimeout(() => transaction.oncomplete?.(), 0);
+    transaction.objectStore = () => ({
+      index() {
+        return {
+          get(key) {
+            const shouldHide = database.#reads++ < 2;
+            const value = shouldHide
+              ? undefined
+              : [...database.#tasks.values()].find((task) => task.occurrenceKey === key);
+            return asyncRequest(value);
+          },
+        };
+      },
+      add(record) {
+        if ([...database.#tasks.values()].some((task) => task.occurrenceKey === record.occurrenceKey)) {
+          const error = new Error('唯一索引冲突');
+          error.name = 'ConstraintError';
+          throw error;
+        }
+        database.#tasks.set(record.id, structuredClone(record));
+      },
+      put() {},
+    });
+    return transaction;
+  }
 }
 
 class SimulatedStore {
@@ -427,6 +469,35 @@ test('创建重复模板首实例时同步维护搜索索引', async () => {
   const search = await new TaskRepository(database).search('每日站会');
   assert.deepEqual(search.map(({ id }) => id), [task.id]);
   assert.deepEqual(database.snapshot().searchIndex, [createSearchIndexRecord(task)]);
+});
+
+test('真实任务仓库可搜索生成的下一重复实例', async () => {
+  const database = new IndexedDbFake();
+  const taskRepository = new TaskRepository(database);
+  const templateRepository = new RecurringTemplateRepository(database);
+  let sequence = 0;
+  const now = () => NOW;
+  const generateId = () => `search-recurring-${++sequence}`;
+  const taskService = new TaskService(taskRepository, { now, generateId });
+  const service = new RecurringService({
+    taskService,
+    taskRepository,
+    templateRepository,
+    now,
+    generateId,
+  });
+  const created = await service.createTemplate({
+    title: '真实仓库搜索重复实例',
+    scheduledDate: '2026-09-17',
+    recurrence: { frequency: 'daily', interval: 1 },
+  });
+
+  await service.generateNext(created.template.id, created.task.scheduledDate);
+
+  assert.deepEqual(
+    (await taskRepository.search('真实仓库搜索')).map((task) => task.scheduledDate),
+    ['2026-09-17', '2026-09-18'],
+  );
 });
 
 test('create、get 与 list 返回独立快照', async () => {
@@ -941,6 +1012,25 @@ test('任务仓库按 occurrenceKey 查询并幂等创建', async () => {
   assert.equal(second.created, false);
   assert.equal(second.task.id, task.id);
   assert.equal((await memory.findByOccurrenceKey(task.occurrenceKey)).id, task.id);
+});
+
+test('真实仓库契约在 occurrenceKey 唯一索引竞态时返回获胜实例', async () => {
+  const first = indexedTask({
+    id: 'winner',
+    seriesId: 'template-race',
+    occurrenceKey: 'template-race:2026-09-18',
+  });
+  const second = { ...first, id: 'loser' };
+  const repository = new TaskRepository(new ConstraintRaceDatabase());
+
+  const [left, right] = await Promise.all([
+    repository.createIfOccurrenceAbsent(first, { ...EVENT, id: 'winner-event', taskId: first.id }),
+    repository.createIfOccurrenceAbsent(second, { ...EVENT, id: 'loser-event', taskId: second.id }),
+  ]);
+
+  assert.equal(left.created, true);
+  assert.equal(right.created, false);
+  assert.equal(right.task.id, first.id);
 });
 
 test('TagRepository.deleteAndDetach 在同一事务同步搜索索引 revision', async () => {
