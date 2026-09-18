@@ -6,9 +6,22 @@ html {
   font-size: var(--fs-body);
   line-height: var(--lh-body);
   -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
-body { margin: 0; background: var(--canvas); }
+body {
+  margin: 0;
+  background: var(--canvas);
+  /* 触屏设备上取消默认高亮块：交互反馈统一由 hover / active / focus 表达。 */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 中文标题在窄容器里容易把最后两个字挤到下一行，balance 让两行长度更接近；
+   正文则用 pretty 避免行尾孤字。Chromium 版本过低时会自动忽略，不影响换行结果。 */
+h1, h2, h3, h4 { text-wrap: balance; }
+p { text-wrap: pretty; }
+
+::selection { background: var(--selection); color: var(--ink); }
 
 /* 表单控件一律显式声明字号与字重。
    不声明就会沿用浏览器"默认字号"设置，同一套布局在不同机器上高度不一致。 */
@@ -18,7 +31,7 @@ select,
 textarea {
   font-family: inherit;
   font-size: var(--fs-body);
-  line-height: 1.4;
+  line-height: var(--lh-control);
 }
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
@@ -61,7 +74,13 @@ button {
 
 button:hover { background: var(--teal-soft); }
 
-button:disabled { cursor: not-allowed; opacity: .55; }
+/* 裸按钮的禁用态：整块淡化即可。
+   实心按钮（.button-*）在上面这层之上另有"退回表层"的显式禁用样式，
+   避免半透明把实心底和文字一起压低、看不出还能不能读。 */
+button:disabled {
+  cursor: not-allowed;
+  opacity: .6;
+}
 
 button,
 input,
@@ -69,6 +88,8 @@ select,
 textarea,
 summary,
 a {
+  /* manipulation 去掉移动端双击缩放判定，点击反馈不再延迟约 300ms。 */
+  touch-action: manipulation;
   transition:
     background-color var(--dur-fast) var(--ease-out),
     border-color var(--dur-fast) var(--ease-out),

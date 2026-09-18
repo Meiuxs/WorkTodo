@@ -1,6 +1,10 @@
 /* 设计令牌：所有尺寸、间距、圆角、字号、动效与颜色只在这里定义一次。
    业务样式表只引用变量，不再出现裸数值，避免同类元素各写一套。 */
 :root {
+  /* color-scheme 让滚动条、日期选择器、下拉列表跟随主题。
+     不声明时深色主题下这些原生控件仍是浅色，界面会"漏白"。 */
+  color-scheme: light;
+
   /* ---- 结构色 ---- */
   --canvas: #e8f1ed;
   --surface: #fbfaf7;
@@ -20,16 +24,41 @@
   --coral: #c23f22;
   --coral-soft: #fae9e4;
   --focus: #1b6466;
-  --disabled: #a7b5b0;
   --hover-tint: rgb(39 107 108 / 7%);
   --nav-hover: rgb(255 253 249 / 60%);
+  /* 当前导航项：teal-soft 与薄荷灰侧栏几乎同色，选中态要"抬起来"才看得见，
+     所以用比侧栏更亮的表层色，而不是再叠一层同色系的浅青。 */
+  --nav-active: #fffdf9;
   --toast-action: #f5c7bd;
+  /* 遮罩：抽屉和对话框共用。深色主题下必须加重，否则遮罩几乎看不见。 */
+  --overlay: rgb(24 51 49 / 32%);
+  /* 选中文字底色：与动作色同源，不引入第五种颜色。 */
+  --selection: #cfe4dd;
+
+  /* ---- 数量角标 ----
+     中性角标复用结构色，提醒角标复用珊瑚实心（与"逾期"同为需要注意的信号）。
+     两个都引用已有令牌，深色主题不需要重复定义。 */
+  --badge-bg: var(--line);
+  --badge-ink: var(--ink);
+  --badge-alert-bg: var(--coral);
+  --badge-alert-ink: var(--surface-raised);
+
+  /* ---- 层级与投影 ---- */
+  /* 卡片只用 1px 底线表达"抬起一档"，浮层才用完整投影。 */
+  --shadow-card: 0 1px 0 rgb(24 51 49 / 4%);
+  --shadow-float: 0 8px 24px rgb(24 51 49 / 10%);
 
   /* ---- 布局骨架 ---- */
   --sidebar-w: 216px;
   --content-measure: 960px;
   --control-h: 38px;
-  --control-h-sm: 30px;
+  /* 34px 兼顾紧凑排布与 32px 触控下限（WCAG 2.2 目标尺寸） */
+  --control-h-sm: 34px;
+  /* 弹窗里的记录输入框是首屏唯一主入口，比工作台控件再高一档 */
+  --control-h-lg: 42px;
+  /* 进度条与占比条共用同一高度，视觉上同属一组"度量"元素 */
+  --track-h: 8px;
+  --track-h-thin: 4px;
 
   /* ---- 间距刻度（4px 基准）---- */
   --sp-1: 2px;
@@ -53,34 +82,43 @@
      阶梯 12 / 13 / 14 / 16 / 20 / 24 / 30，中段每级差 >=4px，层级才读得出来。
      系统 CJK 字体（Microsoft YaHei / Noto Sans CJK）只有 Regular 与 Bold 两档，
      所以不引入 500/600 中间字重，强调一律用字号 + 颜色 + 700 表达。 */
-  --font-sans: "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+  /* 字体栈按平台从"系统自带的设计用字"排到通用兜底：
+     UOS → Noto / Source Han；macOS → PingFang；Windows → 优先 YaHei UI
+     （UI 版在 12–14px 小字号下比普通版更清晰，Windows 10 起随系统提供）。 */
+  --font-sans: "Noto Sans CJK SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
+  --fs-micro: 11px;
   --fs-caption: 12px;
   --fs-ui: 13px;
   --fs-body: 14px;
-  --fs-nav-label: 13px;
+  /* 分组标签比条目小一号，配合常规字重拉开"目录 / 条目"两层 */
+  --fs-nav-label: 12px;
   --fs-nav-item: 14px;
-  --fs-micro: 11px;
   --fs-lead: 16px;
   --fs-h3: 16px;
   --fs-h2: 20px;
   --fs-metric: 24px;
   --fs-h1: 30px;
+  --lh-micro: 1.35;
   --lh-caption: 1.5;
+  --lh-control: 1.4;
   --lh-body: 1.7;
   --lh-heading: 1.3;
   --lh-display: 1.2;
   --tracking-tight: -0.01em;
+  /* 30px 以上的大标题再收紧一档，让方块字排成一条更实的线 */
+  --tracking-display: -0.025em;
   --tracking-brand: 0.08em;
+  /* 小型全大写/分组标签的统一字距（"快速记录""任务详情"这类 eyebrow） */
+  --tracking-caps: 0.04em;
 
   /* ---- 动效 ---- */
   --dur-fast: 120ms;
   --dur-base: 180ms;
   --ease-out: cubic-bezier(.2, .7, .3, 1);
-
-  --shadow-float: 0 8px 24px rgb(24 51 49 / 10%);
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --canvas: #10201f;
   --surface: #162a28;
   --surface-raised: #1d3532;
@@ -93,10 +131,13 @@
   --coral: #ff9a82;
   --coral-soft: #4b2d2a;
   --focus: #8ce1d5;
-  --disabled: #71817d;
   --hover-tint: rgb(99 195 183 / 10%);
   --nav-hover: rgb(29 53 50 / 88%);
+  --nav-active: #23413d;
   --toast-action: #8b3f33;
+  --overlay: rgb(3 10 9 / 64%);
+  --selection: #2b5a54;
+  --shadow-card: 0 1px 0 rgb(0 0 0 / 26%);
   --shadow-float: 0 8px 24px rgb(0 0 0 / 28%);
 }
 

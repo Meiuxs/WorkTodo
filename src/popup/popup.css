@@ -1,10 +1,14 @@
 @import url("../styles/tokens.css");
 @import url("../styles/base.css");
 
-/* 宽高都由内容决定：不写 min-height，弹窗就不会在内容很短时留一大条空带。 */
-body { width: 360px; background: var(--canvas); }
+/* 弹窗的全部样式集中在这里，不再分"基础块 + 覆盖块"两段。
+   之前的覆盖块用 18px/28px/42px 这类裸数值重写了下面的规则，
+   同一处样式读两遍才能知道最终值，这里统一回到令牌刻度。 */
 
-.popup { padding: var(--sp-5); }
+/* 宽高都由内容决定：不写 min-height，弹窗就不会在内容很短时留一大条空带。 */
+body { width: 380px; background: var(--canvas); }
+
+.popup { padding: var(--sp-6); }
 
 .popup__topline, .popup__summary, .popup__input-row, .popup__date-options, .task-row {
   display: flex;
@@ -23,14 +27,27 @@ body { width: 360px; background: var(--canvas); }
   font-size: var(--fs-ui);
 }
 .popup__open-dashboard:hover { background: var(--teal-soft); }
+
 h1 {
-  margin: var(--sp-6) 0 var(--sp-2);
-  font-size: var(--fs-h2);
+  margin: var(--sp-7) 0 var(--sp-3);
+  font-size: var(--fs-metric);
   line-height: var(--lh-heading);
   letter-spacing: var(--tracking-tight);
 }
-.popup__summary { gap: var(--sp-3); color: var(--muted); font-size: var(--fs-ui); }
-.progress { flex: 1; height: 4px; border-radius: var(--r-pill); background: var(--line); overflow: hidden; }
+
+/* "快速记录"小标签：青绿色 + 全大写式字距，把主入口从摘要信息里挑出来。 */
+.popup__capture-label { margin: 0; color: var(--teal); font-size: var(--fs-caption); font-weight: 700; letter-spacing: var(--tracking-caps); }
+.popup__capture-label span { margin-left: var(--sp-3); color: var(--muted); font-weight: 400; letter-spacing: 0; }
+
+.popup__summary {
+  gap: var(--sp-3);
+  margin-top: var(--sp-6);
+  border-top: 1px solid var(--line);
+  padding-top: var(--sp-4);
+  color: var(--muted);
+  font-size: var(--fs-ui);
+}
+.progress { flex: 1; height: var(--track-h-thin); border-radius: var(--r-pill); background: var(--line); overflow: hidden; }
 .progress > span { display: block; height: 100%; border-radius: var(--r-pill); background: var(--teal); }
 
 .task-section { margin-top: var(--sp-7); }
@@ -44,21 +61,23 @@ h1 {
 .task-list { margin: 0; padding: 0; list-style: none; }
 .task-row {
   gap: var(--sp-3);
-  min-height: 36px;
+  /* 44px 是触屏下"一行一点"的舒适下限，比桌面控件再高一点。 */
+  min-height: 44px;
   border-bottom: 1px solid var(--line);
   font-size: var(--fs-body);
 }
 .task-row__state { color: var(--teal); font-weight: 700; }
 .task-row__title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.task-row__detail { color: var(--muted); font-size: var(--fs-caption); }
+.task-row__detail { color: var(--muted); font-size: var(--fs-caption); font-variant-numeric: tabular-nums; }
 .task-row__detail--overdue { color: var(--coral); font-weight: 700; }
 
-.popup__form { margin-top: var(--sp-7); }
+/* 记录区与上面的"回顾"内容之间留出最大一段间距：弹窗只有一个主入口。 */
+.popup__form { margin-top: var(--sp-8); border-top: 1px solid var(--line); padding-top: var(--sp-5); }
 .popup__input-row { gap: var(--sp-3); align-items: stretch; }
 /* 高度和字号都写死：表单控件默认继承浏览器默认字号，用户把默认字号调小就会比按钮矮一截。 */
 .popup__input-row input {
   flex: 1;
-  height: var(--control-h);
+  height: var(--control-h-lg);
   border: 1px solid var(--line-strong);
   border-radius: var(--r-sm);
   background: var(--surface-raised);
@@ -69,18 +88,19 @@ h1 {
 /* 打开弹窗即自动聚焦，把聚焦环压回边框上，避免出现里外两层框。 */
 .popup__input-row input:focus-visible { outline-offset: -2px; }
 .popup__submit {
-  min-width: var(--control-h);
-  min-height: var(--control-h);
+  min-width: var(--control-h-lg);
+  min-height: var(--control-h-lg);
   border: 0;
   border-radius: var(--r-sm);
   background: var(--teal);
   color: var(--surface-raised);
   padding: 0;
-  font-size: var(--sp-6);
+  font-size: var(--fs-h2);
   line-height: 1;
 }
 .popup__submit:hover { background: var(--focus); }
-.popup__date-options { gap: var(--sp-2); margin-top: var(--sp-3); }
+
+.popup__date-options { flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-3); }
 .date-option {
   min-height: var(--control-h-sm);
   border: 1px solid var(--line-strong);
@@ -92,10 +112,12 @@ h1 {
 }
 .date-option:hover { border-color: var(--teal); color: var(--teal); }
 .date-option[aria-pressed="true"] { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); font-weight: 700; }
+
 /* 没有提示文字时不占位，弹窗底部不再留一条空带；出错时内容变高，浏览器会自动放大弹窗。 */
 .form-message { min-height: 20px; margin: var(--sp-2) 0 0; color: var(--coral); font-size: var(--fs-ui); }
 .form-message:empty { display: none; }
 .empty { color: var(--muted); font-size: var(--fs-ui); }
+
 .toast {
   position: fixed;
   right: var(--sp-4);
@@ -112,25 +134,10 @@ h1 {
   margin-left: var(--sp-3);
   border: 0;
   background: transparent;
-  color: var(--toast-action, #b9f1df);
+  color: var(--toast-action);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
 }
-.toast__action:hover { text-decoration: underline; }
-
-/* ============ Popup 线性记录体验 ============ */
-body { width: 380px; }
-.popup { padding: 20px; }
-.popup h1 { margin-top: 24px; font-size: 24px; letter-spacing: -.02em; }
-.popup__capture-label { margin: 0; color: var(--teal); font-size: var(--fs-caption); font-weight: 700; letter-spacing: .04em; }
-.popup__capture-label span { margin-left: 8px; color: var(--muted); font-weight: 400; letter-spacing: 0; }
-.popup__summary { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
-.task-section { margin-top: 24px; }
-.task-section h2 { margin-bottom: 8px; }
-.task-row { min-height: 44px; }
-.popup__form { margin-top: 28px; border-top: 1px solid var(--line); padding-top: 16px; }
-.popup__input-row { gap: 8px; }
-.popup__input-row input { height: 42px; background: var(--surface-raised); }
-.popup__submit { min-width: 42px; min-height: 42px; }
-.popup__date-options { flex-wrap: wrap; }
+/* 反馈条是深色底，悬停不能套用基础层的浅色 hover 底色，否则文字瞬间读不出来。 */
+.toast__action:hover { background: transparent; text-decoration: underline; }
