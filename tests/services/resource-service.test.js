@@ -58,3 +58,12 @@ test('资料关联可复用，删除关联资料前需要明确确认', async ()
   await resourceService.remove(resource.id, { force: true });
   assert.equal(repository.resources.has(resource.id), false);
 });
+
+test('文件引用可以由用户主动重新选择，并可保存副本', async () => {
+  const { resourceService } = service();
+  const first = await resourceService.createFile({ file: new Blob(['old'], { type: 'text/plain' }), fileName: 'old.txt', saveCopy: false });
+  const updated = await resourceService.replaceFile(first.id, new Blob(['new'], { type: 'text/plain' }), true);
+  assert.equal(updated.storageMode, 'copy');
+  assert.equal(updated.fileName, '未命名文件');
+  assert.equal(updated.blob.size, 3);
+});

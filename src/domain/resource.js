@@ -121,7 +121,10 @@ export function updateResource(current, changes) {
   }
   if (next.type === 'url') next.url = normalizeUrl(next.url);
   if (next.type === 'snippet') next.content = text(next.content, 'content', { required: true, max: MAX_RESOURCE_CONTENT_LENGTH });
-  if (next.type === 'file') Object.assign(next, normalizeFile(next));
+  if (next.type === 'file') {
+    Object.assign(next, normalizeFile(next));
+    delete next.file;
+  }
   next.title = text(next.title, 'title', { required: true, max: 200 });
   next.note = text(next.note, 'note', { max: MAX_RESOURCE_NOTE_LENGTH });
   validateResource(next);

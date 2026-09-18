@@ -46,7 +46,7 @@ export class ResourceService {
   }
 
   async update(id, changes, expectedRevision) {
-    const current = await this.#repository.get(id);
+    const current = await this.#repository.get(id, { includeBlob: true });
     if (current === undefined) throw new ValidationError(`资料 ${id} 不存在`);
     const updated = updateResource(current, { ...changes, updatedAt: this.#now() });
     return this.#repository.update(updated, expectedRevision ?? current.revision);
@@ -67,7 +67,21 @@ export class ResourceService {
   }
 
   async get(id) {
-    return this.#repository.get(id);
+    return this.#repository.get(id, { includeBlob: true });
+  }
+
+  async replaceFile(id, file, saveCopy = false) {
+    if (!(file instanceof Blob)) throw new ValidationError('请选择有效文件');
+    return this.update(id, {
+      file,
+      fileName: file.name ?? '未命名文件',
+      title: file.name ?? '未命名文件',
+      mimeType: file.type,
+      size: file.size,
+      lastModified: file.lastModified ?? null,
+      storageMode: saveCopy ? 'copy' : 'reference',
+      blob: saveCopy ? file : null,
+    });
   }
 
   async listForTask(taskId) {

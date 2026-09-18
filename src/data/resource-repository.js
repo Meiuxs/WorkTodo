@@ -28,6 +28,13 @@ function prepare(resource) {
   return copy;
 }
 
+function metadata(resource) {
+  const copy = clone(resource);
+  copy.blob = null;
+  copy.copyIncluded = resource.storageMode === 'copy' ? false : null;
+  return copy;
+}
+
 export class ResourceRepository {
   #database;
 
@@ -42,24 +49,29 @@ export class ResourceRepository {
   async create(resource) {
     const resourceToSave = prepare(resource);
     const database = await this.#getDatabase();
-    const transaction = database.transaction('resources', 'readwrite');
-    transaction.objectStore('resources').add(resourceToSave);
+    const transaction = database.transaction(['resources', 'resourceBlobs'], 'readwrite');
+    transaction.objectStore('resources').add(metadata(resourceToSave));
+    if (resourceToSave.blob instanceof Blob) transaction.objectStore('resourceBlobs').put({ id: resourceToSave.id, blob: resourceToSave.blob });
     await transactionResult(transaction);
     return clone(resourceToSave);
   }
 
-  async get(id) {
+  async get(id, { includeBlob = false } = {}) {
     const database = await this.#getDatabase();
-    const transaction = database.transaction('resources', 'readonly');
+    const transaction = database.transaction(includeBlob ? ['resources', 'resourceBlobs'] : 'resources', 'readonly');
     const resource = await requestResult(transaction.objectStore('resources').get(id));
+    const blobRecord = includeBlob && resource !== undefined
+      ? await requestResult(transaction.objectStore('resourceBlobs').get(id))
+      : undefined;
     await transactionResult(transaction);
-    return resource === undefined ? undefined : clone(resource);
+    if (resource === undefined) return undefined;
+    return clone(blobRecord?.blob === undefined ? resource : { ...resource, blob: blobRecord.blob });
   }
 
   async update(resource, expectedRevision = resource.revision - 1) {
     const resourceToSave = prepare(resource);
     const database = await this.#getDatabase();
-    const transaction = database.transaction('resources', 'readwrite');
+    const transaction = database.transaction(['resources', 'resourceBlobs'], 'readwrite');
     const store = transaction.objectStore('resources');
     const current = await requestResult(store.get(resourceToSave.id));
     if (current === undefined) {
@@ -72,7 +84,10 @@ export class ResourceRepository {
       try { await transactionResult(transaction); } catch { /* expected abort */ }
       throw new ConflictError(resourceToSave.id);
     }
-    store.put(resourceToSave);
+    store.put(metadata(resourceToSave));
+    const blobs = transaction.objectStore('resourceBlobs');
+    if (resourceToSave.blob instanceof Blob) blobs.put({ id: resourceToSave.id, blob: resourceToSave.blob });
+    else blobs.delete(resourceToSave.id);
     await transactionResult(transaction);
     return clone(resourceToSave);
   }
@@ -101,7 +116,7 @@ export class ResourceRepository {
   async attachTask(taskId, resourceId) {
     if (typeof taskId !== 'string' || taskId.length === 0) throw new ValidationError('taskId 不能为空');
     const database = await this.#getDatabase();
-    const transaction = database.transaction(['resources', 'taskResources'], 'readwrite');
+    const transaction = database.transaction(['resources', 'taskResources', 'resourceBlobs'], 'readwrite');
     const resource = await requestResult(transaction.objectStore('resources').get(resourceId));
     if (resource === undefined) {
       transaction.abort();
@@ -158,6 +173,7 @@ export class ResourceRepository {
     const relations = await requestResult(links.index('resourceId').getAll(id));
     relations.forEach((relation) => links.delete([relation.taskId, relation.resourceId]));
     resources.delete(id);
+    transaction.objectStore('resourceBlobs').delete(id);
     await transactionResult(transaction);
   }
 
@@ -188,12 +204,17 @@ export class ResourceRepository {
       taskResourceKeys.add(key);
     }
     const database = await this.#getDatabase();
-    const transaction = database.transaction(['resources', 'taskResources'], 'readwrite');
+    const transaction = database.transaction(['resources', 'taskResources', 'resourceBlobs'], 'readwrite');
     const resourcesStore = transaction.objectStore('resources');
     const linksStore = transaction.objectStore('taskResources');
+    const blobsStore = transaction.objectStore('resourceBlobs');
     resourcesStore.clear();
     linksStore.clear();
-    resources.forEach((resource) => resourcesStore.put(resource));
+    blobsStore.clear();
+    resources.forEach((resource) => {
+      resourcesStore.put(metadata(resource));
+      if (resource.blob instanceof Blob) blobsStore.put({ id: resource.id, blob: resource.blob });
+    });
     taskResources.forEach((relation) => linksStore.put(relation));
     await transactionResult(transaction);
   }

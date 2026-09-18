@@ -5,6 +5,17 @@ test('导出包含版本信息，导入经过预览后可合并', async ({ exten
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('备份任务');
   await dashboard.getByRole('button', { name: '添加', exact: true }).click();
+  await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
+  await dashboard.getByRole('button', { name: '备份任务' }).click();
+  const editor = dashboard.getByRole('dialog').first();
+  await editor.getByText(/相关资料/).click();
+  await editor.getByRole('button', { name: '添加资料' }).click();
+  const resourceDialog = dashboard.getByRole('dialog').last();
+  await resourceDialog.getByLabel('资料名称').fill('备份资料');
+  await resourceDialog.locator('[data-resource-url]').fill('https://example.com/backup');
+  await resourceDialog.getByRole('button', { name: '保存资料' }).click();
+  await expect(editor.getByText('备份资料')).toBeVisible();
+  await editor.getByRole('button', { name: '取消' }).click();
 
   await dashboard.getByRole('button', { name: '设置' }).click();
   const downloadPromise = dashboard.waitForEvent('download');
@@ -16,9 +27,11 @@ test('导出包含版本信息，导入经过预览后可合并', async ({ exten
   expect(backup.tags).toEqual([]);
   expect(backup.recurringTemplates).toEqual([]);
   expect(backup.tasks).toHaveLength(1);
+  expect(backup.resources).toHaveLength(1);
+  expect(backup.taskResources).toHaveLength(1);
 
   await dashboard.locator('#import-file').setInputFiles(filePath);
-  await expect(dashboard.getByText(/任务 1 · 分类 0 · 事件 1/)).toBeVisible();
+  await expect(dashboard.getByText(/任务 1 · 分类 0 · 事件 1 · 资料 1/)).toBeVisible();
   await dashboard.getByRole('button', { name: '确认导入' }).click();
   await expect(dashboard.getByText(/导入完成：1 个任务/)).toBeVisible();
 });

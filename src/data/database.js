@@ -92,6 +92,9 @@ export function upgradeDatabase(database, transaction = database.transaction) {
     ['taskId', 'taskId'],
     ['resourceId', 'resourceId'],
   ]);
+  if (!database.objectStoreNames.contains('resourceBlobs')) {
+    database.createObjectStore('resourceBlobs', { keyPath: 'id' });
+  }
   const events = database.objectStoreNames.contains('events')
     ? transaction.objectStore('events')
     : database.createObjectStore('events', { keyPath: 'id' });

@@ -151,6 +151,7 @@ test('schema v4 创建搜索索引、资料与关联 store', () => {
   });
   assert.deepEqual(stores.get('resources').options, { keyPath: 'id' });
   assert.deepEqual(stores.get('taskResources').options, { keyPath: ['taskId', 'resourceId'] });
+  assert.deepEqual(stores.get('resourceBlobs').options, { keyPath: 'id' });
   assert.deepEqual(stores.get('taskResources').createdIndexes, [
     { name: 'taskId', keyPath: 'taskId', options: undefined },
     { name: 'resourceId', keyPath: 'resourceId', options: undefined },
@@ -213,7 +214,7 @@ test('schema v4 复用现有 store、补建缺失索引并新增资料 store', (
       contains: (name) => stores.has(name),
     },
     createObjectStore: (name, options) => {
-      assert.equal(['resources', 'taskResources'].includes(name), true);
+      assert.equal(['resources', 'taskResources', 'resourceBlobs'].includes(name), true);
       const store = createStore(name, options);
       stores.set(name, store);
       return store;
