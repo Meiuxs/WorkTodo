@@ -164,7 +164,7 @@
 /* ============ 今日摘要 ============ */
 .today-summary {
   display: grid;
-  grid-template-columns: minmax(150px, .7fr) minmax(220px, 1.3fr);
+  grid-template-columns: minmax(150px, .7fr) minmax(220px, 1.1fr) minmax(220px, 1.2fr);
   gap: var(--sp-7);
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
@@ -181,6 +181,21 @@
   font-variant-numeric: tabular-nums;
 }
 .today-summary span { color: var(--muted); font-size: var(--fs-ui); }
+.today-summary__next { display: grid; align-content: center; gap: var(--sp-2); min-width: 0; }
+.today-summary__next .eyebrow { color: var(--muted); font-size: var(--fs-caption); font-weight: 700; }
+.today-summary__task {
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 0;
+  font-size: var(--fs-lead);
+  font-weight: 700;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.today-summary__task:hover { background: transparent; color: var(--teal); text-decoration: underline; }
 .progress-block { display: grid; align-content: center; gap: var(--sp-2); max-width: 480px; }
 .progress-block progress {
   display: block;

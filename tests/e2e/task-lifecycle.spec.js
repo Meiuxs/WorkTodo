@@ -16,6 +16,16 @@ test('安排今天并完成后进入实际完成的工作记录', async ({ exten
   await expect(dashboard.getByText('实际完成', { exact: true })).toBeVisible();
 });
 
+test('今日页突出下一步任务并保留可直接记录的入口', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.getByLabel('记录一个新事项').fill('下一步任务');
+  await page.locator('#quick-add-date').selectOption('today');
+  await page.getByRole('button', { name: '添加', exact: true }).click();
+  await expect(page.locator('[data-next-action]')).toContainText('下一步任务');
+  await expect(page.locator('[data-focus-quick-add]')).toHaveCount(0);
+  await expect(page.getByLabel('记录一个新事项')).toBeVisible();
+});
+
 test('取消删除确认后任务保留且删除操作仍可用', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('保留删除前确认');
