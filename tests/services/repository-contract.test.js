@@ -2,10 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { ConflictError, TaskRepository } from '../../src/data/task-repository.js';
+import { RecurringTemplateRepository } from '../../src/data/recurring-template-repository.js';
 import { createSearchIndexRecord } from '../../src/data/search-index.js';
 import { TagRepository } from '../../src/data/tag-repository.js';
 import { SettingsRepository } from '../../src/data/settings-repository.js';
 import { ValidationError } from '../../src/domain/errors.js';
+import { createRecurringTemplate } from '../../src/domain/recurring-template.js';
+import { createTask } from '../../src/domain/task.js';
+import { createTaskEvent } from '../../src/domain/task-event.js';
 import { BackupService } from '../../src/services/backup-service.js';
 import { RecurringService } from '../../src/services/recurring-service.js';
 import { TaskService } from '../../src/services/task-service.js';
@@ -394,6 +398,35 @@ test('模板和首个实例在同一个仓库边界内可导出和替换', async
   const snapshot = await templates.exportAll();
   assert.equal(snapshot.templates.length, 1);
   assert.equal((await repo.get(created.task.id)).id, created.task.id);
+});
+
+test('创建重复模板首实例时同步维护搜索索引', async () => {
+  const database = new IndexedDbFake();
+  const templateRepository = new RecurringTemplateRepository(database);
+  const template = createRecurringTemplate({
+    title: '每日站会',
+    scheduledDate: '2026-09-17',
+    recurrence: { frequency: 'daily', interval: 1 },
+  }, NOW, 'template-search');
+  const task = createTask({
+    title: template.title,
+    scheduledDate: template.scheduledDate,
+    seriesId: template.id,
+    occurrenceKey: `${template.id}:${template.scheduledDate}`,
+  }, NOW, 'task-search');
+  const event = createTaskEvent({
+    id: 'event-search',
+    taskId: task.id,
+    type: 'CREATE',
+    occurredAt: NOW,
+    detail: { recurringTemplateId: template.id },
+  });
+
+  await templateRepository.createWithTask(template, task, event);
+
+  const search = await new TaskRepository(database).search('每日站会');
+  assert.deepEqual(search.map(({ id }) => id), [task.id]);
+  assert.deepEqual(database.snapshot().searchIndex, [createSearchIndexRecord(task)]);
 });
 
 test('create、get 与 list 返回独立快照', async () => {

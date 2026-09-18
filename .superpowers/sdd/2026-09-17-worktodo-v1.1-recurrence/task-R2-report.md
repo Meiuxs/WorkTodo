@@ -14,8 +14,9 @@
 - `node --test tests/services/recurring-service.test.js tests/services/repository-contract.test.js`：22/22 通过
 - `node --test tests/services/backup-service.test.js tests/services/repository-contract.test.js tests/services/recurring-service.test.js`：42/42 通过
 - `npm run test:unit`：172/172 通过
+- 复审回归：`node --test tests/services/repository-contract.test.js --test-name-pattern="创建重复模板首实例时同步维护搜索索引"`：21/21 通过
 
 ## Concerns
 
-- 首个重复实例按计划通过模板仓库事务写入任务、事件和模板；搜索索引仍由后续任务仓库流程维护，R2 未扩展该派生索引写入。
+- 首个重复实例在模板、任务、事件和 `searchIndex` 四个 store 的同一事务中写入，搜索失败时随事务原子回滚。
 - 内存模板 fake 在未显式传入任务仓库时复用最近创建的内存任务仓库，以匹配 R2 测试约定的分离构造方式；生产代码不依赖该测试辅助行为。

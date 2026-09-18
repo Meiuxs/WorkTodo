@@ -2,6 +2,7 @@ import { createTaskEvent } from '../domain/task-event.js';
 import { validateRecurringTemplate } from '../domain/recurring-template.js';
 import { validateTask } from '../domain/task.js';
 import { openWorkTodoDatabase } from './database.js';
+import { createSearchIndexRecord } from './search-index.js';
 
 function clone(value) {
   return structuredClone(value);
@@ -36,12 +37,13 @@ export class RecurringTemplateRepository {
     if (eventToSave.taskId !== task.id) throw new TypeError('event.taskId 必须与任务一致');
     const database = await this.#database;
     const transaction = database.transaction(
-      ['recurringTemplates', 'tasks', 'events'],
+      ['recurringTemplates', 'tasks', 'events', 'searchIndex'],
       'readwrite',
     );
     transaction.objectStore('recurringTemplates').add(clone(template));
     transaction.objectStore('tasks').add(clone(task));
     transaction.objectStore('events').add(eventToSave);
+    transaction.objectStore('searchIndex').put(createSearchIndexRecord(task));
     await transactionResult(transaction);
     return { template: clone(template), task: clone(task) };
   }
