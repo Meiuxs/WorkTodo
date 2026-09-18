@@ -282,6 +282,20 @@ const taskEditor = createTaskEditor({
   openResourcePicker: (taskId, source) => resourcePicker.openForTask(taskId, source),
 });
 
+/* 侧栏高亮必须跟着"最终渲染的那个路由"走，所以放在 navigate 里，
+   而不是只挂在鼠标点击上——按 T/W/M 走的是同一条 navigate。 */
+function markCurrentRoute(route) {
+  document.querySelectorAll('[data-route]').forEach((item) => {
+    if (item.dataset.route === route) {
+      // 值必须是 page：aria-current="" 会被当成默认值 false，
+      // 既丢语义，也会让 [aria-current="page"] 的选中样式失效。
+      item.setAttribute('aria-current', 'page');
+    } else {
+      item.removeAttribute('aria-current');
+    }
+  });
+}
+
 async function navigate(route) {
   const nextRoute = routeMeta[route] === undefined ? 'today' : route;
   const [title, subtitle] = routeMeta[nextRoute];
@@ -289,13 +303,12 @@ async function navigate(route) {
   document.querySelector('#page-subtitle').textContent = subtitle;
   document.querySelector('#quick-add').hidden = ['history', 'settings', 'resources'].includes(nextRoute);
   document.querySelector('#quick-add-message').textContent = '';
+  markCurrentRoute(nextRoute);
   await controller.navigate(nextRoute);
 }
 
 document.querySelectorAll('[data-route]').forEach((button) => {
   button.addEventListener('click', async () => {
-    document.querySelectorAll('[data-route]').forEach((item) => item.removeAttribute('aria-current'));
-    button.setAttribute('aria-current', 'page');
     await navigate(button.dataset.route);
   });
 });

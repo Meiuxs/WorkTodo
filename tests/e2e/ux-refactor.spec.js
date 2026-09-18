@@ -24,6 +24,39 @@ test('Popup 先让用户记录，再展示少量今日重点', async ({ extensio
   await expect(popup.getByRole('heading', { name: '今天要推进' })).toBeVisible();
 });
 
+test('快捷键导航后侧栏选中项同步更新', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  const nav = dashboard.getByRole('navigation', { name: '工作台导航' });
+  const navItem = (name) => nav.getByRole('button', { name, exact: true });
+
+  await expect(navItem('今天')).toHaveAttribute('aria-current', 'page');
+
+  // 焦点要先离开可编辑控件，页面快捷键才生效。
+  await dashboard.locator('#page-title').click();
+
+  await dashboard.keyboard.press('w');
+  await expect(dashboard.locator('#page-title')).toHaveText('本周');
+  await expect(navItem('本周')).toHaveAttribute('aria-current', 'page');
+  await expect(navItem('今天')).not.toHaveAttribute('aria-current', 'page');
+
+  await dashboard.keyboard.press('m');
+  await expect(dashboard.locator('#page-title')).toHaveText('月历');
+  await expect(navItem('月历')).toHaveAttribute('aria-current', 'page');
+
+  await dashboard.keyboard.press('t');
+  await expect(dashboard.locator('#page-title')).toHaveText('今日工作');
+  await expect(navItem('今天')).toHaveAttribute('aria-current', 'page');
+  await expect(navItem('月历')).not.toHaveAttribute('aria-current', 'page');
+
+  // 选中项不能只改属性：用户看到的是字重与底色，这里确认视觉也跟上了。
+  const weights = await dashboard.evaluate(() => ({
+    current: getComputedStyle(document.querySelector('[data-route="today"]')).fontWeight,
+    other: getComputedStyle(document.querySelector('[data-route="month"]')).fontWeight,
+  }));
+  expect(weights.current).toBe('700');
+  expect(weights.other).toBe('400');
+});
+
 test('侧栏角标提示逾期与待整理数量且不改变导航项名称', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   const nav = dashboard.getByRole('navigation', { name: '工作台导航' });
