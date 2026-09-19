@@ -31,6 +31,11 @@ Windows 下 E2E 默认使用 Microsoft Edge。可通过 `PLAYWRIGHT_CHANNEL` 指
 - 长表单对话框限制在视口内滚动，打开后聚焦首个有效字段，关闭后恢复触发元素焦点。
 - 这套规则已同步记录在根目录 [`AGENTS.md`](AGENTS.md)，后续实现和评审以该文件与设计规范为准。
 
+## 版本发布
+
+- 版本发布记录：[docs/releases.md](docs/releases.md)，按版本记录版本号、变更摘要、测试结果、包文件名、GitHub Release 链接和 tag 名称。
+- `manifest.json` 的 `version` 是扩展发布版本的唯一来源；升级规则、发布步骤与命名约束见 [`AGENTS.md`](AGENTS.md) 的「版本与 GitHub 发布」。
+
 ## 加载已解压扩展
 
 1. 打开 Chrome 的 `chrome://extensions`。
