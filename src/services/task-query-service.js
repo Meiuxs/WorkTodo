@@ -10,7 +10,7 @@ import {
   toLocalDate,
 } from '../domain/dates.js';
 import { ValidationError } from '../domain/errors.js';
-import { isInboxTask } from '../domain/task.js';
+import { isInboxTask, isSubtask } from '../domain/task.js';
 
 const PRIORITY_RANK = {
   high: 3,
@@ -303,6 +303,25 @@ export class TaskQueryService {
 
   async all() {
     return this.#repository.list();
+  }
+
+  /* 按父任务分组拉取子任务（含已完成/已取消，排除回收站），供父行内联嵌套渲染。
+     子任务多无计划日期，不会出现在今天/本周等按日期筛选的列表里，必须单独取。 */
+  async subtasksByParent(parentIds) {
+    const wanted = new Set(parentIds);
+    const grouped = new Map();
+    if (wanted.size === 0) return grouped;
+    const tasks = await this.#repository.list();
+    for (const task of tasks) {
+      if (task.trashedAt !== null || !isSubtask(task) || !wanted.has(task.parentId)) continue;
+      const bucket = grouped.get(task.parentId);
+      if (bucket === undefined) grouped.set(task.parentId, [task]);
+      else bucket.push(task);
+    }
+    for (const children of grouped.values()) {
+      children.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+    }
+    return grouped;
   }
 
   async search(filters = {}) {

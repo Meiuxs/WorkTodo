@@ -1,5 +1,6 @@
 import { endOfWeek, formatLocalDay, formatLocalDayWithWeekday, startOfWeek, weekdayLabel } from '../../domain/dates.js';
 import { renderTaskList } from '../task-list.js';
+import { readHistoryState, writeParams } from '../hash.js';
 import { runViewAction } from '../../shared/ui.js';
 import { shouldShowSummaryEditor } from '../../shared/ux.js';
 
@@ -57,6 +58,19 @@ export function createHistoryView({
   let renderVersion = 0;
   let summaryVersion = 0;
 
+  /* 记录范围也是视图状态：每次渲染从 hash 读回，刷新和后退能回到看过的区间。
+     无历史栈的环境（Node 单测）里跳过，保留模块内状态以免点击被默认值覆盖。 */
+  function syncRangeFromHash() {
+    if (globalThis.history?.replaceState === undefined) return;
+    const state = readHistoryState();
+    mode = state.mode === 'daily' || state.mode === 'weekly' ? state.mode : 'weekly';
+    anchor = /^\d{4}-\d{2}-\d{2}$/.test(state.date ?? '') ? state.date : today();
+  }
+
+  function writeRange() {
+    writeParams({ mode, date: anchor });
+  }
+
   function invalidateSummary() {
     summaryVersion += 1;
     const output = root.querySelector('#history-summary-text');
@@ -76,6 +90,7 @@ export function createHistoryView({
     async render(signal) {
       const requestVersion = ++renderVersion;
       summaryVersion += 1;
+      syncRangeFromHash();
       const requestedMode = mode;
       const requestedAnchor = anchor;
       const fromDate = requestedMode === 'daily' ? requestedAnchor : startOfWeek(requestedAnchor);
@@ -171,6 +186,7 @@ export function createHistoryView({
       root.querySelectorAll('[data-history-mode]').forEach((button) => {
         button.addEventListener('click', () => {
           mode = button.dataset.historyMode;
+          writeRange();
           invalidateSummary();
           runViewAction(() => this.render(signal), { signal, onError });
         });
@@ -178,6 +194,7 @@ export function createHistoryView({
       root.querySelector('#history-date').addEventListener('change', (event) => {
         if (event.target.value.length === 0) return;
         anchor = event.target.value;
+        writeRange();
         invalidateSummary();
         runViewAction(() => this.render(signal), { signal, onError });
       });
@@ -237,6 +254,12 @@ export function createHistoryView({
         resourceCounts,
         emptyMessage: '这个区间还没有实际完成记录。',
       });
+      writeRange();
+    },
+
+    /* 回顾页是聚合报表，任务行变化后直接重建，不做局部替换。 */
+    patch(signal) {
+      return this.render(signal);
     },
   };
 }

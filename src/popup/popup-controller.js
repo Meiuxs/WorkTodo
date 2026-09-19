@@ -40,4 +40,18 @@ export class PopupController {
     await this.#sendMessage({ type: 'TASK_CHANGED', taskId: task.id });
     return result;
   }
+
+  /* Popup 里的“轻推进”：一键完成当前事项，父带子任务也直接完成（与工作台确认路径不同），
+     靠 toast 撤销兜底。complete 不经过 RecurringService，与工作台普通完成同一底层方法。 */
+  async completeTask(id, revision) {
+    const { task } = await this.#taskService.complete(id, revision);
+    await this.#sendMessage({ type: 'TASK_CHANGED', taskId: id });
+    return task;
+  }
+
+  async restoreTask(id, revision) {
+    const { task } = await this.#taskService.restore(id, revision);
+    await this.#sendMessage({ type: 'TASK_CHANGED', taskId: id });
+    return task;
+  }
 }

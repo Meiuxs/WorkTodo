@@ -102,6 +102,52 @@ test('load 保留逾期总数，供 Popup 明确提示未展示的逾期任务',
   assert.equal(state.focusTasks.length, 3);
 });
 
+test('completeTask 完成任务并广播，返回新 revision 供撤销使用', async () => {
+  const calls = [];
+  const messages = [];
+  const controller = new PopupController({
+    taskService: {
+      async complete(id, revision) {
+        calls.push({ id, revision });
+        return { task: { id, revision: revision + 1, lifecycle: 'completed' }, event: { id: 'e1' } };
+      },
+    },
+    queryService: {},
+    statisticsService: {},
+    today: () => '2026-09-17',
+    sendMessage: async (message) => messages.push(message),
+  });
+
+  const task = await controller.completeTask('t1', 3);
+
+  assert.deepEqual(calls, [{ id: 't1', revision: 3 }]);
+  assert.equal(task.revision, 4);
+  assert.deepEqual(messages, [{ type: 'TASK_CHANGED', taskId: 't1' }]);
+});
+
+test('restoreTask 用完成后的 revision 撤销完成并广播', async () => {
+  const calls = [];
+  const messages = [];
+  const controller = new PopupController({
+    taskService: {
+      async restore(id, revision) {
+        calls.push({ id, revision });
+        return { task: { id, revision: revision + 1, lifecycle: 'todo' }, event: { id: 'e2' } };
+      },
+    },
+    queryService: {},
+    statisticsService: {},
+    today: () => '2026-09-17',
+    sendMessage: async (message) => messages.push(message),
+  });
+
+  const task = await controller.restoreTask('t1', 4);
+
+  assert.deepEqual(calls, [{ id: 't1', revision: 4 }]);
+  assert.equal(task.lifecycle, 'todo');
+  assert.deepEqual(messages, [{ type: 'TASK_CHANGED', taskId: 't1' }]);
+});
+
 test('broadcastTaskChanged 向所有扩展页面发送统一变更消息', async () => {
   const messages = [];
 

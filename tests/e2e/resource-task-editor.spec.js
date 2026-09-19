@@ -4,7 +4,7 @@ test('任务可以关联网页资料、文本片段和本地文件元数据', as
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('准备评审');
   await dashboard.locator('#quick-add-date').selectOption('today');
-  await dashboard.getByRole('button', { name: '添加', exact: true }).click();
+  await dashboard.getByRole('button', { name: '记录', exact: true }).click();
 
   const task = dashboard.getByRole('button', { name: '准备评审' });
   await task.click();

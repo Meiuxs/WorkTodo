@@ -2,8 +2,16 @@ import { assertLocalDate, assertTimeRange } from './dates.js';
 import { TransitionError, ValidationError } from './errors.js';
 
 const LIFECYCLES = new Set(['todo', 'in_progress', 'completed', 'cancelled']);
-const PRIORITIES = new Set(['none', 'low', 'medium', 'high']);
+// 有序数组：循环切换优先级（行内 P 键）依赖这个顺序，Set 只用于校验。
+const PRIORITY_ORDER = ['none', 'low', 'medium', 'high'];
+const PRIORITIES = new Set(PRIORITY_ORDER);
 const ACTIONS = new Set(['START', 'COMPLETE', 'CANCEL', 'RESTORE', 'TRASH', 'UNTRASH', 'RESCHEDULE', 'POSTPONE']);
+
+export function nextPriority(priority) {
+  const index = PRIORITY_ORDER.indexOf(priority);
+  // 未知档位（脏数据）视为“无”，从循环头部重新进入，避免索引 -1 算出非法结果。
+  return PRIORITY_ORDER[((index === -1 ? 0 : index) + 1) % PRIORITY_ORDER.length];
+}
 
 function assertIdentifier(value, fieldName) {
   if (typeof value !== 'string' || value.length === 0) {
@@ -74,6 +82,11 @@ function assertActive(task, action) {
 
 export function isInboxTask(task) {
   return task.scheduledDate === null;
+}
+
+// 子任务：带 parentId 的任务。顶层列表只展示 parentId 为空的任务，子任务靠父行内联呈现。
+export function isSubtask(task) {
+  return task.parentId !== null && task.parentId !== undefined;
 }
 
 export function validateTask(task) {

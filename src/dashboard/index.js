@@ -28,6 +28,7 @@ import { RecurringService } from '../services/recurring-service.js';
 import { generateId } from '../shared/ids.js';
 import { createShortcutHandler } from './shortcuts.js';
 import { createNavBadges } from './nav-badges.js';
+import { readRoute, writeRoute, DEFAULT_ROUTE } from './hash.js';
 import { ResourceRepository } from '../data/resource-repository.js';
 import { ResourceService } from '../services/resource-service.js';
 import { createResourcePicker } from './resource-picker.js';
@@ -153,16 +154,22 @@ async function onAction(action, taskId, revision, value) {
     let force = false;
     if (count > 0) {
       force = await confirmAction({
-        title: '仍有未完成子任务',
-        message: `还有 ${count} 个子任务未完成。确认只会完成父任务，不会自动完成这些子任务。`,
-        confirmLabel: '仍然完成',
+        title: '完成父任务及其子任务？',
+        message: `还有 ${count} 个子任务未完成。完成父任务会同时把这些子任务标记为已完成。`,
+        confirmLabel: '完成全部',
       });
       if (!force) return null;
     }
     const result = await controller.handleTaskAction('complete', taskId, revision, { force });
-    showToast('已完成任务', {
+    const children = result.completedChildren ?? [];
+    showToast(children.length > 0 ? `已完成父任务和 ${children.length} 个子任务` : '已完成任务', {
       actionLabel: '撤销',
-      onAction: () => controller.handleTaskAction('restore', taskId, result.task.revision).catch(onError),
+      onAction: async () => {
+        await controller.handleTaskAction('restore', taskId, result.task.revision).catch(onError);
+        for (const child of children) {
+          await controller.handleTaskAction('restore', child.id, child.revision).catch(onError);
+        }
+      },
     });
     return result;
   }
@@ -196,9 +203,15 @@ async function onAction(action, taskId, revision, value) {
       actionLabel: '撤销',
       onAction: () => controller.handleTaskAction('untrash', taskId, result.task.revision).catch(onError),
     });
+  } else if (action === 'cycle-priority') {
+    // P 键循环优先级：菜单里没有对应按钮，Toast 是唯一的结果反馈，必须报出新档位。
+    const labels = { none: '无优先级', low: '低优先级', medium: '中优先级', high: '高优先级' };
+    showToast(`已设为${labels[result.task.priority] ?? '无优先级'}`);
   } else if (action === 'postpone') {
     // 日期在界面上只写中文格式，ISO 只留在数据层与导出文件里。
     showToast(value ? `已延期到 ${formatLocalDay(value)}` : '任务已更新');
+  } else if (action === 'reschedule') {
+    showToast(value ? `已安排到 ${formatLocalDay(value)}` : '已移除计划日期');
   } else if (action === 'copy') {
     showToast('已复制为新任务');
   } else if (action === 'delete-permanently') {
@@ -316,6 +329,10 @@ function markCurrentRoute(route) {
 
 async function navigate(route) {
   const nextRoute = routeMeta[route] === undefined ? 'today' : route;
+  // hash 是路由的唯一来源：进入某视图时把路径写回地址栏（replaceState 不触发
+  // hashchange，不会与下方监听互相回环），刷新、深链、收藏都能停在当前视图。
+  lastRoutePath = nextRoute;
+  writeRoute(nextRoute);
   const [title, subtitle] = routeMeta[nextRoute];
   document.querySelector('#page-title').textContent = title;
   document.querySelector('#page-subtitle').textContent = subtitle;
@@ -324,6 +341,16 @@ async function navigate(route) {
   markCurrentRoute(nextRoute);
   await controller.navigate(nextRoute);
 }
+
+// 地址栏 hash 变化（前进/后退/手动改路径）时复用同一条 navigate；
+// 视图级查询参数（筛选、记录范围）由视图自身响应，这里只在路径变化时重路由，
+// 避免改一个筛选条件写回 hash 时又触发整页重渲染。
+let lastRoutePath = readRoute();
+window.addEventListener('hashchange', () => {
+  const path = readRoute() || DEFAULT_ROUTE;
+  if (path === lastRoutePath) return;
+  void navigate(path).catch(onError);
+});
 
 document.querySelectorAll('[data-route]').forEach((button) => {
   button.addEventListener('click', async () => {
@@ -374,9 +401,10 @@ document.querySelector('#quick-add').addEventListener('submit', async (event) =>
   try {
     const result = await controller.createTask({ title: input.value, scheduledDate });
     input.value = '';
+    // 保留本次日期选择：连续安排多件“今天”的任务时不必每件重选；
+    // 自定义日期仍然清空，避免下一个标题悄悄落到旧日期上。
     custom.value = '';
-    select.value = 'inbox';
-    custom.hidden = true;
+    if (select.value === 'custom') custom.hidden = true;
     showToast(scheduledDate === null ? '已添加到收集箱' : `已安排到 ${formatLocalDay(scheduledDate)}`, {
       actionLabel: '撤销',
       onAction: () => onAction('undo-create', result.task.id, result.task.revision).catch(onError),
@@ -417,7 +445,7 @@ async function initialize() {
   } finally {
     app.hidden = false;
   }
-  await navigate('today').catch(onError);
+  await navigate(readRoute() || DEFAULT_ROUTE).catch(onError);
 }
 
 initialize().catch(onError);

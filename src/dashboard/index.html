@@ -18,14 +18,14 @@
         </div>
         <nav class="nav" aria-label="工作台导航">
           <div class="nav__group nav__group--primary">
-            <button type="button" data-route="today" aria-current="page" aria-keyshortcuts="t" aria-describedby="nav-badge-today-desc">今天<span class="nav__aside"><span class="nav__badge" data-nav-badge="today" data-tone="alert" hidden aria-hidden="true"></span><kbd class="nav__kbd" aria-hidden="true">T</kbd></span></button>
+            <button type="button" data-route="today" aria-current="page" aria-keyshortcuts="t" aria-describedby="nav-badge-today-desc">今天<span class="nav__aside"><span class="nav__badge" data-nav-badge="today" data-tone="alert" hidden aria-hidden="true"></span></span></button>
             <span class="sr-only" id="nav-badge-today-desc" data-nav-badge-desc="today"></span>
           </div>
           <div class="nav__group">
             <p class="nav__label">计划</p>
             <button type="button" data-route="tomorrow">明天</button>
-            <button type="button" data-route="week" aria-keyshortcuts="w">本周<span class="nav__aside"><kbd class="nav__kbd" aria-hidden="true">W</kbd></span></button>
-            <button type="button" data-route="month" aria-keyshortcuts="m">月历<span class="nav__aside"><kbd class="nav__kbd" aria-hidden="true">M</kbd></span></button>
+            <button type="button" data-route="week" aria-keyshortcuts="w">本周</button>
+            <button type="button" data-route="month" aria-keyshortcuts="m">月历</button>
           </div>
           <div class="nav__group">
             <p class="nav__label">任务</p>
@@ -58,13 +58,13 @@
 
         <form class="quick-add" id="quick-add">
           <div class="quick-add__lead">
-            <p class="eyebrow">快速记录 <kbd class="nav__kbd" aria-hidden="true">N</kbd></p>
+            <p class="eyebrow">快速记录</p>
             <span>只写标题，稍后再整理</span>
           </div>
           <div class="quick-add__row">
             <label class="sr-only" for="quick-add-title">记录一个新事项</label>
             <input id="quick-add-title" maxlength="200" autocomplete="off" aria-keyshortcuts="n" placeholder="写下下一件要推进的事……" required>
-            <button type="submit" class="button-primary" aria-label="添加">记录</button>
+            <button type="submit" class="button-primary">记录</button>
           </div>
           <div class="quick-add__options">
             <label class="sr-only" for="quick-add-date">计划日期</label>
@@ -176,9 +176,9 @@
 
     <dialog class="modal" id="confirm-dialog">
       <form method="dialog">
-        <h2 data-confirm-title>执行这个操作？</h2>
+        <h2 data-confirm-title>确认操作？</h2>
         <p data-confirm-message></p>
-        <div class="dialog-actions"><button value="cancel">取消</button><button class="button-danger" value="confirm" data-confirm-submit>执行操作</button></div>
+        <div class="dialog-actions"><button value="cancel">取消</button><button class="button-danger" value="confirm" data-confirm-submit></button></div>
       </form>
     </dialog>
 

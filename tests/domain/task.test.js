@@ -5,6 +5,7 @@ import { ValidationError, TransitionError } from '../../src/domain/errors.js';
 import {
   createTask,
   isInboxTask,
+  nextPriority,
   transitionTask,
   validateTask,
 } from '../../src/domain/task.js';
@@ -245,4 +246,13 @@ test('任务事件拒绝缺失或空白的必填字段', () => {
       `${fieldName} 缺失时应被拒绝`,
     );
   }
+});
+
+test('优先级沿无→低→中→高循环，尾部回到无', () => {
+  assert.equal(nextPriority('none'), 'low');
+  assert.equal(nextPriority('low'), 'medium');
+  assert.equal(nextPriority('medium'), 'high');
+  assert.equal(nextPriority('high'), 'none');
+  // 意外脏数据视为“无”，下一次按 P 即进入低档位，不会产出非法优先级。
+  assert.equal(nextPriority('legacy'), 'low');
 });

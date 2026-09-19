@@ -114,16 +114,20 @@ test('activeCount 忽略已完成、已取消、已回收和非本父任务的�
   assert.equal(await service.activeCount('parent-1'), 2);
 });
 
-test('父任务存在未完成子任务时默认阻止完成', async () => {
+test('父任务存在未完成子任务时默认阻止完成，确认后连带完成子任务', async () => {
   const { repository, service } = makeSubtaskService();
-  await service.createSubtask('parent-1', { title: '整理材料' });
+  const child = await service.createSubtask('parent-1', { title: '整理材料' });
 
   await assert.rejects(service.completeParent('parent-1', 0), /仍有未完成子任务/);
   assert.equal((await repository.get('parent-1')).lifecycle, 'todo');
+  assert.equal((await repository.get(child.task.id)).lifecycle, 'todo');
 
   const completed = await service.completeParent('parent-1', 0, { force: true });
   assert.equal(completed.task.lifecycle, 'completed');
   assert.equal(completed.event.type, 'COMPLETE');
+  // 级联：未完成的子任务被一并完成，并回传供撤销逐个恢复。
+  assert.deepEqual(completed.completedChildren.map((task) => task.id), [child.task.id]);
+  assert.equal((await repository.get(child.task.id)).lifecycle, 'completed');
 });
 
 test('没有未完成子任务时父任务可直接完成', async () => {

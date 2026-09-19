@@ -50,6 +50,10 @@ textarea {
 textarea { height: auto; padding: var(--sp-3) var(--sp-4); resize: vertical; }
 select { padding-right: var(--sp-2); }
 
+/* Windows 深色模式下原生 select 的弹出层可能仍是白底：显式声明 option 的前背景，
+   避免浅色选项文字（继承自 --ink）在白底上读不出来。 */
+select option { background-color: var(--surface-raised); color: var(--ink); }
+
 input::placeholder,
 textarea::placeholder { color: var(--muted); }
 
@@ -145,6 +149,9 @@ a {
 }
 
 .skip-link:focus-visible { transform: translateY(0); }
+
+/* skip-link 的落点：预留给吸顶头部的高度，键盘直达主体时目标不会被头部盖住。 */
+#view-root { scroll-margin-top: var(--sp-5); }
 
 button:focus-visible,
 input:focus-visible,

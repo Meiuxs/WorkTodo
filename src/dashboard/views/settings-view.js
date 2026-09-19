@@ -202,6 +202,15 @@ export function createSettingsView({
     csvService.exportDownload(contents, filename);
   }
 
+  /* 列表的增删改只影响 .category-list 区域：重取数据后只重建这一块，
+     不碰整个设置视图——否则主题选择、导入预览状态会被连带重置。 */
+  async function renderCategoryList(signal) {
+    categories = await taskService.listCategories();
+    if (signal?.aborted) return;
+    const list = root.querySelector('.category-list');
+    if (list !== null) list.innerHTML = categoryRows(categories);
+  }
+
   async function render(signal) {
     categories = await taskService.listCategories();
     if (signal?.aborted) return;
@@ -223,6 +232,23 @@ export function createSettingsView({
           <option value="dark">深色</option>
         </select>
       </label>
+    </section>
+    <section class="view-section" aria-labelledby="shortcuts-heading">
+      <div class="section-heading">
+        <div><h2 id="shortcuts-heading">键盘快捷键</h2><p>焦点在输入框里时页面快捷键不生效；弹窗打开期间全局快捷键暂停。</p></div>
+      </div>
+      <table class="shortcuts-table">
+        <caption class="sr-only">工作台键盘快捷键清单</caption>
+        <tbody>
+          <tr><th scope="row"><kbd class="kbd">T</kbd></td><td>回到今天</td></tr>
+          <tr><th scope="row"><kbd class="kbd">W</kbd></td><td>本周</td></tr>
+          <tr><th scope="row"><kbd class="kbd">M</kbd></td><td>月历</td></tr>
+          <tr><th scope="row"><kbd class="kbd">N</kbd></td><td>聚焦快速记录输入框</td></tr>
+          <tr><th scope="row"><kbd class="kbd">F</kbd></td><td>聚焦全部任务的搜索框</td></tr>
+          <tr><th scope="row"><kbd class="kbd">D</kbd></td><td>在任务行上：展开菜单并选中改期首项</td></tr>
+          <tr><th scope="row"><kbd class="kbd">P</kbd></td><td>在任务行上：循环优先级（无→低→中→高）</td></tr>
+        </tbody>
+      </table>
     </section>
     <section class="view-section" aria-labelledby="data-management-heading">
       <div class="section-heading">
@@ -321,8 +347,7 @@ export function createSettingsView({
         try {
           const destination = deleteDialog.querySelector('select').value || null;
           await taskService.deleteCategory(categoryId, destination);
-          await onDataChanged();
-          if (!signal?.aborted) await render(signal);
+          await renderCategoryList(signal);
         } catch (error) {
           if (signal?.aborted) return;
           deleteDialog.querySelector('[data-delete-message]').textContent = error.message;
@@ -340,8 +365,7 @@ export function createSettingsView({
         runViewAction(async () => {
           try {
             await taskService.renameCategory(categoryId, row.querySelector('input').value);
-            await onDataChanged();
-            if (!signal?.aborted) await render(signal);
+            await renderCategoryList(signal);
           } catch (error) {
             if (signal?.aborted) return;
             root.querySelector('#category-message').textContent = error.message;

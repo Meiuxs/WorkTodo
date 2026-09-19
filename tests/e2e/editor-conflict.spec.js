@@ -3,7 +3,7 @@ import { test, expect, openDashboard } from './fixtures.js';
 async function createTodayTask(dashboard, title) {
   await dashboard.getByLabel('记录一个新事项').fill(title);
   await dashboard.locator('#quick-add-date').selectOption('today');
-  await dashboard.getByRole('button', { name: '添加', exact: true }).click();
+  await dashboard.getByRole('button', { name: '记录', exact: true }).click();
   await expect(dashboard.getByRole('button', { name: title })).toBeVisible();
 }
 

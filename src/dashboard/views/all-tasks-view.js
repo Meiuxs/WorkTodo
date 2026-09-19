@@ -1,5 +1,7 @@
 import { escapeHtml, runViewAction } from '../../shared/ui.js';
-import { renderTaskList } from '../task-list.js';
+import { readFilters as readHashFilters, writeParams } from '../hash.js';
+import { renderTaskList, renderTaskRow, arrangeSubtasks } from '../task-list.js';
+import { patchTaskContainers } from '../list-patch.js';
 
 const EMPTY_FILTERS = Object.freeze({
   text: '',
@@ -19,6 +21,21 @@ function categoryOptions(categories, selected) {
     `<option value="__none" ${selected === '__none' ? 'selected' : ''}>未归入列表</option>`,
     ...categories.map((item) => `<option value="${escapeHtml(item.id)}" ${selected === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`),
   ].join('');
+}
+
+function hashFilters() {
+  return { ...EMPTY_FILTERS, ...readHashFilters() };
+}
+
+/* 空值统一成 ''：HTMLFormControlsCollection 在 name 重复时会返回 RadioNodeList，
+   按 FormData 逐字段归一，保证 filters 始终是“键全在、值为字符串”的普通对象。 */
+function normalizeFilters(source) {
+  const normalized = { ...EMPTY_FILTERS };
+  for (const key of Object.keys(EMPTY_FILTERS)) {
+    const value = source.get(key);
+    normalized[key] = typeof value === 'string' ? value : '';
+  }
+  return normalized;
 }
 
 function tagOptions(tags, selected) {
@@ -42,7 +59,7 @@ function queryFilters(filters) {
 }
 
 export function createAllTasksView({ root, query, taskService, tagService, today, onAction, onEdit, onError, getResourceCounts, resourceService }) {
-  let filters = { ...EMPTY_FILTERS };
+  let filters = hashFilters();
   let categories = [];
   let tags = [];
   let searchTimer;
@@ -67,27 +84,33 @@ export function createAllTasksView({ root, query, taskService, tagService, today
       : filters.hasResources === 'false'
         ? tasks.filter((task) => (resourceCounts.get(task.id) ?? 0) === 0)
         : tasks;
+    const { topLevel, childrenByParent } = await arrangeSubtasks(query, visibleTasks);
     const filterCount = root.querySelector('#filter-count');
     if (filterCount === null) return;
-    renderTaskList(listRoot, visibleTasks, {
+    renderTaskList(listRoot, topLevel, {
       today: today(),
       onAction,
       onEdit,
       onError,
       tags,
       resourceCounts,
+      childrenByParent,
       emptyMessage: '没有符合当前筛选条件的任务。',
     });
-    filterCount.textContent = `显示 ${visibleTasks.length} 项`;
+    filterCount.textContent = `显示 ${topLevel.length} 项`;
   }
 
   function readFilters() {
     const form = root.querySelector('#task-filters');
-    filters = Object.fromEntries(new FormData(form).entries());
+    filters = normalizeFilters(new FormData(form));
+    // 筛选即状态：写回 hash，刷新、后退和收藏都能回到同一份结果。
+    writeParams(filters);
   }
 
   return {
     async render(signal) {
+      // hash 是筛选的唯一来源：导航离开再回来（或在地址栏改条件）都以它为准。
+      filters = hashFilters();
       [categories, tags] = await Promise.all([
         taskService.listCategories(),
         tagService.list(),
@@ -99,7 +122,7 @@ export function createAllTasksView({ root, query, taskService, tagService, today
           <span id="filter-count" class="filter-count">显示 0 项</span>
         </div>
         <form class="filters" id="task-filters">
-          <label class="filter-search">搜索 <kbd class="nav__kbd" aria-hidden="true">F</kbd><input type="search" name="text" value="${escapeHtml(filters.text)}" placeholder="标题或描述" aria-keyshortcuts="f"></label>
+          <label class="filter-search">搜索<input type="search" name="text" value="${escapeHtml(filters.text)}" placeholder="标题或描述" aria-keyshortcuts="f"></label>
           <label>状态<select name="lifecycle">
             <option value="">全部</option><option value="todo" ${filters.lifecycle === 'todo' ? 'selected' : ''}>待办</option><option value="in_progress" ${filters.lifecycle === 'in_progress' ? 'selected' : ''}>进行中</option><option value="completed" ${filters.lifecycle === 'completed' ? 'selected' : ''}>已完成</option><option value="cancelled" ${filters.lifecycle === 'cancelled' ? 'selected' : ''}>已取消</option>
           </select></label>
@@ -130,9 +153,38 @@ export function createAllTasksView({ root, query, taskService, tagService, today
       });
       root.querySelector('#clear-filters').addEventListener('click', () => {
         filters = { ...EMPTY_FILTERS };
+        writeParams(filters);
         runViewAction(() => this.render(signal), { signal, onError });
       });
       await refreshList(signal);
+    },
+
+    async patch(signal) {
+      let tasks;
+      try {
+        tasks = await query.search(queryFilters(filters));
+      } catch (error) {
+        if (signal?.aborted || error?.name === 'AbortError') return;
+        await this.render(signal);
+        return;
+      }
+      if (signal?.aborted) return;
+      const resourceCounts = await getResourceCounts?.(tasks) ?? new Map();
+      const visibleTasks = filters.hasResources === 'true'
+        ? tasks.filter((task) => (resourceCounts.get(task.id) ?? 0) > 0)
+        : filters.hasResources === 'false'
+          ? tasks.filter((task) => (resourceCounts.get(task.id) ?? 0) === 0)
+          : tasks;
+      if (signal?.aborted) return;
+      const { topLevel, childrenByParent } = await arrangeSubtasks(query, visibleTasks);
+      if (signal?.aborted) return;
+      const patched = patchTaskContainers(root, [
+        { container: root.querySelector('#all-tasks-list'), tasks: topLevel },
+      ], {
+        renderRow: (task) => renderTaskRow(task, { today: today(), tags, resourceCounts, childrenByParent }),
+        collectCounts: () => ({ '#filter-count': `显示 ${topLevel.length} 项` }),
+      });
+      if (patched === false) await this.render(signal);
     },
   };
 }

@@ -309,6 +309,14 @@ export function createTaskEditor({
     event.preventDefault();
     close().catch(() => {});
   });
+  // 原生日期/时间选择器贴着输入框弹出，字段靠近抽屉底部时浮层会向上翻转盖住上面的内容。
+  // 聚焦时把该字段滚到视口中段，给原生浮层留出向下展开的空间（浮层本身不可用 CSS 定位）。
+  dialog.addEventListener('focusin', (event) => {
+    const control = event.target;
+    if (control instanceof HTMLElement && control.matches('input[type="time"], input[type="date"]')) {
+      control.scrollIntoView({ block: 'center' });
+    }
+  });
   dialog.querySelector('[data-editor-copy]').addEventListener('click', async () => {
     if (currentTask === null) return;
     await onCopy(currentTask.id);

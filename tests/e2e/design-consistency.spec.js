@@ -3,7 +3,7 @@ import { test, expect, openDashboard } from './fixtures.js';
 async function createTodayTask(dashboard, title) {
   await dashboard.getByLabel('记录一个新事项').fill(title);
   await dashboard.locator('#quick-add-date').selectOption('today');
-  await dashboard.getByRole('button', { name: '添加', exact: true }).click();
+  await dashboard.getByRole('button', { name: '记录', exact: true }).click();
 }
 
 test('页面级空状态使用同一结构且不重复表达同一件事', async ({ extension }) => {
@@ -31,7 +31,7 @@ test('页面级空状态使用同一结构且不重复表达同一件事', async
 test('任务菜单用动作名称表达破坏性操作并只保留一个编辑入口', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('术语检查任务');
-  await dashboard.getByRole('button', { name: '添加', exact: true }).click();
+  await dashboard.getByRole('button', { name: '记录', exact: true }).click();
   await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
 
   const row = dashboard.locator('[data-task-id]').filter({ hasText: '术语检查任务' });
@@ -42,7 +42,7 @@ test('任务菜单用动作名称表达破坏性操作并只保留一个编辑�
   await expect(row.getByRole('button', { name: '添加子任务', exact: true })).toHaveCount(0);
 
   // 恢复是动作，不是勾选：可恢复的行不再声明 checkbox 语义。
-  await row.getByRole('button', { name: '完成', exact: true }).click();
+  await row.getByRole('checkbox', { name: '完成任务' }).click();
   await dashboard.getByRole('button', { name: '已完成', exact: true }).click();
   const completedRow = dashboard.locator('[data-task-id]').filter({ hasText: '术语检查任务' });
   await expect(completedRow.locator('.task__check')).toHaveAttribute('aria-label', '恢复任务');

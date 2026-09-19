@@ -85,7 +85,7 @@ test('回收站可以恢复任务，永久删除任务需要二次确认', async
   const page = await openDashboard(extension);
   await page.getByLabel('记录一个新事项').fill('待删除任务');
   await page.locator('#quick-add-date').selectOption('today');
-  await page.getByRole('button', { name: '添加', exact: true }).click();
+  await page.getByRole('button', { name: '记录', exact: true }).click();
   const row = page.locator('[data-task-id]').filter({ has: page.getByRole('button', { name: '待删除任务' }) });
   await row.getByText('更多', { exact: true }).click();
   await row.getByRole('button', { name: '移入回收站', exact: true }).click();
@@ -99,6 +99,8 @@ test('回收站可以恢复任务，永久删除任务需要二次确认', async
   await expect(confirmation.getByRole('heading', { name: '永久删除任务？' })).toBeVisible();
   await confirmation.getByRole('button', { name: '取消' }).click();
   await expect(page.getByRole('button', { name: '待删除任务' })).toBeVisible();
+  // 取消确认后行菜单会随“点外收起”一起关闭，重试需重新展开。
+  await row.getByText('更多', { exact: true }).click();
   await row.getByRole('button', { name: '永久删除' }).click();
   await confirmation.getByRole('button', { name: '永久删除' }).click();
   await expect(page.getByRole('button', { name: '待删除任务' })).toHaveCount(0);
@@ -233,7 +235,7 @@ test('toast 撤销按钮在浅色和深色主题下都保持可读', async ({ ex
   await page.getByLabel('主题').selectOption('dark');
   await page.getByRole('button', { name: '今天' }).click();
   await page.getByLabel('记录一个新事项').fill('检查主题对比度');
-  await page.getByRole('button', { name: '添加', exact: true }).click();
+  await page.getByRole('button', { name: '记录', exact: true }).click();
   await expect(page.locator('#toast').getByRole('button', { name: '撤销' })).toBeVisible();
 
   await expect.poll(async () => {

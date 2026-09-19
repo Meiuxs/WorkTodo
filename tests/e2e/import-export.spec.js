@@ -4,7 +4,7 @@ import { test, expect, openDashboard } from './fixtures.js';
 test('导出包含版本信息，导入经过预览后可合并', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('备份任务');
-  await dashboard.getByRole('button', { name: '添加', exact: true }).click();
+  await dashboard.getByRole('button', { name: '记录', exact: true }).click();
   await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
   await dashboard.getByRole('button', { name: '备份任务' }).click();
   const editor = dashboard.getByRole('dialog').first();

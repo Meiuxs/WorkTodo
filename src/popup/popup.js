@@ -50,11 +50,38 @@ function showPopupSuccess(feedback, onUndo) {
   showPopupSuccess.timeoutId = window.setTimeout(() => { toast.hidden = true; }, 5000);
 }
 
+function showCompleteToast(onUndo) {
+  toast.replaceChildren();
+  const text = document.createElement('span');
+  text.textContent = '已完成任务';
+  const undo = document.createElement('button');
+  undo.type = 'button';
+  undo.className = 'toast__action';
+  undo.textContent = '撤销';
+  undo.addEventListener('click', async () => {
+    undo.disabled = true;
+    try {
+      await onUndo();
+      text.textContent = '已撤销完成';
+      undo.remove();
+    } catch {
+      text.textContent = '撤销没有完成，请打开工作台处理';
+      undo.disabled = false;
+    }
+  }, { once: true });
+  toast.append(text, ' ', undo);
+  toast.hidden = false;
+  window.clearTimeout(showPopupSuccess.timeoutId);
+  showPopupSuccess.timeoutId = window.setTimeout(() => { toast.hidden = true; }, 5000);
+}
+
 function taskMarkup(task, today) {
   const overdue = task.scheduledDate !== null && task.scheduledDate < today;
   const detail = overdue ? '逾期' : (task.startTime ?? '无时间');
-  // 符号本身没有语义，用 role="img" + 文字名称把它读出来。
-  return `<li class="task-row"><span class="task-row__state" role="img" aria-label="${overdue ? '逾期' : '待办'}">□</span><span class="task-row__title">${escapeHtml(task.title)}</span><span class="task-row__detail${overdue ? ' task-row__detail--overdue' : ''}">${detail}</span></li>`;
+  const checked = task.lifecycle === 'completed';
+  // 完成是 Popup 里的“立刻推进”动作：用真正的按钮与 role="checkbox"，
+  // 与工作台任务行的圆圈完全一致的语义，而不是看起来能点却不可点的静态符号。
+  return `<li class="task-row"><button class="task-row__check" type="button" role="checkbox" aria-checked="${checked}" aria-label="完成任务" data-action="complete" data-task-id="${escapeHtml(task.id)}" data-revision="${task.revision}">${checked ? '✓' : ''}</button><span class="task-row__title">${escapeHtml(task.title)}</span><span class="task-row__detail${overdue ? ' task-row__detail--overdue' : ''}">${detail}</span></li>`;
 }
 
 const repository = new TaskRepository();
@@ -124,6 +151,30 @@ form.addEventListener('submit', async (event) => {
 });
 
 document.querySelector('#open-dashboard').addEventListener('click', openDashboard);
+
+async function handleComplete(button) {
+  const taskId = button.dataset.taskId;
+  const revision = Number(button.dataset.revision);
+  button.disabled = true;
+  try {
+    const completed = await controller.completeTask(taskId, revision);
+    await refresh();
+    showCompleteToast(async () => {
+      await controller.restoreTask(taskId, completed.revision);
+      await refresh();
+    });
+  } catch {
+    if (button.isConnected) button.disabled = false;
+    message.textContent = '操作没有完成，请重新打开扩展重试。';
+  }
+}
+
+for (const list of [document.querySelector('#overdue-list'), document.querySelector('#focus-list')]) {
+  list.addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-action="complete"]');
+    if (button !== null) void handleComplete(button);
+  });
+}
 
 input.focus();
 refresh().catch(() => { message.textContent = '任务列表暂时无法加载。请重新打开扩展。'; });

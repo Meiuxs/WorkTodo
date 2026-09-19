@@ -1,3 +1,5 @@
+import { nextPriority } from '../domain/task.js';
+
 const ROUTES = new Set([
   'today',
   'tomorrow',
@@ -53,6 +55,25 @@ export class DashboardController {
     await this.#render(this.#route);
   }
 
+  /* 任务动作后的首选刷新路径：视图支持 patch 时只原地更新变化的任务行，
+     保住滚动位置、键盘焦点和其他行展开中的菜单；不支持时回退整页渲染。 */
+  async #refreshAfterAction() {
+    const view = this.#views[this.#route];
+    if (typeof view?.patch === 'function') {
+      try {
+        await view.patch();
+        // 原地更新也要顺带刷新外壳角标，与 #renderView 的处理一致。
+        if (this.#onRendered !== null) {
+          Promise.resolve().then(() => this.#onRendered()).catch(() => {});
+        }
+        return;
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
+      }
+    }
+    await this.refresh();
+  }
+
   #render(route) {
     this.#renderAbortController?.abort();
     const renderAbortController = new AbortController();
@@ -82,7 +103,7 @@ export class DashboardController {
   }
 
   async onMessage(message) {
-    if (message?.type === 'TASK_CHANGED') await this.refresh();
+    if (message?.type === 'TASK_CHANGED') await this.#refreshAfterAction();
   }
 
   async createTask(input) {
@@ -95,7 +116,7 @@ export class DashboardController {
   async editTask(taskId, changes, revision) {
     const result = await this.#taskService.edit(taskId, changes, revision);
     await this.#sendMessage({ type: 'TASK_CHANGED', taskId: result.task.id });
-    await this.refresh();
+    await this.#refreshAfterAction();
     return result;
   }
 
@@ -123,6 +144,9 @@ export class DashboardController {
       result = await this.#taskService[action](taskId, value, revision);
     } else if (action === 'set-priority') {
       result = await this.#taskService.edit(taskId, { priority: value }, revision);
+    } else if (action === 'cycle-priority') {
+      // 行内 P 键快捷循环：菜单里不再有优先级子菜单，循环顺序由领域层定义。
+      result = await this.#taskService.edit(taskId, { priority: nextPriority(value) }, revision);
     } else if (action === 'set-starred') {
       result = await this.#taskService.edit(taskId, { starred: value === true }, revision);
     } else if (methods[action] === 'copy') {
@@ -133,7 +157,7 @@ export class DashboardController {
       throw new Error(`不支持的任务操作: ${action}`);
     }
     await this.#sendMessage({ type: 'TASK_CHANGED', taskId: result.task.id });
-    await this.refresh();
+    await this.#refreshAfterAction();
     return result;
   }
 }

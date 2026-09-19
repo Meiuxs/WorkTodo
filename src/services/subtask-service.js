@@ -28,10 +28,28 @@ export class SubtaskService {
     )).length;
   }
 
+  #activeChildren(children) {
+    return children.filter((task) => (
+      task.trashedAt === null && !['completed', 'cancelled'].includes(task.lifecycle)
+    ));
+  }
+
+  /* 完成父任务时默认连带完成其未完成的子任务：
+     - 无未完成子任务：直接完成父任务；
+     - 有未完成子任务且未确认（force=false）：抛错，由界面先弹确认；
+     - 确认后（force=true）：先级联完成子任务，再完成父任务，返回被自动完成的子任务供撤销时逐个恢复。 */
   async completeParent(parentId, revision, { force = false } = {}) {
-    if (!force && (await this.activeCount(parentId)) > 0) {
+    const children = await this.#repository.list({ parentId });
+    const active = this.#activeChildren(children);
+    if (active.length > 0 && !force) {
       throw new ValidationError('父任务仍有未完成子任务');
     }
-    return this.#taskService.complete(parentId, revision);
+    const completedChildren = [];
+    for (const child of active) {
+      const result = await this.#taskService.complete(child.id, child.revision);
+      completedChildren.push(result.task);
+    }
+    const result = await this.#taskService.complete(parentId, revision);
+    return { ...result, completedChildren };
   }
 }

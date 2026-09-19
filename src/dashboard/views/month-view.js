@@ -123,5 +123,11 @@ export function createMonthView({
         });
       });
     },
+
+    /* 月历是格子矩阵，行级原地替换保不住网格焦点分配（roving tabindex），
+       动作后仍然整页重渲染。 */
+    patch(signal) {
+      return this.render(signal);
+    },
   };
 }

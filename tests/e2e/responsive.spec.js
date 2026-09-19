@@ -6,7 +6,7 @@ test('移动视口下快速新增和任务操作不产生横向溢出', async ({
 
   await dashboard.getByLabel('记录一个新事项').fill('移动端任务');
   await dashboard.locator('#quick-add-date').selectOption('today');
-  await dashboard.getByRole('button', { name: '添加', exact: true }).click();
+  await dashboard.getByRole('button', { name: '记录', exact: true }).click();
   await expect(dashboard.getByRole('button', { name: '移动端任务' })).toBeVisible();
 
   const overflow = await dashboard.evaluate(() => ({
@@ -14,5 +14,5 @@ test('移动视口下快速新增和任务操作不产生横向溢出', async ({
     clientWidth: document.documentElement.clientWidth,
   }));
   expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
-  await expect(dashboard.getByRole('button', { name: '添加', exact: true })).toBeVisible();
+  await expect(dashboard.getByRole('button', { name: '记录', exact: true })).toBeVisible();
 });
