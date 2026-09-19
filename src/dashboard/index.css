@@ -987,15 +987,22 @@ input::placeholder { color: var(--muted); }
 /* ============ 确认对话框 ============ */
 .modal {
   width: min(460px, calc(100vw - 32px));
+  max-height: calc(100vh - var(--sp-8));
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   background: var(--surface-raised);
   padding: 0;
+  overflow: hidden;
 }
-.modal form { padding: var(--sp-6); }
+.modal form {
+  max-height: calc(100vh - var(--sp-8));
+  overflow: auto;
+  padding: var(--sp-6);
+}
 .modal h2 { margin: 0; font-size: var(--fs-h2); line-height: var(--lh-heading); }
 .modal p { color: var(--muted); font-size: var(--fs-body); }
 .modal label { display: grid; gap: var(--sp-2); margin: var(--sp-5) 0; color: var(--muted); font-size: var(--fs-caption); }
+.modal .dialog-actions { margin-top: var(--sp-6); border-top: 1px solid var(--line); padding-top: var(--sp-4); }
 
 /* ============ 反馈条 ============ */
 /* 反馈条要停在快速记录栏上方：两者都在底部时，toast 会盖住"更多字段"按钮。 */

@@ -15,4 +15,11 @@ test('资料收集箱可以创建、搜索并关联网页资料', async ({ exten
 
   await dashboard.getByLabel('搜索资料').fill('example.com');
   await expect(dashboard.getByText('项目规范')).toBeVisible();
+
+  await dashboard.locator('[data-resource-id]').getByRole('button', { name: '删除' }).click();
+  const confirmDialog = dashboard.locator('#confirm-dialog');
+  await expect(confirmDialog).toBeVisible();
+  await expect(confirmDialog.getByRole('heading', { name: '删除资料？' })).toBeVisible();
+  await confirmDialog.getByRole('button', { name: '取消' }).click();
+  await expect(confirmDialog).toBeHidden();
 });

@@ -17,6 +17,20 @@ test('Popup 快速新增任务后 Dashboard 收集箱可见且刷新后仍存在
   await expect(dashboard.getByRole('button', { name: '联系客户' })).toBeVisible();
 });
 
+test('Popup 成功反馈不遮挡底部日期选择', async ({ extension }) => {
+  const popup = await openPopup(extension);
+  await popup.getByLabel('记录一个新事项').fill('检查反馈位置');
+  await popup.getByRole('button', { name: '添加任务' }).click();
+  await expect(popup.getByText('已添加到收集箱')).toBeVisible();
+
+  const positions = await popup.evaluate(() => {
+    const toast = document.querySelector('#toast').getBoundingClientRect();
+    const dateOptions = document.querySelector('.popup__date-options').getBoundingClientRect();
+    return { toastTop: toast.top, dateOptionsBottom: dateOptions.bottom };
+  });
+  expect(positions.toastTop).toBeGreaterThanOrEqual(positions.dateOptionsBottom);
+});
+
 test('工作记录先显示结论，生成总结后再展开文本编辑区域', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByRole('button', { name: '工作记录' }).click();

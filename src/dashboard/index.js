@@ -216,6 +216,7 @@ const viewOptions = {
   onAction,
   onEdit,
   onError,
+  confirmAction,
   resourceService,
   getResourceCounts,
 };

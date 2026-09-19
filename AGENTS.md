@@ -22,6 +22,14 @@
 4. **行动可恢复**：完成、延期、取消和删除都给出清晰反馈与可回退路径。
 5. **本地可信**：状态、保存、导入和数据风险都用平实文字说明。
 
+## UI 设计规范引用
+
+- 统一设计规范：[docs/superpowers/designs/2026-09-17-worktodo-ui-design.md](docs/superpowers/designs/2026-09-17-worktodo-ui-design.md)。
+- 交互评审入口：[docs/review-index.md](docs/review-index.md)。
+- 运行时设计令牌：[src/styles/tokens.css](src/styles/tokens.css)。
+- Popup、任务编辑抽屉、确认对话框、资料表单和 Toast 必须按设计规范分层；不得新增浏览器原生 `window.confirm`、遮挡主操作的 Toast 或超出视口的长表单弹窗。
+- 若实现与规范冲突，先更新规范和 README 的说明，再修改组件，并补充对应的键盘、响应式和无障碍验收。
+
 ## Engineering Constraints
 
 - 目标平台：Chromium 110+、统信 UOS、ARM64。

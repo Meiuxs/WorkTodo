@@ -4,7 +4,7 @@ function typeLabel(type) {
   return type === 'url' ? '网页链接' : type === 'file' ? '本地文件' : '文本片段';
 }
 
-export function createResourcesView({ root, resourceService, query, onError }) {
+export function createResourcesView({ root, resourceService, query, onError, confirmAction }) {
   let text = '';
   let type = 'all';
   let renderVersion = 0;
@@ -81,7 +81,12 @@ export function createResourcesView({ root, resourceService, query, onError }) {
       root.querySelectorAll('[data-resource-delete]').forEach((button) => button.addEventListener('click', () => {
         runViewAction(async () => {
           const card = button.closest('[data-resource-id]');
-          if (!window.confirm('删除这条资料？已保存的文件副本也会被删除，且无法恢复。')) return;
+          const confirmed = await confirmAction({
+            title: '删除资料？',
+            message: '已保存的文件副本也会被删除，且无法恢复。',
+            confirmLabel: '删除资料',
+          });
+          if (!confirmed) return;
           await resourceService.remove(card.dataset.resourceId, { force: false });
           await this.render(signal);
         }, { signal, onError });

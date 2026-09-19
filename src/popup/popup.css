@@ -119,10 +119,8 @@ h1 {
 .empty { color: var(--muted); font-size: var(--fs-ui); }
 
 .toast {
-  position: fixed;
-  right: var(--sp-4);
-  bottom: var(--sp-4);
-  max-width: 310px;
+  max-width: none;
+  margin-top: var(--sp-4);
   border-radius: var(--r-md);
   background: var(--ink);
   box-shadow: var(--shadow-float);
