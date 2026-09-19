@@ -28,11 +28,19 @@ function renderWeeklyDays(days, todayDate) {
       hasAttention ? 'history-day--attention' : '',
     ].filter(Boolean).join(' ');
     const label = isToday ? '今天' : weekdayLabel(day.date);
-    const ariaLabel = `${label}：完成 ${completedCount} 项，计划 ${plannedCount} 项，延期 ${postponedCount} 次`;
-    return `<div class="${classes}" aria-label="${ariaLabel}">
+    const statusText = plannedCount === 0
+      ? '无计划'
+      : postponedCount > 0
+        ? `延期 ${postponedCount} 次`
+        : plannedCount > completedCount
+          ? '待处理'
+          : '按计划';
+    const ariaLabel = `${label}：完成 ${completedCount} 项，计划 ${plannedCount} 项，${statusText}`;
+    return `<div class="${classes}" role="listitem" aria-label="${ariaLabel}">
       <div class="history-day__column"><span style="height: ${height}%"></span></div>
       <strong>${completedCount}</strong>
       <small>${label}</small>
+      <small class="history-day__status">${statusText}</small>
     </div>`;
   }).join('');
 }
@@ -93,6 +101,7 @@ export function createHistoryView({
       }
       if (signal?.aborted || requestVersion !== renderVersion) return;
       const resourceCounts = await getResourceCounts?.(completed) ?? new Map();
+      if (signal?.aborted || requestVersion !== renderVersion) return;
       // 界面上的范围文案用中文日期；服务层生成的总结文本仍保留 ISO，便于粘贴后机器解析。
       const rangeText = requestedMode === 'daily'
         ? formatLocalDayWithWeekday(requestedAnchor)
@@ -108,7 +117,7 @@ export function createHistoryView({
       const todayDate = today();
       const breakdown = requestedMode === 'weekly'
         ? `<div class="history-breakdown__heading"><h3 id="history-breakdown-heading">工作节奏</h3><span>用每天的完成量看变化，不只看一个百分比。</span></div>
-          <div class="history-days" aria-label="本周每日完成量">${renderWeeklyDays(weeklyDays, todayDate)}</div>
+          <div class="history-days" role="list" aria-label="本周每日完成量">${renderWeeklyDays(weeklyDays, todayDate)}</div>
           <div class="history-legend"><span>已完成</span><span>有延期或待处理</span></div>`
         : `<div class="history-breakdown__heading"><h3 id="history-breakdown-heading">今日回顾</h3><span>日视图优先查看完成事项，不强行展示趋势。</span></div>
           <p class="history-day-summary">${summary.completedCount === 0 ? '今天还没有完成记录，先完成一件小事，再回来看看进度。' : `今天完成 ${summary.completedCount} 项，计划任务 ${summary.plannedCount} 项。`}</p>`;

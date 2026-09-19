@@ -414,4 +414,56 @@ test('History 视图默认按周显示七天真实完成节奏', async () => {
   assert.equal((root.innerHTML.match(/class="history-day(?: |")/g) ?? []).length, 7);
   assert.match(root.innerHTML, /class="history-day history-day--today(?: |\")/);
   assert.match(root.innerHTML, /<strong>2<\/strong>/);
+  assert.match(root.innerHTML, /role="list"/);
+  assert.match(root.innerHTML, /role="listitem"/);
+  assert.match(root.innerHTML, /class="history-day__status">延期 1 次<\/small>/);
+});
+
+test('History 视图资源统计迟到后不会覆盖最新渲染', async () => {
+  const { root } = createHistoryRoot();
+  let releaseFirst;
+  let firstStartedResolve;
+  const firstStarted = new Promise((resolve) => { firstStartedResolve = resolve; });
+  const firstCounts = new Promise((resolve) => { releaseFirst = resolve; });
+  let weeklyCalls = 0;
+  let resourceCalls = 0;
+  const view = createHistoryView({
+    root,
+    query: { async completed() { return []; } },
+    statistics: {
+      async weekly() {
+        weeklyCalls += 1;
+        return {
+          completedCount: weeklyCalls,
+          plannedCount: 1,
+          createdCount: 0,
+          postponedCount: 0,
+          completionRate: 1,
+          plannedCompletedCount: weeklyCalls,
+          carriedOverCompletedCount: 0,
+        };
+      },
+    },
+    summaryService: {},
+    today: () => '2026-09-17',
+    onAction() {},
+    onEdit() {},
+    getResourceCounts: async () => {
+      resourceCalls += 1;
+      if (resourceCalls === 1) {
+        firstStartedResolve();
+        return firstCounts;
+      }
+      return new Map();
+    },
+  });
+
+  const firstRender = view.render();
+  await firstStarted;
+  await view.render();
+  releaseFirst(new Map());
+  await firstRender;
+
+  assert.match(root.innerHTML, /已完成 2 项/);
+  assert.doesNotMatch(root.innerHTML, /已完成 1 项/);
 });
