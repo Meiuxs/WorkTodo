@@ -19,7 +19,7 @@ Windows 下 E2E 默认使用 Microsoft Edge。可通过 `PLAYWRIGHT_CHANNEL` 指
 
 ## UI 设计规范
 
-- 设计规范：[WorkTodo V1.0 界面设计规范](docs/superpowers/designs/2026-09-17-worktodo-ui-design.md)。这里维护视觉令牌、Popup、任务编辑抽屉、确认对话框、Toast、响应式和无障碍约束。
+- 设计规范：[WorkTodo v1.5 UX/UI 设计规范](docs/superpowers/designs/2026-09-17-worktodo-ui-design.md)。这里维护用户任务流、信息架构、视觉令牌、Popup、任务编辑抽屉、确认对话框、Toast、响应式和无障碍约束。
 - 交互评审入口：[UX 评审入口](docs/review-index.md)。涉及布局、弹窗或任务流程的修改，先对照该入口和设计规范检查。
 - 运行时代码使用 [设计令牌](src/styles/tokens.css)，颜色、间距、圆角、字号和浮层阴影不要在页面样式中重复发明。
 

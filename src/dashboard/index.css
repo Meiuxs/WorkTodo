@@ -997,6 +997,7 @@ input::placeholder { color: var(--muted); }
 .modal form {
   max-height: calc(100vh - var(--sp-8));
   overflow: auto;
+  overscroll-behavior: contain;
   padding: var(--sp-6);
 }
 .modal h2 { margin: 0; font-size: var(--fs-h2); line-height: var(--lh-heading); }
