@@ -15,10 +15,15 @@ export function createCompletedView({ root, query, today, onAction, onEdit, onEr
         <div id="cancelled-list"></div>
       </details>`;
       const options = { today: today(), onAction, onEdit, onError, resourceCounts };
-      renderTaskList(root.querySelector('#completed-list'), completed, {
-        ...options,
-        emptyMessage: '还没有已完成任务。',
-      });
+      const completedList = root.querySelector('#completed-list');
+      if (completed.length === 0) {
+        completedList.innerHTML = `<div class="empty-state">
+          <p class="empty-state__title">还没有已完成任务</p>
+          <p class="empty-state__text">点任务行左侧的圆圈即可完成，完成记录会按实际完成日期出现在这里。</p>
+        </div>`;
+      } else {
+        renderTaskList(completedList, completed, options);
+      }
       renderTaskList(root.querySelector('#cancelled-list'), cancelled, {
         ...options,
         emptyMessage: '没有已取消任务。',

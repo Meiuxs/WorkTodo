@@ -9,7 +9,7 @@ function defaultNow() {
 
 function categoryName(name) {
   if (typeof name !== 'string' || name.trim().length === 0) {
-    throw new ValidationError('分类名称不能为空');
+    throw new ValidationError('列表名称不能为空');
   }
   return name.trim();
 }
@@ -168,15 +168,15 @@ export class TaskService {
 
   async renameCategory(id, name) {
     const current = await this.#repository.getCategory(id);
-    if (current === undefined) throw new ValidationError(`分类 ${id} 不存在`);
+    if (current === undefined) throw new ValidationError(`列表 ${id} 不存在`);
     return this.#repository.updateCategory({ ...current, name: categoryName(name), updatedAt: this.#now() });
   }
 
   async deleteCategory(id, destinationCategoryId) {
-    if (destinationCategoryId === undefined) throw new ValidationError('删除分类必须明确指定迁移目标');
-    if (destinationCategoryId === id) throw new ValidationError('删除分类必须迁移到另一分类或未分类');
+    if (destinationCategoryId === undefined) throw new ValidationError('删除列表必须明确指定迁移目标');
+    if (destinationCategoryId === id) throw new ValidationError('删除列表必须迁移到另一列表或未归入列表');
     if (destinationCategoryId !== null && (await this.#repository.getCategory(destinationCategoryId)) === undefined) {
-      throw new ValidationError(`分类 ${destinationCategoryId} 不存在`);
+      throw new ValidationError(`列表 ${destinationCategoryId} 不存在`);
     }
     const now = this.#now();
     return this.#repository.deleteCategoryAndMoveTasks(id, destinationCategoryId, {

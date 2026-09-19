@@ -63,7 +63,7 @@ test('取消删除确认后任务保留且删除操作仍可用', async ({ exten
     has: dashboard.getByRole('button', { name: '保留删除前确认' }),
   });
   await taskRow.getByText('更多', { exact: true }).click();
-  const deleteButton = taskRow.getByRole('button', { name: '删除', exact: true });
+  const deleteButton = taskRow.getByRole('button', { name: '移入回收站', exact: true });
   await deleteButton.click();
   const confirmation = dashboard.locator('#confirm-dialog');
   await expect(confirmation).toBeVisible();

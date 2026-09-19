@@ -526,18 +526,7 @@
   font-size: var(--fs-ui);
 }
 
-/* 今天页的首屏空状态：从一句灰字升级为"看得懂 + 点得动"的引导，
-   顺带修复 today-view 里早已存在、却从来没有被渲染出来的 [data-focus-quick-add] 按钮。 */
-.empty-state { border-bottom: 1px solid var(--line); padding: var(--sp-6) 0 var(--sp-8); }
-.empty-state__title {
-  margin: 0;
-  color: var(--ink);
-  font-size: var(--fs-lead);
-  font-weight: 700;
-  line-height: var(--lh-heading);
-}
-.empty-state__text { margin: var(--sp-2) 0 0; color: var(--muted); font-size: var(--fs-ui); }
-.empty-state__action { margin-top: var(--sp-5); }
+/* 空状态样式已上移到 base.css：工作台与 Popup 共用同一结构，避免各页自造一套。 */
 
 .completed-fold {
   margin-top: var(--sp-7);
@@ -595,7 +584,8 @@ input::placeholder { color: var(--muted); }
 .button-secondary { border-color: var(--line-strong); background: var(--surface); color: var(--ink); }
 .button-secondary:hover { border-color: var(--teal); color: var(--teal); }
 .button-danger { background: var(--coral); color: var(--surface-raised); }
-.button-danger:hover { background: var(--coral); filter: brightness(.92); }
+/* hover 要提高对比度而不是压暗：用更深的珊瑚色，深色主题下换成更亮的一档。 */
+.button-danger:hover { background: var(--coral-strong); }
 
 /* 实心/描边按钮的禁用态：退回表层底色并降到 muted，文字依然看得清。
    不用半透明是因为半透明会把底色和文字一起压低，深色主题下糊成一团。 */
@@ -1080,7 +1070,9 @@ input::placeholder { color: var(--muted); }
   .month-day { min-height: 76px; padding: var(--sp-2); }
   .month-day .task { grid-template-columns: 18px minmax(0, 1fr); gap: var(--sp-1); min-height: 30px; }
   .month-day .task__check { width: 16px; height: 16px; }
-  .month-day .task__more { display: none; }
+  /* 窄屏同样要能完成、延期和删除：把"更多"放回文档流，不再依赖悬停。 */
+  .month-day .task { grid-template-columns: 18px minmax(0, 1fr) auto; }
+  .month-day .task__more { position: static; opacity: 1; }
   /* 移动端月历是密度概览，但状态须保留非颜色化表达（AGENTS 要求），故恢复元信息显示。 */
   .month-day .task__title { font-size: var(--fs-micro); }
   .month-day .task__meta { display: block; font-size: var(--fs-micro); line-height: var(--lh-micro); }

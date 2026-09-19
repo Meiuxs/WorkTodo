@@ -231,5 +231,5 @@ test('删除分类必须显式指定目标，且目标分类必须存在', async
   const { service } = createService();
   await assert.rejects(() => service.deleteCategory('old'), /明确指定/);
   await assert.rejects(() => service.deleteCategory('old', 'missing'), /不存在/);
-  await assert.rejects(() => service.deleteCategory('old', 'old'), /另一分类/);
+  await assert.rejects(() => service.deleteCategory('old', 'old'), /另一列表/);
 });

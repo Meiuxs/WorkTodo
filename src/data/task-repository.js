@@ -391,7 +391,7 @@ export class TaskRepository {
     if (current === undefined) {
       transaction.abort();
       try { await transactionResult(transaction); } catch { /* 统一为业务错误 */ }
-      throw new ValidationError(`分类 ${categoryToSave.id} 不存在`);
+      throw new ValidationError(`列表 ${categoryToSave.id} 不存在`);
     }
     categories.put(categoryToSave);
     await transactionResult(transaction);
@@ -413,10 +413,10 @@ export class TaskRepository {
         ? null
         : await requestResult(categories.get(destinationCategoryId));
       if (category === undefined || (destinationCategoryId !== null && destination === undefined)) {
-        throw new ValidationError('分类不存在');
+        throw new ValidationError('列表不存在');
       }
       if (typeof createEvent !== 'function') {
-        throw new ValidationError('分类迁移需要事件创建函数');
+        throw new ValidationError('列表迁移需要事件创建函数');
       }
 
       const currentTasks = await requestResult(tasks.index('categoryId').getAll(categoryId));

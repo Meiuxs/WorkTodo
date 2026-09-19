@@ -33,7 +33,7 @@ export function createTodayView({ root, query, statistics, today, onAction, onEd
         <div class="today-summary__next" data-next-action>
           <span class="eyebrow">下一步</span>
           ${nextTask === null
-            ? '<strong>记录第一件事</strong><span>从下方快速新增开始</span>'
+            ? '<strong>记录第一件事</strong><span>从上方快速记录开始</span>'
             : `<button type="button" class="today-summary__task" aria-label="下一步任务" data-next-task="${escapeHtml(nextTask.id)}">${escapeHtml(nextTask.title)}</button><span>${overdue.length > 0 ? '先处理逾期事项' : '今天可以推进'}</span>`}
         </div>
       </section>
@@ -62,7 +62,7 @@ export function createTodayView({ root, query, statistics, today, onAction, onEd
       if (planned.length === 0) {
         root.querySelector('#today-list').innerHTML = `<div class="empty-state">
           <p class="empty-state__title">今天还没有待办</p>
-          <p class="empty-state__text">在下方输入框记录一件要做的事，按 Enter 保存后就会出现在这里。</p>
+          <p class="empty-state__text">在上方快速记录里写下一件要做的事，按 Enter 保存后就会出现在这里。</p>
           <button type="button" class="button-primary empty-state__action" data-focus-quick-add>记录第一件事</button>
         </div>`;
       } else {

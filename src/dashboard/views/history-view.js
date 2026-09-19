@@ -1,14 +1,10 @@
-import { addLocalDays, endOfWeek, formatLocalDay, formatLocalDayWithWeekday, startOfWeek } from '../../domain/dates.js';
+import { endOfWeek, formatLocalDay, formatLocalDayWithWeekday, startOfWeek, weekdayLabel } from '../../domain/dates.js';
 import { renderTaskList } from '../task-list.js';
 import { runViewAction } from '../../shared/ui.js';
 import { shouldShowSummaryEditor } from '../../shared/ux.js';
 
 function formatRate(rate) {
   return rate === null ? '暂无计划' : `${Math.round(rate * 100)}%`;
-}
-
-function weekdayLabel(date) {
-  return formatLocalDayWithWeekday(date).split(' ').at(-1);
 }
 
 function renderWeeklyDays(days, todayDate) {

@@ -166,7 +166,7 @@ function validateTasks(tasks, categoryIds, tagIds) {
     if (task.categoryId !== null) {
       assertUuid(task.categoryId, 'task.categoryId');
       if (!categoryIds.has(task.categoryId)) {
-        throw new ValidationError('task.categoryId 必须引用备份中的分类');
+        throw new ValidationError('task.categoryId 必须引用备份中的列表');
       }
     }
     if (task.tagIds.some((tagId) => !tagIds.has(tagId))) {

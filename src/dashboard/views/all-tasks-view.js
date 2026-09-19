@@ -99,7 +99,7 @@ export function createAllTasksView({ root, query, taskService, tagService, today
           <span id="filter-count" class="filter-count">显示 0 项</span>
         </div>
         <form class="filters" id="task-filters">
-          <label class="filter-search">搜索<input type="search" name="text" value="${escapeHtml(filters.text)}" placeholder="标题或描述"></label>
+          <label class="filter-search">搜索 <kbd class="nav__kbd" aria-hidden="true">F</kbd><input type="search" name="text" value="${escapeHtml(filters.text)}" placeholder="标题或描述" aria-keyshortcuts="f"></label>
           <label>状态<select name="lifecycle">
             <option value="">全部</option><option value="todo" ${filters.lifecycle === 'todo' ? 'selected' : ''}>待办</option><option value="in_progress" ${filters.lifecycle === 'in_progress' ? 'selected' : ''}>进行中</option><option value="completed" ${filters.lifecycle === 'completed' ? 'selected' : ''}>已完成</option><option value="cancelled" ${filters.lifecycle === 'cancelled' ? 'selected' : ''}>已取消</option>
           </select></label>

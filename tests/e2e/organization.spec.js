@@ -176,6 +176,11 @@ test('标签和子任务在键盘与 390px 视口下不溢出并恢复焦点', a
 
   await page.keyboard.press('Escape');
 
+  // 抽屉里已有未保存修改：Esc 先弹出放弃确认，确认后才关闭并恢复焦点。
+  const discardDialog = page.locator('#confirm-dialog');
+  await expect(discardDialog).toBeVisible();
+  await discardDialog.getByRole('button', { name: '放弃修改' }).click();
+
   await expect(page.getByRole('button', { name: '窄屏组织任务' })).toBeFocused();
 
   await page.getByRole('button', { name: '窄屏组织任务' }).click();

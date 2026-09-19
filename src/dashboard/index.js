@@ -116,11 +116,12 @@ function showToast(message, { actionLabel = null, onAction = null } = {}) {
   }, 5000);
 }
 
-function confirmAction({ title, message, confirmLabel = '确认' }) {
+function confirmAction({ title, message, confirmLabel = null }) {
   const trigger = document.activeElement;
   confirmDialog.querySelector('[data-confirm-title]').textContent = title;
   confirmDialog.querySelector('[data-confirm-message]').textContent = message;
-  confirmDialog.querySelector('[data-confirm-submit]').textContent = confirmLabel;
+  // 兜底也用动作名称：界面上不出现单独的"确认"。
+  confirmDialog.querySelector('[data-confirm-submit]').textContent = confirmLabel ?? title.replace(/[？?]$/, '');
   confirmDialog.showModal();
   confirmDialog.querySelector('button[value="cancel"]')?.focus();
   return new Promise((resolve) => {
@@ -292,6 +293,11 @@ const taskEditor = createTaskEditor({
   onReload: (taskId) => taskService.getTask(taskId),
   resourceService,
   openResourcePicker: (taskId, source) => resourcePicker.openForTask(taskId, source),
+  confirmDiscard: () => confirmAction({
+    title: '放弃未保存的修改？',
+    message: '关闭后这次修改不会保存，任务仍保持打开前的状态。',
+    confirmLabel: '放弃修改',
+  }),
 });
 
 /* 侧栏高亮必须跟着"最终渲染的那个路由"走，所以放在 navigate 里，

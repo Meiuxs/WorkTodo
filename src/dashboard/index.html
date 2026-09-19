@@ -58,12 +58,12 @@
 
         <form class="quick-add" id="quick-add">
           <div class="quick-add__lead">
-            <p class="eyebrow">快速记录</p>
+            <p class="eyebrow">快速记录 <kbd class="nav__kbd" aria-hidden="true">N</kbd></p>
             <span>只写标题，稍后再整理</span>
           </div>
           <div class="quick-add__row">
             <label class="sr-only" for="quick-add-title">记录一个新事项</label>
-            <input id="quick-add-title" maxlength="200" autocomplete="off" placeholder="写下下一件要推进的事……" required>
+            <input id="quick-add-title" maxlength="200" autocomplete="off" aria-keyshortcuts="n" placeholder="写下下一件要推进的事……" required>
             <button type="submit" class="button-primary" aria-label="添加">记录</button>
           </div>
           <div class="quick-add__options">
@@ -80,7 +80,7 @@
         </form>
         <p class="form-message" id="quick-add-message" role="alert"></p>
 
-        <section class="view-root" id="view-root" tabindex="-1" aria-live="polite"></section>
+        <section class="view-root" id="view-root" tabindex="-1"></section>
       </main>
     </div>
 
@@ -92,7 +92,7 @@
         </header>
         <div class="drawer-body">
           <p class="drawer-section-label">先确定</p>
-          <label class="field">任务名称<input name="title" maxlength="200" required autofocus></label>
+          <label class="field">任务名称<input name="title" maxlength="200" required></label>
           <p class="field-hint">先填标题和计划日期，其他可以稍后补。</p>
           <div class="field-grid">
             <label class="field">计划日期<input name="scheduledDate" type="date"></label>
@@ -176,9 +176,9 @@
 
     <dialog class="modal" id="confirm-dialog">
       <form method="dialog">
-        <h2 data-confirm-title>确认操作</h2>
+        <h2 data-confirm-title>执行这个操作？</h2>
         <p data-confirm-message></p>
-        <div class="dialog-actions"><button value="cancel">取消</button><button class="button-danger" value="confirm" data-confirm-submit>确认</button></div>
+        <div class="dialog-actions"><button value="cancel">取消</button><button class="button-danger" value="confirm" data-confirm-submit>执行操作</button></div>
       </form>
     </dialog>
 

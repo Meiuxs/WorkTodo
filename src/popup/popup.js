@@ -53,7 +53,8 @@ function showPopupSuccess(feedback, onUndo) {
 function taskMarkup(task, today) {
   const overdue = task.scheduledDate !== null && task.scheduledDate < today;
   const detail = overdue ? '逾期' : (task.startTime ?? '无时间');
-  return `<li class="task-row"><span class="task-row__state" aria-label="待办">□</span><span class="task-row__title">${escapeHtml(task.title)}</span><span class="task-row__detail${overdue ? ' task-row__detail--overdue' : ''}">${detail}</span></li>`;
+  // 符号本身没有语义，用 role="img" + 文字名称把它读出来。
+  return `<li class="task-row"><span class="task-row__state" role="img" aria-label="${overdue ? '逾期' : '待办'}">□</span><span class="task-row__title">${escapeHtml(task.title)}</span><span class="task-row__detail${overdue ? ' task-row__detail--overdue' : ''}">${detail}</span></li>`;
 }
 
 const repository = new TaskRepository();

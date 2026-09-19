@@ -1,4 +1,4 @@
-const COLUMNS = ['标题', '状态', '优先级', '分类', '标签', '计划日期', '开始时间', '截止时间', '完成时间', '创建时间'];
+const COLUMNS = ['标题', '状态', '优先级', '列表', '标签', '计划日期', '开始时间', '截止时间', '完成时间', '创建时间'];
 
 function cell(value) {
   const text = value === null || value === undefined ? '' : String(value);

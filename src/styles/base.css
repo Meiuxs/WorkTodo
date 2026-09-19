@@ -113,6 +113,23 @@ a {
   border: 0;
 }
 
+/* 页面级空状态：工作台与弹窗共用同一结构（标题 + 说明 + 可选主入口）。 */
+.empty-state {
+  border-bottom: 1px solid var(--line);
+  padding: var(--sp-6) 0 var(--sp-8);
+}
+
+.empty-state__title {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-lead);
+  font-weight: 700;
+  line-height: var(--lh-heading);
+}
+
+.empty-state__text { margin: var(--sp-2) 0 0; color: var(--muted); font-size: var(--fs-ui); }
+.empty-state__action { margin-top: var(--sp-5); }
+
 /* 键盘用户跳过侧边导航直达主体。默认移出视口，获得焦点时滑入。 */
 .skip-link {
   position: fixed;

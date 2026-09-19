@@ -113,8 +113,11 @@ export function formatLocalDay(date) {
   return `${Number(month)}月${Number(day)}日`;
 }
 
-export function formatLocalDayWithWeekday(date) {
+export function weekdayLabel(date) {
   const [year, month, day] = date.split('-').map(Number);
-  const weekday = WEEKDAY_LABELS[new Date(year, month - 1, day).getDay()];
-  return `${formatLocalDay(date)} ${weekday}`;
+  return WEEKDAY_LABELS[new Date(year, month - 1, day).getDay()];
+}
+
+export function formatLocalDayWithWeekday(date) {
+  return `${formatLocalDay(date)} ${weekdayLabel(date)}`;
 }

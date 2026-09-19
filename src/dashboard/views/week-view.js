@@ -32,11 +32,15 @@ export function createWeekView({
       const range = result.startDate === result.endDate
         ? formatLocalDay(result.startDate)
         : `${formatLocalDay(result.startDate)} 至 ${formatLocalDay(result.endDate)}`;
+      // 说明行只在有数据时出现：空状态由下方 .empty-state 唯一表达，避免同一屏说两遍同一件事。
+      const rangeSummary = singleDate
+        ? `明天有 ${allTasks.length} 项计划。`
+        : `本周有 ${plannedDays.length} 天安排了任务，共 ${allTasks.length} 项。`;
       root.innerHTML = `<section class="view-section" aria-labelledby="week-heading">
         <div class="section-heading">
           <div>
             <h2 id="week-heading">${singleDate ? '明天计划' : '本周计划'} · ${range}</h2>
-            <p>${plannedDays.length === 0 ? '当前没有安排，先记录一件要推进的事。' : `显示 ${plannedDays.length} 个有计划的日期，共 ${allTasks.length} 项。`}完成、取消和删除规则与今天页一致。</p>
+            ${plannedDays.length === 0 ? '' : `<p>${rangeSummary}</p>`}
           </div>
         </div>
         <div class="week-grid${plannedDays.length === 0 ? ' week-grid--empty' : ''}"></div>
@@ -44,7 +48,14 @@ export function createWeekView({
 
       const grid = root.querySelector('.week-grid');
       if (plannedDays.length === 0) {
-        grid.innerHTML = `<div class="week-empty" role="status"><strong>${singleDate ? '明天还没有计划' : '本周还没有计划'}</strong><span>用下方快速记录，先把下一步写下来。</span></div>`;
+        grid.innerHTML = `<div class="empty-state">
+          <p class="empty-state__title">${singleDate ? '明天还没有计划' : '本周还没有计划'}</p>
+          <p class="empty-state__text">${singleDate ? '先把明天要做的一件事写下来。' : '先记录一件要推进的事，再回来安排日期。'}</p>
+          <button type="button" class="button-primary empty-state__action" data-focus-quick-add>记录一件事</button>
+        </div>`;
+        grid.querySelector('[data-focus-quick-add]').addEventListener('click', () => {
+          document.querySelector('#quick-add-title')?.focus();
+        });
         return;
       }
       if (plannedDays.length === 1) grid.classList.add('week-grid--single');

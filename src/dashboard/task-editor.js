@@ -36,6 +36,7 @@ export function createTaskEditor({
   resourceService,
   openResourcePicker,
   onClose = () => {},
+  confirmDiscard = null,
 }) {
   const form = dialog.querySelector('form');
   const title = dialog.querySelector('[data-editor-title]');
@@ -55,6 +56,11 @@ export function createTaskEditor({
   let trigger = null;
   let anchorTaskId = null;
   let subtaskBusy = false;
+  // 有未保存修改时关闭抽屉要先确认，避免 Esc 或误点直接丢掉编辑内容。
+  let dirty = false;
+  function markDirty() {
+    dirty = true;
+  }
   const recurring = field(form, 'recurring');
   const recurringFields = dialog.querySelector('[data-recurring-fields]');
   const recurringPicker = dialog.querySelector('[data-recurring-picker]');
@@ -157,6 +163,7 @@ export function createTaskEditor({
     trigger = document.activeElement;
     title.textContent = '新增任务';
     form.reset();
+    dirty = false;
     recurring.checked = false;
     recurringPicker.hidden = false;
     updateRecurringVisibility();
@@ -180,6 +187,7 @@ export function createTaskEditor({
     trigger = sourceElement;
     title.textContent = task.title;
     form.reset();
+    dirty = false;
     recurring.checked = false;
     recurringPicker.hidden = true;
     updateRecurringVisibility();
@@ -200,7 +208,12 @@ export function createTaskEditor({
     requestAnimationFrame(() => field(form, 'title').focus());
   }
 
-  function close() {
+  async function close({ force = false } = {}) {
+    if (!force && dirty && confirmDiscard !== null) {
+      const discard = await confirmDiscard();
+      if (!discard) return false;
+    }
+    dirty = false;
     clearSectionMessages();
     if (dialog.open) dialog.close();
     showMessage('');
@@ -220,6 +233,7 @@ export function createTaskEditor({
         : document.querySelector(`[data-task-id="${CSS.escape(taskId)}"] [data-action="edit"]`);
       replacement?.focus();
     });
+    return true;
   }
 
   async function save() {
@@ -233,7 +247,8 @@ export function createTaskEditor({
           ? await onCreate(readChanges())
           : await onCreateRecurring({ ...readChanges(), ...readRecurringForm(form) }))
         : await onUpdate(currentTask.id, readChanges(), currentTask.revision);
-      close();
+      dirty = false;
+      await close();
       return result;
     } catch (error) {
       showMessage(errorMessage(error));
@@ -283,17 +298,21 @@ export function createTaskEditor({
     event.preventDefault();
     save();
   });
+  form.addEventListener('input', markDirty);
+  form.addEventListener('change', markDirty);
   dialog.querySelectorAll('[data-editor-close]').forEach((button) => {
-    button.addEventListener('click', close);
+    button.addEventListener('click', () => {
+      close().catch(() => {});
+    });
   });
   dialog.addEventListener('cancel', (event) => {
     event.preventDefault();
-    close();
+    close().catch(() => {});
   });
   dialog.querySelector('[data-editor-copy]').addEventListener('click', async () => {
     if (currentTask === null) return;
     await onCopy(currentTask.id);
-    close();
+    await close({ force: true });
   });
   dialog.querySelector('[data-editor-reload]').addEventListener('click', async () => {
     if (currentTask === null) return;

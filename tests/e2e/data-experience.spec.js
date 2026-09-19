@@ -88,10 +88,10 @@ test('回收站可以恢复任务，永久删除任务需要二次确认', async
   await page.getByRole('button', { name: '添加', exact: true }).click();
   const row = page.locator('[data-task-id]').filter({ has: page.getByRole('button', { name: '待删除任务' }) });
   await row.getByText('更多', { exact: true }).click();
-  await row.getByRole('button', { name: '删除', exact: true }).click();
+  await row.getByRole('button', { name: '移入回收站', exact: true }).click();
   await page.locator('#confirm-dialog').getByRole('button', { name: '移入回收站' }).click();
 
-  await page.getByRole('button', { name: '回收站' }).click();
+  await page.getByRole('button', { name: '回收站', exact: true }).click();
   await expect(page.getByRole('button', { name: '待删除任务' })).toBeVisible();
   await row.getByText('更多', { exact: true }).click();
   await row.getByRole('button', { name: '永久删除' }).click();
@@ -138,7 +138,7 @@ test('回收站主复选框恢复四种状态并只清空 trashedAt', async ({ e
   ];
   await seedTrashedTasks(page, tasks);
 
-  await page.getByRole('button', { name: '回收站' }).click();
+  await page.getByRole('button', { name: '回收站', exact: true }).click();
   for (const task of tasks) {
     const row = page.locator(`[data-task-id="${task.id}"]`);
     const checkbox = row.locator('.task__check');
@@ -151,7 +151,7 @@ test('回收站主复选框恢复四种状态并只清空 trashedAt', async ({ e
     await row.locator('.task__check').click();
     await expect(row).toHaveCount(0);
   }
-  await expect(page.getByText('回收站为空，删除的任务会在这里等待处理。')).toBeVisible();
+  await expect(page.locator('.empty-state__title')).toHaveText('回收站是空的');
 
   const restored = await page.evaluate(async (ids) => {
     const database = await new Promise((resolve, reject) => {
@@ -212,7 +212,7 @@ test('设置页可以下载 CSV 文件而不申请 downloads 权限', async ({ e
   const contents = await readFile(filePath);
   expect([...contents.subarray(0, 3)]).toEqual([0xEF, 0xBB, 0xBF]);
   expect(contents.toString('utf8').slice(1).split('\r\n')[0]).toBe(
-    '"标题","状态","优先级","分类","标签","计划日期","开始时间","截止时间","完成时间","创建时间"',
+    '"标题","状态","优先级","列表","标签","计划日期","开始时间","截止时间","完成时间","创建时间"',
   );
 });
 

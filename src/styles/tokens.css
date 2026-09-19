@@ -23,6 +23,8 @@
   /* 文字与实心按钮共用同一个值：surface 上 4.99:1，白字压其上 5.13:1 */
   --coral: #c23f22;
   --coral-soft: #fae9e4;
+  /* 危险按钮的 hover：比静止态更深，保证悬停时对比度更高。 */
+  --coral-strong: #9c3116;
   --focus: #1b6466;
   --hover-tint: rgb(39 107 108 / 7%);
   --nav-hover: rgb(255 253 249 / 60%);
@@ -130,6 +132,7 @@
   --teal-soft: #1e4642;
   --coral: #ff9a82;
   --coral-soft: #4b2d2a;
+  --coral-strong: #ffb9a6;
   --focus: #8ce1d5;
   --hover-tint: rgb(99 195 183 / 10%);
   --nav-hover: rgb(29 53 50 / 88%);

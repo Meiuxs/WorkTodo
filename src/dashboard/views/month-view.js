@@ -85,6 +85,37 @@ export function createMonthView({
         });
       }
 
+      // 声明了 role="grid" 就要提供方向键导航：左右移动一天，上下移动一周，Home/End 到本周首尾。
+      const cells = [...root.querySelectorAll('[data-date]')];
+      const startCell = cells.find((cell) => cell.dataset.date === currentDate) ?? cells[0];
+      let focusedIndex = cells.indexOf(startCell);
+      const focusCell = (index) => {
+        if (index < 0 || index >= cells.length) return false;
+        focusedIndex = index;
+        cells.forEach((cell, cellIndex) => {
+          cell.tabIndex = cellIndex === index ? 0 : -1;
+        });
+        cells[index].focus();
+        return true;
+      };
+      if (focusedIndex >= 0) focusCell(focusedIndex);
+      root.querySelector('.month-grid')?.addEventListener('keydown', (event) => {
+        // 只在日期格子本身获得焦点时接管方向键，格子内的任务按钮保持自己的行为。
+        if (!event.target.matches('[data-date]')) return;
+        const index = cells.indexOf(event.target);
+        const weekStart = Math.floor(index / 7) * 7;
+        if (event.key === 'Home' || event.key === 'End') {
+          event.preventDefault();
+          focusCell(event.key === 'Home' ? weekStart : weekStart + 6);
+          return;
+        }
+        const offsets = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
+        const offset = offsets[event.key];
+        if (offset === undefined) return;
+        event.preventDefault();
+        focusCell(index + offset);
+      });
+
       root.querySelectorAll('[data-month-nav]').forEach((button) => {
         button.addEventListener('click', () => {
           anchor = shiftMonth(anchor, Number(button.dataset.monthNav));

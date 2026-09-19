@@ -45,7 +45,7 @@ export function taskMeta(task, today) {
   if (task.startTime !== null) return task.startTime;
   if (task.lifecycle === 'cancelled') return task.scheduledDate === null ? '无计划日期' : formatLocalDay(task.scheduledDate);
   if (task.scheduledDate === today) return '今天 · 无时间';
-  return task.scheduledDate === null ? '收集箱 · 无时间' : `${formatLocalDay(task.scheduledDate)} · 无时间`;
+  return task.scheduledDate === null ? '收集箱' : `${formatLocalDay(task.scheduledDate)} · 无时间`;
 }
 
 function taskStatus(task, today) {
@@ -99,10 +99,10 @@ function taskActions(task) {
   } else {
     actions.push('<button type="button" data-action="restore">恢复待办</button>');
   }
-  actions.push('<button type="button" data-action="edit">添加子任务</button>');
-  actions.push('<button type="button" data-action="edit">编辑标签</button>');
+  // 子任务、标签和更多字段都在同一个编辑抽屉里，菜单只保留一个与行为一致的入口。
+  actions.push('<button type="button" data-action="edit">编辑任务</button>');
   actions.push('<button type="button" data-action="copy">复制</button>');
-  actions.push('<button type="button" data-action="trash">删除</button>');
+  actions.push('<button type="button" data-action="trash">移入回收站</button>');
   return actions.join('');
 }
 
@@ -136,10 +136,14 @@ function taskMarkup(task, today, tags, resourceCounts) {
   const resourceLabel = resourceCount > 0 ? ` · 资料 ${resourceCount}` : '';
   const priorityLabel = taskPriorityLabel(task.priority);
   const priorityMarkup = ` · <span class="task__priority">${priorityLabel}</span>`;
+  // 恢复不是勾选行为：可恢复的行用普通按钮，避免读屏把动作读成复选框的状态切换。
+  const checkAttributes = canRestore
+    ? 'aria-label="恢复任务"'
+    : `role="checkbox" aria-checked="${checked}" aria-label="完成任务"`;
   return `<article class="task task--${escapeHtml(task.lifecycle)}${overdue ? ' task--overdue' : ''}" data-task-id="${escapeHtml(task.id)}" data-revision="${task.revision}" role="listitem">
-    <button class="task__check" type="button" role="checkbox" aria-checked="${checked}" data-action="${checkboxAction}" aria-label="${canRestore ? '恢复任务' : '完成任务'}">${checked ? '✓' : ''}</button>
+    <button class="task__check" type="button" ${checkAttributes} data-action="${checkboxAction}">${checked ? '✓' : ''}</button>
     <div class="task__body">
-      <button class="task__title" type="button" data-action="edit">${escapeHtml(task.title)}</button>
+      <button class="task__title" type="button" data-action="edit" title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</button>
       <span class="task__meta"><span class="task__status">${status}</span> · ${escapeHtml(taskMeta(task, today))}${priorityMarkup}${task.starred ? ' · 已星标' : ''}${tagMarkup}${resourceLabel}</span>
     </div>
     <details class="task__more">
