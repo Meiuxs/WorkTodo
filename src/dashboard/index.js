@@ -44,7 +44,7 @@ const routeMeta = {
   completed: ['已完成', '回看已经结束的任务'],
   trash: ['回收站', '恢复或永久删除已删除任务'],
   history: ['工作记录', '按实际完成日期回顾工作'],
-  settings: ['设置', '分类与本地数据管理'],
+  settings: ['设置', '列表与本地数据管理'],
 };
 
 const repository = new TaskRepository();
@@ -117,12 +117,17 @@ function showToast(message, { actionLabel = null, onAction = null } = {}) {
 }
 
 function confirmAction({ title, message, confirmLabel = '确认' }) {
+  const trigger = document.activeElement;
   confirmDialog.querySelector('[data-confirm-title]').textContent = title;
   confirmDialog.querySelector('[data-confirm-message]').textContent = message;
   confirmDialog.querySelector('[data-confirm-submit]').textContent = confirmLabel;
   confirmDialog.showModal();
+  confirmDialog.querySelector('button[value="cancel"]')?.focus();
   return new Promise((resolve) => {
-    confirmDialog.addEventListener('close', () => resolve(confirmDialog.returnValue === 'confirm'), { once: true });
+    confirmDialog.addEventListener('close', () => {
+      trigger?.focus?.();
+      resolve(confirmDialog.returnValue === 'confirm');
+    }, { once: true });
   });
 }
 
@@ -136,6 +141,12 @@ async function onError(error) {
 }
 
 async function onAction(action, taskId, revision, value) {
+  if (action === 'undo-create') {
+    const result = await controller.handleTaskAction('undo-create', taskId, revision);
+    showToast('已撤销创建');
+    return result;
+  }
+
   if (action === 'complete') {
     const count = await subtaskService.activeCount(taskId);
     let force = false;
@@ -362,7 +373,7 @@ document.querySelector('#quick-add').addEventListener('submit', async (event) =>
     custom.hidden = true;
     showToast(scheduledDate === null ? '已添加到收集箱' : `已安排到 ${formatLocalDay(scheduledDate)}`, {
       actionLabel: '撤销',
-      onAction: () => controller.handleTaskAction('trash', result.task.id, result.task.revision).catch(onError),
+      onAction: () => onAction('undo-create', result.task.id, result.task.revision).catch(onError),
     });
     input.focus();
   } catch (error) {

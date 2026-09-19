@@ -111,7 +111,9 @@ export class DashboardController {
       copy: 'copy',
     };
     let result;
-    if (action === 'complete' && this.#recurringService !== null) {
+    if (action === 'undo-create') {
+      result = await this.#taskService.undoCreate(taskId, revision);
+    } else if (action === 'complete' && this.#recurringService !== null) {
       const force = value?.force === true;
       result = await this.#recurringService.complete(taskId, revision, { force });
     } else if (action === 'complete' && this.#subtaskService !== null) {
@@ -119,6 +121,10 @@ export class DashboardController {
       result = await this.#subtaskService.completeParent(taskId, revision, { force });
     } else if (action === 'postpone' || action === 'reschedule') {
       result = await this.#taskService[action](taskId, value, revision);
+    } else if (action === 'set-priority') {
+      result = await this.#taskService.edit(taskId, { priority: value }, revision);
+    } else if (action === 'set-starred') {
+      result = await this.#taskService.edit(taskId, { starred: value === true }, revision);
     } else if (methods[action] === 'copy') {
       result = await this.#taskService.copy(taskId);
     } else if (methods[action] !== undefined) {

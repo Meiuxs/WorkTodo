@@ -111,6 +111,48 @@ test('真实 IndexedDB 10,000 条任务可正确搜索和统计', async ({ exten
   });
 });
 
+test('全部任务长列表支持分段加载、搜索和键盘操作', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.evaluate(async () => {
+    const { TaskRepository } = await import('../data/task-repository.js');
+    const localNoon = new Date(2026, 8, 17, 12).toISOString();
+    const tasks = Array.from({ length: 1_000 }, (_, index) => ({
+      id: `ui-bulk-${index}`,
+      title: `界面批量任务 ${index}`,
+      description: '',
+      starred: false,
+      priority: 'none',
+      categoryId: null,
+      parentId: null,
+      tagIds: [],
+      seriesId: null,
+      occurrenceKey: null,
+      scheduledDate: null,
+      firstScheduledDate: null,
+      startTime: null,
+      dueTime: null,
+      lifecycle: 'todo',
+      revision: 0,
+      createdAt: localNoon,
+      updatedAt: localNoon,
+      completedAt: null,
+      cancelledAt: null,
+      trashedAt: null,
+    }));
+    await new TaskRepository().replaceAll({ tasks, categories: [], events: [], tags: [], recurringTemplates: [] });
+  });
+  await page.getByRole('button', { name: '全部任务', exact: true }).click();
+  await expect(page.locator('.task-list > .task')).toHaveCount(200);
+  await expect(page.getByRole('button', { name: /加载更多/ })).toBeVisible();
+  await page.getByRole('button', { name: /加载更多/ }).click();
+  await expect(page.locator('.task-list > .task')).toHaveCount(400);
+  await page.getByLabel('搜索').fill('界面批量任务 999');
+  await expect(page.locator('.task-list > .task')).toHaveCount(1);
+  await page.locator('.task__title').focus();
+  await page.keyboard.press('d');
+  await expect(page.locator('.task__menu [data-menu-section="date"] button').first()).toBeFocused();
+});
+
 test('本周视图展示今天所在周的计划任务', async ({ extension }) => {
   const page = await openDashboard(extension);
   await page.getByLabel('记录一个新事项').fill('本周计划事项');
@@ -557,8 +599,8 @@ test('导航后完成的分类变更仍刷新当前路由', async ({ extension }
   });
 
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByLabel('新分类名称').fill('导航刷新分类');
-  await page.getByRole('button', { name: '创建分类', exact: true }).click();
+  await page.getByLabel('新列表名称').fill('导航刷新列表');
+  await page.getByRole('button', { name: '创建列表', exact: true }).click();
   await page.getByRole('button', { name: '今天', exact: true }).click();
   await page.waitForTimeout(400);
 

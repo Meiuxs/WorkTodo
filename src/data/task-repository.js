@@ -222,6 +222,31 @@ export class TaskRepository {
     return clone(current);
   }
 
+  async deleteCreated(id, expectedRevision) {
+    assertRevision(expectedRevision);
+    const database = await this.#getDatabase();
+    const transaction = database.transaction(['tasks', 'events', 'searchIndex'], 'readwrite');
+    const tasks = transaction.objectStore('tasks');
+    const searchIndex = transaction.objectStore('searchIndex');
+    const current = await requestResult(tasks.get(id));
+    if (current === undefined || current.revision !== expectedRevision) {
+      transaction.abort();
+      try { await transactionResult(transaction); } catch { /* 统一为业务错误 */ }
+      throw new ConflictError(id);
+    }
+    if (current.lifecycle !== 'todo' || current.trashedAt !== null) {
+      transaction.abort();
+      try { await transactionResult(transaction); } catch { /* 统一为业务错误 */ }
+      throw new ValidationError('只能撤销尚未开始的任务创建');
+    }
+    const events = await requestResult(transaction.objectStore('events').index('taskId').getAll(id));
+    for (const event of events) transaction.objectStore('events').delete(event.id);
+    searchIndex.delete(id);
+    tasks.delete(id);
+    await transactionResult(transaction);
+    return clone(current);
+  }
+
   async #listTaskIndex(indexName, range, criteria = {}) {
     const database = await this.#getDatabase();
     const transaction = database.transaction('tasks', 'readonly');

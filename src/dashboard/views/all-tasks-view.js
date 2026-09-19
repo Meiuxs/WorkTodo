@@ -15,8 +15,8 @@ const EMPTY_FILTERS = Object.freeze({
 
 function categoryOptions(categories, selected) {
   return [
-    `<option value="" ${selected === '' ? 'selected' : ''}>全部分类</option>`,
-    `<option value="__none" ${selected === '__none' ? 'selected' : ''}>未分类</option>`,
+    `<option value="" ${selected === '' ? 'selected' : ''}>全部列表</option>`,
+    `<option value="__none" ${selected === '__none' ? 'selected' : ''}>未归入列表</option>`,
     ...categories.map((item) => `<option value="${escapeHtml(item.id)}" ${selected === item.id ? 'selected' : ''}>${escapeHtml(item.name)}</option>`),
   ].join('');
 }
@@ -105,7 +105,7 @@ export function createAllTasksView({ root, query, taskService, tagService, today
           </select></label>
           <label>从<input type="date" name="fromDate" value="${filters.fromDate}"></label>
           <label>到<input type="date" name="toDate" value="${filters.toDate}"></label>
-          <label>分类<select name="categoryId">${categoryOptions(categories, filters.categoryId)}</select></label>
+          <label>列表<select name="categoryId">${categoryOptions(categories, filters.categoryId)}</select></label>
           <label>标签<select name="tagId" aria-label="标签">${tagOptions(tags, filters.tagId)}</select></label>
           <label>优先级<select name="priority">
             <option value="">全部</option><option value="high" ${filters.priority === 'high' ? 'selected' : ''}>高</option><option value="medium" ${filters.priority === 'medium' ? 'selected' : ''}>中</option><option value="low" ${filters.priority === 'low' ? 'selected' : ''}>低</option><option value="none" ${filters.priority === 'none' ? 'selected' : ''}>无</option>

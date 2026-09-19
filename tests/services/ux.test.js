@@ -13,10 +13,12 @@ test('快速新增反馈明确告诉用户任务去了哪里', () => {
   assert.deepEqual(getQuickAddFeedback({ scheduledDate: null }), {
     message: '已添加到收集箱',
     nextAction: '打开工作台',
+    undoAction: '撤销',
   });
   assert.deepEqual(getQuickAddFeedback({ scheduledDate: '2026-09-19' }), {
     message: '已安排到 9月19日',
     nextAction: '打开工作台',
+    undoAction: '撤销',
   });
 });
 

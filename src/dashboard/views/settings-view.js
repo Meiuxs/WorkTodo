@@ -39,7 +39,7 @@ export class DataManagementController {
       this.#state = {
         kind: 'preview',
         canConfirm: true,
-        message: `可以导入 ${preview.taskCount} 个任务、${preview.categoryCount} 个分类、${preview.eventCount} 条事件和 ${preview.resourceCount} 条资料。`,
+        message: `可以导入 ${preview.taskCount} 个任务、${preview.categoryCount} 个列表、${preview.eventCount} 条事件和 ${preview.resourceCount} 条资料。`,
         preview,
         text,
       };
@@ -95,7 +95,7 @@ export class DataManagementController {
 }
 
 function categoryOptions(categories, selectedId = '') {
-  return '<option value="">转为未分类</option>' + categories
+  return '<option value="">转为未归入列表</option>' + categories
     .filter((item) => item.id !== selectedId)
     .map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`)
     .join('');
@@ -103,13 +103,13 @@ function categoryOptions(categories, selectedId = '') {
 
 function categoryRows(categories) {
   if (categories.length === 0) {
-    return '<p class="empty">还没有分类。创建后可在任务编辑器中分配。</p>';
+    return '<p class="empty">还没有列表。创建后可在任务编辑器中分配。</p>';
   }
   return categories.map((item) => `<div class="category-row" data-category-id="${escapeHtml(item.id)}">
-    <label class="sr-only" for="category-${escapeHtml(item.id)}">分类名称</label>
+    <label class="sr-only" for="category-${escapeHtml(item.id)}">列表名称</label>
     <input id="category-${escapeHtml(item.id)}" value="${escapeHtml(item.name)}" maxlength="100">
     <button type="button" data-category-action="rename">保存名称</button>
-    <button type="button" data-category-action="delete">删除分类</button>
+    <button type="button" data-category-action="delete">删除列表</button>
   </div>`).join('');
 }
 
@@ -131,7 +131,7 @@ export function createSettingsView({
     const preview = state.preview;
     return `<div class="data-state data-state--${state.kind}" role="status">
       <p>${escapeHtml(state.message)}</p>
-      ${state.kind === 'preview' ? `<p class="data-preview">任务 ${preview.taskCount} · 分类 ${preview.categoryCount} · 事件 ${preview.eventCount} · 资料 ${preview.resourceCount} · 冲突 ${preview.conflicts.length}</p>${preview.omittedFileCopies > 0 ? `<p class="data-warning">有 ${preview.omittedFileCopies} 个文件副本不会包含在 JSON 备份中，导入后需要重新选择文件。</p>` : ''}` : ''}
+      ${state.kind === 'preview' ? `<p class="data-preview">任务 ${preview.taskCount} · 列表 ${preview.categoryCount} · 事件 ${preview.eventCount} · 资料 ${preview.resourceCount} · 冲突 ${preview.conflicts.length}</p>${preview.omittedFileCopies > 0 ? `<p class="data-warning">有 ${preview.omittedFileCopies} 个文件副本不会包含在 JSON 备份中，导入后需要重新选择文件。</p>` : ''}` : ''}
       ${state.kind === 'preview' ? `<fieldset class="import-mode"><legend>选择导入方式</legend>
         <label><input type="radio" name="import-mode" value="merge" checked> 合并（冲突保留较新版本）</label>
         <label><input type="radio" name="import-mode" value="replace"> 覆盖（先建立本机恢复点）</label>
@@ -147,26 +147,33 @@ export function createSettingsView({
     region.innerHTML = dataStateMarkup(dataController.state);
     region.querySelector('#confirm-import')?.addEventListener('click', () => {
       const mode = root.querySelector('input[name="import-mode"]:checked')?.value ?? 'merge';
+      const confirmation = root.querySelector('#import-confirm');
+      const trigger = root.querySelector('#confirm-import');
+      const preview = dataController.state.preview;
+      const title = confirmation.querySelector('[data-import-confirm-title]');
+      const message = confirmation.querySelector('[data-import-confirm-message]');
+      const submit = confirmation.querySelector('[data-import-confirm-submit]');
       if (mode === 'replace') {
-        const confirmation = root.querySelector('#replace-import-confirm');
-        confirmation.showModal();
-        confirmation.addEventListener('close', () => {
-          if (confirmation.returnValue !== 'confirm') return;
-          runViewAction(async () => {
-            await dataController.confirm(mode);
-            if (dataController.state.kind === 'result') await onDataChanged();
-            if (signal?.aborted) return;
-            renderDataState(signal);
-          }, { signal, onError });
-        }, { once: true });
-        return;
+        title.textContent = '覆盖本机数据？';
+        message.textContent = `覆盖前会建立本机恢复点；导入 ${preview.taskCount} 个任务、${preview.categoryCount} 个列表和 ${preview.resourceCount} 条资料后，当前数据将以备份文件为准。${preview.omittedFileCopies > 0 ? ` ${preview.omittedFileCopies} 个文件副本不会导入，之后需要重新选择文件。` : ''}`;
+        submit.textContent = '确认覆盖并导入';
+      } else {
+        title.textContent = '合并到本机数据？';
+        message.textContent = `将合并 ${preview.taskCount} 个任务、${preview.categoryCount} 个列表和 ${preview.resourceCount} 条资料；发现 ${preview.conflicts.length} 个冲突时保留较新版本。${preview.omittedFileCopies > 0 ? ` ${preview.omittedFileCopies} 个文件副本不会导入。` : ''}`;
+        submit.textContent = '确认导入';
       }
-      runViewAction(async () => {
-        await dataController.confirm(mode);
-        if (dataController.state.kind === 'result') await onDataChanged();
-        if (signal?.aborted) return;
-        renderDataState(signal);
-      }, { signal, onError });
+      confirmation.showModal();
+      confirmation.querySelector('[value="cancel"]')?.focus();
+      confirmation.addEventListener('close', () => {
+        trigger?.focus();
+        if (confirmation.returnValue !== 'confirm') return;
+        runViewAction(async () => {
+          await dataController.confirm(mode);
+          if (dataController.state.kind === 'result') await onDataChanged();
+          if (signal?.aborted) return;
+          renderDataState(signal);
+        }, { signal, onError });
+      }, { once: true });
     });
   }
 
@@ -228,29 +235,29 @@ export function createSettingsView({
         <label class="button-secondary file-picker">选择导入文件<input id="import-file" type="file" accept="application/json,.json"></label>
       </div>
       <div id="data-state"></div>
-      <dialog class="modal" id="replace-import-confirm">
+      <dialog class="modal" id="import-confirm">
         <form method="dialog">
-          <h2>覆盖本机数据？</h2>
-          <p>覆盖前会建立本机恢复点，但导入完成后当前任务、分类和设置将以备份文件为准。</p>
-          <div class="dialog-actions"><button value="cancel">取消</button><button class="button-danger" value="confirm">确认覆盖并导入</button></div>
+          <h2 data-import-confirm-title>确认导入？</h2>
+          <p data-import-confirm-message></p>
+          <div class="dialog-actions"><button value="cancel">取消</button><button class="button-danger" value="confirm" data-import-confirm-submit>确认导入</button></div>
         </form>
       </dialog>
     </section>
     <section class="view-section" aria-labelledby="category-heading">
       <div class="section-heading">
-        <div><h2 id="category-heading">分类</h2><p>删除分类时必须把任务迁移到未分类或其他分类，任务本身不会删除。</p></div>
+        <div><h2 id="category-heading">列表</h2><p>删除列表时必须把任务迁移到未归入列表或其他列表，任务本身不会删除。</p></div>
       </div>
       <form id="create-category" class="category-create">
-        <label for="new-category">新分类名称</label>
+        <label for="new-category">新列表名称</label>
         <input id="new-category" name="name" maxlength="100" required>
-        <button type="submit">创建分类</button>
+        <button type="submit">创建列表</button>
       </form>
       <p class="form-message" id="category-message" role="alert"></p>
       <div class="category-list">${categoryRows(categories)}</div>
       <dialog class="modal" id="delete-category-dialog">
         <form method="dialog">
-          <h2>删除分类</h2>
-          <p>该分类下的任务会迁移到：</p>
+          <h2>删除列表</h2>
+          <p>该列表下的任务会迁移到：</p>
           <label>迁移目标<select name="destination"></select></label>
           <p class="form-message" data-delete-message></p>
           <div class="dialog-actions"><button value="cancel">取消</button><button class="button-danger" value="confirm">删除并迁移</button></div>

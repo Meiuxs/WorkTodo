@@ -124,6 +124,9 @@ export class TaskService {
   async permanentlyDelete(id, expectedRevision) {
     return { task: await this.#repository.permanentlyDelete(id, expectedRevision) };
   }
+  async undoCreate(id, expectedRevision) {
+    return { task: await this.#repository.deleteCreated(id, expectedRevision) };
+  }
 
   async copy(id) {
     const source = await this.#task(id);

@@ -34,4 +34,10 @@ export class PopupController {
     await this.#sendMessage({ type: 'TASK_CHANGED', taskId: task.id });
     return task;
   }
+
+  async undoCreate(task) {
+    const result = await this.#taskService.undoCreate(task.id, task.revision);
+    await this.#sendMessage({ type: 'TASK_CHANGED', taskId: task.id });
+    return result;
+  }
 }

@@ -12,6 +12,7 @@ export function getQuickAddFeedback({ scheduledDate = null } = {}) {
   return {
     message: scheduledDate === null ? '已添加到收集箱' : `已安排到 ${formatLocalDay(scheduledDate)}`,
     nextAction: '打开工作台',
+    undoAction: '撤销',
   };
 }
 

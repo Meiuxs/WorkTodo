@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { taskMeta, taskTagLabel } from '../../src/dashboard/task-list.js';
+import { getScheduleOptions, taskMeta, taskPriorityLabel, taskTagLabel } from '../../src/dashboard/task-list.js';
 
 function task(overrides = {}) {
   return {
@@ -37,4 +37,20 @@ test('任务行标签使用文本表达而不是只靠颜色', () => {
   const tags = [{ id: 'customer', name: '客户' }, { id: 'quote', name: '报价' }];
   assert.equal(taskTagLabel({ tagIds: ['customer', 'missing'] }, tags), '#客户');
   assert.equal(taskTagLabel({ tagIds: [] }, tags), '');
+});
+
+test('日期快捷操作覆盖计划常用日期', () => {
+  assert.deepEqual(getScheduleOptions('2026-09-17').map((option) => option.label), [
+    '今天', '明天', '后天', '下周一', '下周',
+  ]);
+  assert.deepEqual(getScheduleOptions('2026-09-17').map((option) => option.value), [
+    '2026-09-17', '2026-09-18', '2026-09-19', '2026-09-21', '2026-09-24',
+  ]);
+});
+
+test('优先级始终有文字表达', () => {
+  assert.equal(taskPriorityLabel('high'), '高优先级');
+  assert.equal(taskPriorityLabel('medium'), '中优先级');
+  assert.equal(taskPriorityLabel('low'), '低优先级');
+  assert.equal(taskPriorityLabel('none'), '无优先级');
 });

@@ -17,11 +17,12 @@ function localDateTime(value) {
   }).format(new Date(value));
 }
 
-export function getPostponeOptions(today) {
+export function getScheduleOptions(today) {
   const date = new Date(`${today}T00:00:00`);
   const weekday = date.getDay();
   const daysUntilNextMonday = ((1 - weekday + 7) % 7) || 7;
   return [
+    { value: today, label: '今天' },
     { value: offsetDate(date, 1), label: '明天' },
     { value: offsetDate(date, 2), label: '后天' },
     { value: offsetDate(date, daysUntilNextMonday), label: '下周一' },
@@ -56,15 +57,30 @@ function taskStatus(task, today) {
   return '待办';
 }
 
-function postponeMenu(task, today) {
-  if (!ACTIVE_LIFECYCLES.has(task.lifecycle) || task.scheduledDate === null) return '';
-  const options = getPostponeOptions(today)
-    .map((option) => `<button type="button" data-action="postpone" data-date="${option.value}">${option.label} · ${formatLocalDay(option.value)}</button>`)
+function scheduleMenu(task, today) {
+  if (!ACTIVE_LIFECYCLES.has(task.lifecycle)) return '';
+  const options = getScheduleOptions(today)
+    .map((option) => `<button type="button" data-action="reschedule" data-date="${option.value}">${option.label} · ${formatLocalDay(option.value)}</button>`)
     .join('');
-  return `<div class="task__postpone" role="group" aria-label="延期 ${escapeHtml(task.title)}">
-    <span class="task__menu-label">延期到</span>
+  return `<div class="task__postpone" data-menu-section="date" role="group" aria-label="安排 ${escapeHtml(task.title)}">
+    <span class="task__menu-label">日期</span>
     ${options}
-    <label class="task__custom-date">自定义 <input type="date" min="${today}" data-postpone-date><button type="button" data-action="postpone-custom">确定</button></label>
+    <label class="task__custom-date">自定义 <input type="date" data-schedule-date><button type="button" data-action="reschedule-custom">确定</button></label>
+    <button type="button" data-action="reschedule" data-date="">移除计划日期</button>
+  </div>`;
+}
+
+function priorityMenu(task) {
+  if (!ACTIVE_LIFECYCLES.has(task.lifecycle)) return '';
+  const priorities = [
+    ['none', '无优先级'],
+    ['low', '低优先级'],
+    ['medium', '中优先级'],
+    ['high', '高优先级'],
+  ];
+  return `<div class="task__postpone" data-menu-section="priority" role="group" aria-label="优先级 ${escapeHtml(task.title)}">
+    <span class="task__menu-label">优先级</span>
+    ${priorities.map(([value, label]) => `<button type="button" data-action="set-priority" data-priority="${value}" aria-pressed="${task.priority === value}">${label}</button>`).join('')}
   </div>`;
 }
 
@@ -79,9 +95,12 @@ function taskActions(task) {
   if (ACTIVE_LIFECYCLES.has(task.lifecycle)) {
     actions.push('<button type="button" data-action="complete">完成</button>');
     actions.push('<button type="button" data-action="cancel">取消</button>');
+    actions.push(`<button type="button" data-action="set-starred" data-starred="${task.starred ? 'false' : 'true'}">${task.starred ? '取消星标' : '加星标'}</button>`);
   } else {
     actions.push('<button type="button" data-action="restore">恢复待办</button>');
   }
+  actions.push('<button type="button" data-action="edit">添加子任务</button>');
+  actions.push('<button type="button" data-action="edit">编辑标签</button>');
   actions.push('<button type="button" data-action="copy">复制</button>');
   actions.push('<button type="button" data-action="trash">删除</button>');
   return actions.join('');
@@ -94,6 +113,10 @@ export function taskTagLabel(task, tags) {
     .filter(Boolean)
     .map((name) => `#${name}`)
     .join(' ');
+}
+
+export function taskPriorityLabel(priority) {
+  return ({ none: '无优先级', low: '低优先级', medium: '中优先级', high: '高优先级' })[priority] ?? '无优先级';
 }
 
 function taskMarkup(task, today, tags, resourceCounts) {
@@ -111,17 +134,20 @@ function taskMarkup(task, today, tags, resourceCounts) {
     && ACTIVE_LIFECYCLES.has(task.lifecycle);
   const resourceCount = resourceCounts.get(task.id) ?? 0;
   const resourceLabel = resourceCount > 0 ? ` · 资料 ${resourceCount}` : '';
+  const priorityLabel = taskPriorityLabel(task.priority);
+  const priorityMarkup = ` · <span class="task__priority">${priorityLabel}</span>`;
   return `<article class="task task--${escapeHtml(task.lifecycle)}${overdue ? ' task--overdue' : ''}" data-task-id="${escapeHtml(task.id)}" data-revision="${task.revision}" role="listitem">
     <button class="task__check" type="button" role="checkbox" aria-checked="${checked}" data-action="${checkboxAction}" aria-label="${canRestore ? '恢复任务' : '完成任务'}">${checked ? '✓' : ''}</button>
     <div class="task__body">
       <button class="task__title" type="button" data-action="edit">${escapeHtml(task.title)}</button>
-      <span class="task__meta"><span class="task__status">${status}</span> · ${escapeHtml(taskMeta(task, today))}${task.starred ? ' · 已星标' : ''}${tagMarkup}${resourceLabel}</span>
+      <span class="task__meta"><span class="task__status">${status}</span> · ${escapeHtml(taskMeta(task, today))}${priorityMarkup}${task.starred ? ' · 已星标' : ''}${tagMarkup}${resourceLabel}</span>
     </div>
     <details class="task__more">
       <summary aria-label="更多任务操作">更多</summary>
       <div class="task__menu">
         ${taskActions(task)}
-        ${postponeMenu(task, today)}
+        ${scheduleMenu(task, today)}
+        ${priorityMenu(task)}
       </div>
     </details>
   </article>`;
@@ -144,8 +170,22 @@ export function renderTaskList(container, tasks, {
     return;
   }
 
-  container.innerHTML = `<div class="task-list" role="list">${tasks.map((task) => taskMarkup(task, today, tags, resourceCounts)).join('')}</div>`;
+  let visibleCount = Math.min(tasks.length, 200);
+  const renderVisible = () => {
+    const visibleTasks = tasks.slice(0, visibleCount);
+    const more = visibleCount < tasks.length
+      ? `<button type="button" class="button-secondary task-list__more" data-load-more>加载更多（还有 ${tasks.length - visibleCount} 项）</button>`
+      : '';
+    container.innerHTML = `<div class="task-list" role="list">${visibleTasks.map((task) => taskMarkup(task, today, tags, resourceCounts)).join('')}</div>${more}`;
+  };
+  renderVisible();
   container.onclick = async (event) => {
+    const loadMore = event.target.closest('[data-load-more]');
+    if (loadMore !== null) {
+      visibleCount = Math.min(visibleCount + 200, tasks.length);
+      renderVisible();
+      return;
+    }
     const button = event.target.closest('button[data-action]');
     if (button === null) return;
     const row = button.closest('[data-task-id]');
@@ -156,10 +196,14 @@ export function renderTaskList(container, tasks, {
       return;
     }
 
-    const value = action === 'postpone-custom'
-      ? row.querySelector('[data-postpone-date]')?.value
-      : button.dataset.date;
-    const resolvedAction = action === 'postpone-custom' ? 'postpone' : action;
+    const value = action === 'reschedule-custom'
+      ? row.querySelector('[data-schedule-date]')?.value
+      : action === 'set-priority'
+        ? button.dataset.priority
+        : action === 'set-starred'
+          ? button.dataset.starred === 'true'
+        : button.dataset.date === '' ? null : button.dataset.date;
+    const resolvedAction = action === 'reschedule-custom' ? 'reschedule' : action;
     button.disabled = true;
     try {
       await onAction?.(resolvedAction, row.dataset.taskId, Number(row.dataset.revision), value);
@@ -168,5 +212,19 @@ export function renderTaskList(container, tasks, {
     } finally {
       if (button.isConnected) button.disabled = false;
     }
+  };
+  container.onkeydown = (event) => {
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (!['d', 'p'].includes(event.key.toLowerCase())) return;
+    if (event.target.closest('input, select, textarea')) return;
+    const row = event.target.closest('[data-task-id]');
+    if (row === null) return;
+    const details = row.querySelector('.task__more');
+    const section = row.querySelector(`[data-menu-section="${event.key.toLowerCase() === 'd' ? 'date' : 'priority'}"]`);
+    const firstAction = section?.querySelector('button');
+    if (details === null || firstAction === null) return;
+    event.preventDefault();
+    details.open = true;
+    firstAction.focus();
   };
 }

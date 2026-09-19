@@ -224,6 +224,35 @@ test('任务操作调用服务、广播并刷新当前视图', async () => {
   assert.equal(view.renderCount, 2);
 });
 
+test('任务操作可在不打开编辑器时更新优先级', async () => {
+  const calls = [];
+  const controller = new DashboardController({
+    views: { today: { async render() {} } },
+    taskService: {
+      async edit(id, changes, revision) {
+        calls.push([id, changes, revision]);
+        return { task: { id, revision: revision + 1 } };
+      },
+    },
+  });
+
+  await controller.handleTaskAction('set-priority', 't1', 2, 'high');
+
+  assert.deepEqual(calls, [['t1', { priority: 'high' }, 2]]);
+});
+
+test('任务操作可在不打开编辑器时切换星标', async () => {
+  const calls = [];
+  const controller = new DashboardController({
+    views: { today: { async render() {} } },
+    taskService: { async edit(id, changes, revision) { calls.push([id, changes, revision]); return { task: { id } }; } },
+  });
+
+  await controller.handleTaskAction('set-starred', 't1', 1, true);
+
+  assert.deepEqual(calls, [['t1', { starred: true }, 1]]);
+});
+
 test('完成重复任务通过重复服务生成下一实例', async () => {
   const calls = [];
   const controller = new DashboardController({

@@ -69,3 +69,17 @@
 - 推荐格式：`类型：变更内容`，例如 `修复：资料副本导入时的校验问题`。
 - 类型可使用：`新增`、`修复`、`优化`、`重构`、`测试`、`文档`、`构建`、`合并`。
 - 提交前确认只包含当前任务相关文件，并在可行时运行对应测试。
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live in GitHub Issues; use the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the default canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Use the single-context layout with root `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.

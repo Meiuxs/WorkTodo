@@ -26,6 +26,33 @@ test('今日页突出下一步任务并保留可直接记录的入口', async ({
   await expect(page.getByLabel('记录一个新事项')).toBeVisible();
 });
 
+test('Dashboard 快速新增撤销不会再次要求确认', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await dashboard.getByLabel('记录一个新事项').fill('临时任务');
+  await dashboard.getByRole('button', { name: '添加', exact: true }).click();
+  await dashboard.getByRole('button', { name: '撤销' }).click();
+  await expect(dashboard.getByRole('dialog')).toHaveCount(0);
+  await expect(dashboard.getByText('已撤销创建')).toBeVisible();
+  await dashboard.getByRole('button', { name: '回收站', exact: true }).click();
+  await expect(dashboard.getByRole('button', { name: '临时任务' })).toHaveCount(0);
+});
+
+test('任务行支持快捷日期和优先级操作', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await dashboard.getByLabel('记录一个新事项').fill('快捷操作任务');
+  await dashboard.getByRole('button', { name: '添加', exact: true }).click();
+  await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
+  const row = dashboard.locator('[data-task-id]').filter({ hasText: '快捷操作任务' });
+  await row.locator('summary[aria-label="更多任务操作"]').click();
+  await row.getByRole('button', { name: /今天 ·/ }).click();
+  await dashboard.getByRole('button', { name: '今天', exact: true }).click();
+  const refreshedRow = dashboard.locator('[data-task-id]').filter({ hasText: '快捷操作任务' });
+  await refreshedRow.locator('summary[aria-label="更多任务操作"]').click();
+  await refreshedRow.getByRole('button', { name: '高优先级' }).click();
+  await expect(dashboard.locator('[data-task-id]').filter({ hasText: '快捷操作任务' })).toContainText('高优先级');
+  await expect(dashboard.getByRole('button', { name: '快捷操作任务' })).toBeVisible();
+});
+
 test('取消删除确认后任务保留且删除操作仍可用', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('保留删除前确认');

@@ -8,7 +8,7 @@ export function createInboxView({ root, query, today, onAction, onEdit, onError,
       const resourceCounts = await getResourceCounts?.(tasks) ?? new Map();
       root.innerHTML = `<section class="view-section" aria-labelledby="inbox-heading">
         <div class="section-heading">
-          <div><h2 id="inbox-heading">收集箱 · ${tasks.length}</h2><p>先记录，再决定日期、优先级和分类。</p></div>
+          <div><h2 id="inbox-heading">收集箱 · ${tasks.length}</h2><p>先记录，再决定日期、优先级和列表。</p></div>
           <button type="button" class="button-secondary" data-focus-quick-add>记录临时事项</button>
         </div>
         <div id="inbox-list"></div>

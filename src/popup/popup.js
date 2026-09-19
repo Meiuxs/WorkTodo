@@ -20,16 +20,31 @@ function openDashboard() {
   chrome.tabs.create({ url: chrome.runtime.getURL('src/dashboard/index.html') });
 }
 
-function showPopupSuccess(feedback) {
+function showPopupSuccess(feedback, onUndo) {
   toast.replaceChildren();
   const text = document.createElement('span');
   text.textContent = feedback.message;
+  const undo = document.createElement('button');
+  undo.type = 'button';
+  undo.className = 'toast__action';
+  undo.textContent = feedback.undoAction;
+  undo.addEventListener('click', async () => {
+    undo.disabled = true;
+    try {
+      await onUndo();
+      text.textContent = '已撤销创建';
+      undo.remove();
+    } catch {
+      text.textContent = '撤销没有完成，请打开工作台处理';
+      undo.disabled = false;
+    }
+  }, { once: true });
   const action = document.createElement('button');
   action.type = 'button';
   action.className = 'toast__action';
   action.textContent = feedback.nextAction;
   action.addEventListener('click', openDashboard, { once: true });
-  toast.append(text, action);
+  toast.append(text, ' ', undo, ' ', action);
   toast.hidden = false;
   window.clearTimeout(showPopupSuccess.timeoutId);
   showPopupSuccess.timeoutId = window.setTimeout(() => { toast.hidden = true; }, 5000);
@@ -66,7 +81,10 @@ function renderTasks(state) {
   const otherTasks = state.focusTasks.filter((task) => !overdueTasks.includes(task));
   const overdueSection = document.querySelector('#overdue-section');
   overdueSection.hidden = state.overdueCount === 0;
-  document.querySelector('#overdue-heading').textContent = `逾期 ${state.overdueCount}`;
+  const hiddenOverdueCount = Math.max(state.overdueCount - overdueTasks.length, 0);
+  document.querySelector('#overdue-heading').textContent = hiddenOverdueCount > 0
+    ? `逾期 ${state.overdueCount}（还有 ${hiddenOverdueCount} 项，打开工作台查看）`
+    : `逾期 ${state.overdueCount}`;
   document.querySelector('#overdue-list').innerHTML = overdueTasks.map((task) => taskMarkup(task, state.date)).join('');
   document.querySelector('#focus-list').innerHTML = otherTasks.map((task) => taskMarkup(task, state.date)).join('');
   document.querySelector('#empty-state').hidden = state.focusTasks.length !== 0;
@@ -89,10 +107,13 @@ form.addEventListener('submit', async (event) => {
   const today = toLocalDate(new Date());
   const scheduledDate = selectedDate === 'today' ? today : selectedDate === 'tomorrow' ? dateOffset(new Date(), 1) : null;
   try {
-    await controller.quickCreate(input.value, scheduledDate);
+    const task = await controller.quickCreate(input.value, scheduledDate);
     input.value = '';
     setSelectedDate('inbox');
-    showPopupSuccess(getQuickAddFeedback({ scheduledDate }));
+    showPopupSuccess(getQuickAddFeedback({ scheduledDate }), async () => {
+      await controller.undoCreate(task);
+      await refresh();
+    });
     await refresh();
     input.focus();
   } catch {

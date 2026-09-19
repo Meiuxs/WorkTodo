@@ -310,6 +310,8 @@
 }
 .task__status { color: var(--ink); font-weight: 700; }
 .task__tags { color: var(--teal); font-weight: 700; }
+.task__priority { color: var(--coral); font-weight: 700; }
+.task-list__more { display: block; margin: var(--sp-4) auto; }
 .task--overdue .task__status { color: var(--coral); }
 .task--completed .task__title { color: var(--muted); text-decoration: line-through; }
 .task--cancelled .task__title { color: var(--muted); }
@@ -486,6 +488,7 @@
   text-align: left;
 }
 .task__menu button:hover { background: var(--teal-soft); }
+.task__menu button[aria-pressed="true"] { background: var(--teal-soft); color: var(--teal); font-weight: 700; }
 /* 破坏性操作与普通操作必须能一眼区分，否则"删除"和"复制"外形完全一样。 */
 .task__menu button[data-action="trash"],
 .task__menu button[data-action="delete-permanently"] { color: var(--coral); }

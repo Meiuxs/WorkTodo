@@ -14,14 +14,15 @@ export function createResourcesView({ root, resourceService, query, onError, con
       const version = ++renderVersion;
       const resources = await resourceService.list({ text, type: type === 'all' ? null : type });
       const tasks = await query.all();
+      const availableTasks = tasks.filter((task) => task.trashedAt === null);
       const relationCounts = new Map(await Promise.all(resources.map(async (resource) => [resource.id, (await resourceService.listTaskIds(resource.id)).length])));
       if (signal?.aborted || version !== renderVersion) return;
       root.innerHTML = `<section class="view-section" aria-labelledby="resources-heading">
         <div class="section-heading"><div><h2 id="resources-heading">资料收集箱 · ${resources.length}</h2><p>先保存上下文，再决定它属于哪个任务。</p></div><button type="button" class="button-primary" data-resource-create>添加资料</button></div>
         <div class="resource-toolbar"><label class="filter-search">搜索资料<input type="search" data-resource-search value="${escapeHtml(text)}" placeholder="名称、链接、文件名或片段"></label><label>类型<select data-resource-filter><option value="all">全部资料</option><option value="url">网页链接</option><option value="file">本地文件</option><option value="snippet">文本片段</option></select></label></div>
-        <div class="resources-list" role="list">${resources.length === 0 ? '<p class="empty">还没有资料。可以先保存一个链接、文件或文本片段。</p>' : resources.map((resource) => `<article class="resource-card" data-resource-id="${escapeHtml(resource.id)}" role="listitem"><div><p class="resource-card__type">${typeLabel(resource.type)}${resource.storageMode === 'copy' ? ' · 已保存副本' : ''}</p><h3>${escapeHtml(resource.title)}</h3><p class="resource-card__source">${escapeHtml(resource.url ?? resource.fileName ?? (resource.content ?? '').slice(0, 100))}</p>${resource.note ? `<p class="resource-card__note">${escapeHtml(resource.note)}</p>` : ''}</div><div class="resource-card__actions"><span>${relationCounts.get(resource.id) === 0 ? '未关联任务' : '已关联任务'}</span>${resource.type === 'file' && resource.storageMode === 'copy' ? '<button type="button" data-resource-download>下载副本</button>' : ''}${resource.type === 'file' && resource.storageMode !== 'copy' ? '<button type="button" data-resource-relink>重新选择文件</button>' : ''}<button type="button" data-resource-associate>关联任务</button><button type="button" data-resource-delete>删除</button></div></article>`).join('')}</div>
+        <div class="resources-list" role="list">${resources.length === 0 ? '<p class="empty">还没有资料。可以先保存一个链接、文件或文本片段。</p>' : resources.map((resource) => `<article class="resource-card" data-resource-id="${escapeHtml(resource.id)}" role="listitem"><div><p class="resource-card__type">${typeLabel(resource.type)}${resource.storageMode === 'copy' ? ' · 已保存副本' : ''}</p><h3>${escapeHtml(resource.title)}</h3><p class="resource-card__source">${escapeHtml(resource.url ?? resource.fileName ?? (resource.content ?? '').slice(0, 100))}</p>${resource.note ? `<p class="resource-card__note">${escapeHtml(resource.note)}</p>` : ''}</div><div class="resource-card__actions"><span>${relationCounts.get(resource.id) === 0 ? '未关联任务' : `已关联 ${relationCounts.get(resource.id)} 个任务`}</span>${resource.type === 'file' && resource.storageMode === 'copy' ? '<button type="button" data-resource-download>下载副本</button>' : ''}${resource.type === 'file' && resource.storageMode !== 'copy' ? '<button type="button" data-resource-relink>重新选择文件</button>' : ''}<button type="button" data-resource-associate>关联任务</button><button type="button" data-resource-delete>删除</button></div></article>`).join('')}</div>
         <dialog class="modal" data-resource-create-dialog><form method="dialog" data-resource-create-form><h2>添加资料</h2><label class="field">资料类型<select data-resource-type><option value="url">网页链接</option><option value="snippet">文本片段</option><option value="file">本地文件</option></select></label><label class="field">资料名称<input data-resource-title maxlength="200" required></label><label class="field" data-url-field>网页链接<input data-resource-url type="url" placeholder="https://"></label><label class="field" data-snippet-field hidden>文本片段<textarea data-resource-content maxlength="20000"></textarea></label><label class="field" data-file-field hidden>本地文件<input data-resource-file type="file"></label><label class="check-field" data-copy-field hidden><input data-resource-copy type="checkbox"> 保存一份副本（单个文件不超过 20 MB）</label><label class="field">备注<textarea data-resource-note maxlength="2000" rows="2"></textarea></label><p class="form-message" data-resource-message role="alert"></p><div class="dialog-actions"><button type="button" data-resource-cancel>取消</button><button type="submit" class="button-primary">保存资料</button></div></form></dialog>
-        <dialog class="modal" data-resource-associate-dialog><form method="dialog" data-resource-associate-form><h2>关联任务</h2><label class="field">选择任务<select data-resource-task-select>${tasks.filter((task) => task.trashedAt === null).map((task) => `<option value="${escapeHtml(task.id)}">${escapeHtml(task.title)}</option>`).join('')}</select></label><p class="form-message" data-associate-message role="alert"></p><div class="dialog-actions"><button type="button" data-associate-cancel>取消</button><button type="submit" class="button-primary">关联</button></div></form></dialog>
+        <dialog class="modal" data-resource-associate-dialog><form method="dialog" data-resource-associate-form><h2>关联任务</h2>${availableTasks.length === 0 ? '<p class="empty">还没有可关联的任务。请先记录一个任务。</p>' : `<label class="field">选择任务<select data-resource-task-select>${availableTasks.map((task) => `<option value="${escapeHtml(task.id)}">${escapeHtml(task.title)}</option>`).join('')}</select></label>`}<p class="form-message" data-associate-message role="alert"></p><div class="dialog-actions"><button type="button" data-associate-cancel>取消</button><button type="submit" class="button-primary" ${availableTasks.length === 0 ? 'disabled' : ''}>关联</button></div></form></dialog>
       </section>`;
       root.querySelector('[data-resource-filter]').value = type;
       root.querySelector('[data-resource-search]').addEventListener('input', (event) => {
@@ -43,7 +44,13 @@ export function createResourcesView({ root, resourceService, query, onError, con
         createForm.querySelector('[data-copy-field]').hidden = selected !== 'file';
       };
       createForm.querySelector('[data-resource-type]').addEventListener('change', updateCreateType);
-      root.querySelector('[data-resource-create]').addEventListener('click', () => { createDialog.showModal(); createForm.querySelector('[data-resource-title]').focus(); });
+      let createTrigger = null;
+      root.querySelector('[data-resource-create]').addEventListener('click', (event) => {
+        createTrigger = event.currentTarget;
+        createDialog.showModal();
+        createForm.querySelector('[data-resource-title]').focus();
+      });
+      createDialog.addEventListener('close', () => createTrigger?.focus());
       createForm.querySelector('[data-resource-cancel]').addEventListener('click', () => createDialog.close());
       createForm.addEventListener('submit', (event) => {
         event.preventDefault();
@@ -65,10 +72,14 @@ export function createResourcesView({ root, resourceService, query, onError, con
         }, { signal, onError });
       });
       const associateDialog = root.querySelector('[data-resource-associate-dialog]');
-      root.querySelectorAll('[data-resource-associate]').forEach((button) => button.addEventListener('click', () => {
+      let associateTrigger = null;
+      root.querySelectorAll('[data-resource-associate]').forEach((button) => button.addEventListener('click', (event) => {
+        associateTrigger = event.currentTarget;
         associateDialog.dataset.resourceId = button.closest('[data-resource-id]').dataset.resourceId;
         associateDialog.showModal();
+        associateDialog.querySelector('[data-resource-task-select]')?.focus();
       }));
+      associateDialog.addEventListener('close', () => associateTrigger?.focus());
       associateDialog.querySelector('[data-associate-cancel]').addEventListener('click', () => associateDialog.close());
       associateDialog.querySelector('[data-resource-associate-form]').addEventListener('submit', (event) => {
         event.preventDefault();

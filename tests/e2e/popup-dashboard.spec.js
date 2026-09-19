@@ -17,6 +17,20 @@ test('Popup 快速新增任务后 Dashboard 收集箱可见且刷新后仍存在
   await expect(dashboard.getByRole('button', { name: '联系客户' })).toBeVisible();
 });
 
+test('Popup 快速新增可直接撤销创建', async ({ extension }) => {
+  const popup = await openPopup(extension);
+  await popup.getByLabel('记录一个新事项').fill('误记任务');
+  await popup.getByRole('button', { name: '添加任务' }).click();
+  await popup.getByRole('button', { name: '撤销' }).click();
+  await expect(popup.getByText('已撤销创建')).toBeVisible();
+
+  const dashboard = await openDashboard(extension);
+  await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
+  await expect(dashboard.getByRole('button', { name: '误记任务' })).toHaveCount(0);
+  await dashboard.getByRole('button', { name: '回收站', exact: true }).click();
+  await expect(dashboard.getByRole('button', { name: '误记任务' })).toHaveCount(0);
+});
+
 test('Popup 成功反馈不遮挡底部日期选择', async ({ extension }) => {
   const popup = await openPopup(extension);
   await popup.getByLabel('记录一个新事项').fill('检查反馈位置');
