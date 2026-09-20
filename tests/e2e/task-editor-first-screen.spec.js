@@ -167,3 +167,40 @@ test('并发冲突时冲突面板可见且焦点落在载入最新版本', async
   });
   expect(inViewport).toBe(true);
 });
+
+test('深色主题下入口行细线可见且摘要用弱化色', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await createTodayTask(dashboard, '深色抽屉任务');
+  // initialize() 会调用 applyTheme 覆写 data-theme，等初始化完成再切换。
+  await expect(dashboard.locator('.app')).toBeVisible();
+  await dashboard.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
+  await dashboard.getByRole('button', { name: '深色抽屉任务' }).click();
+
+  const style = await dashboard.evaluate(() => ({
+    border: getComputedStyle(document.querySelector('#task-editor .editor-group')).borderBottomColor,
+    value: getComputedStyle(document.querySelector('#task-editor [data-group-value="category"]')).color,
+  }));
+  expect(style.border).toBe('rgb(49, 80, 75)');    // --line 深色 #31504b
+  expect(style.value).toBe('rgb(165, 184, 179)');  // --muted 深色 #a5b8b3
+});
+
+test('390px 下抽屉首屏与展开后的入口行都不横向溢出', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await dashboard.setViewportSize({ width: 390, height: 844 });
+  await createTodayTask(dashboard, '窄屏抽屉任务');
+  await dashboard.getByRole('button', { name: '窄屏抽屉任务' }).click();
+
+  const editor = dashboard.locator('#task-editor');
+  const measure = () => editor.evaluate((node) => {
+    const drawerBody = node.querySelector('.drawer-body');
+    return { scrollWidth: drawerBody.scrollWidth, clientWidth: drawerBody.clientWidth };
+  });
+
+  const collapsed = await measure();
+  expect(collapsed.scrollWidth).toBeLessThanOrEqual(collapsed.clientWidth + 1);
+
+  const moreGroup = await openEditorGroup(dashboard, 'more');
+  await moreGroup.getByLabel('描述').fill('X'.repeat(200));
+  const expanded = await measure();
+  expect(expanded.scrollWidth).toBeLessThanOrEqual(expanded.clientWidth + 1);
+});
