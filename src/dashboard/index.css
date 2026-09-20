@@ -49,7 +49,9 @@
 .nav__group { display: flex; flex-direction: column; gap: var(--sp-1); }
 /* 今天是没有分组标签的主入口，与品牌区之间额外空出一档。 */
 .nav__group--primary { margin-top: var(--sp-4); }
-.nav__footer { margin-top: auto; }
+/* 设置入口跟随导航末尾，不吸底：它紧跟在最后一个分组之后，
+   靠 .nav__footer 的上边框与上方分隔（见「侧栏导航与设置入口」规范）。 */
+.nav__footer { margin-top: 0; }
 
 /* 分组标签（计划 / 任务 / 回顾）是目录级信息：
    比条目更小、更轻、更灰，只负责分隔，不与条目争视觉重量。 */
