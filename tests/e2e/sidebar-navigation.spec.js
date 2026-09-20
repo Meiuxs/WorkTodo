@@ -174,3 +174,20 @@ test('390px 下导航条目全部可见且没有横向溢出', async ({ extensio
   // A 段那个 140px 底部内边距早已被 B 段覆盖，取两者中生效的值。
   expect(layout.contentPaddingBottom).toBe('24px');
 });
+
+test('200% 缩放的等效视口下侧栏不产生横向溢出', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  // 浏览器缩放按比例缩小 CSS 视口：1280px 宽的窗口放大到 200% 时，布局视口就是
+  // 640px，媒体查询同样按 640px 匹配。Playwright 无法设置真实的浏览器缩放，
+  // 所以用等效视口验证同一件事；不对 <html> 施加 CSS zoom，因为那会改变
+  // scrollWidth / clientWidth 的语义，写出来的断言容易假阳性。
+  await dashboard.setViewportSize({ width: 640, height: 400 });
+  await expect(dashboard.locator('.app')).toBeVisible();
+  await expect(dashboard.getByRole('button', { name: '设置', exact: true })).toBeVisible();
+
+  const layout = await dashboard.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+});
