@@ -98,3 +98,23 @@ test('深色主题下侧栏分隔线仍与画布背景可区分', async ({ exten
   expect(style.canvas).toBe('rgb(16, 32, 31)');  // --canvas 深色 #10201f
   expect(style.border).not.toBe(style.canvas);
 });
+
+test('设置条目与普通导航项共用同一组基础样式', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+
+  const read = (route) => dashboard.evaluate((selector) => {
+    const style = getComputedStyle(document.querySelector(selector));
+    return {
+      minHeight: style.minHeight,
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+      borderRadius: style.borderRadius,
+      paddingLeft: style.paddingLeft,
+      paddingRight: style.paddingRight,
+      borderLeftWidth: style.borderLeftWidth,
+    };
+  }, `[data-route="${route}"]`);
+
+  // 颜色与上边框是刻意保留的差异，所以这里只比对几何与排版。
+  expect(await read('settings')).toEqual(await read('history'));
+});

@@ -65,8 +65,7 @@
 
 /* 未选中的条目用常规字重：侧栏十来个条目全部加粗会互相抵消，
    700 留给"当前所在页面"，与令牌里"强调专属 700"的约定一致。 */
-.nav button,
-.nav__settings {
+.nav button {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
@@ -81,10 +80,8 @@
   font-weight: 400;
 }
 
-.nav button:hover,
-.nav__settings:hover { background: var(--nav-hover); }
-.nav button[aria-current="page"],
-.nav__settings[aria-current="page"] {
+.nav button:hover { background: var(--nav-hover); }
+.nav button[aria-current="page"] {
   border-left-color: var(--teal);
   background: var(--nav-active);
   color: var(--teal);
@@ -110,12 +107,6 @@
   font-variant-numeric: tabular-nums;
 }
 .nav__badge[data-tone="alert"] { background: var(--badge-alert-bg); color: var(--badge-alert-ink); }
-
-/* 设置与普通条目共用同一条左侧选中标记（吸底由 .nav__footer 负责）。 */
-.nav__settings {
-  border-radius: 0 var(--r-sm) var(--r-sm) 0;
-  padding-inline: var(--sp-3);
-}
 
 /* 设置是次级入口，层级差由分隔线与颜色承担，不由尺寸承担：
    44px 是既有触控目标，缩小字号也违反规范 §6.1。
