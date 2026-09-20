@@ -62,6 +62,57 @@ test('入口行可键盘展开，展开后内部控件可聚焦', async ({ exten
   await expect(group).toHaveAttribute('open', '');
   await group.getByLabel('新标签').focus();
   await expect(group.getByLabel('新标签')).toBeFocused();
+
+  // Enter 与 Space 都要能展开：<details> 的原生键盘行为不能被破坏。
+  await group.locator('summary').focus();
+  await dashboard.keyboard.press('Space');
+  await expect(group).toHaveJSProperty('open', false);
+});
+
+test('首屏无需滚动即可看全三行字段与全部入口行', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await createTodayTask(dashboard, '首屏高度任务');
+  await dashboard.getByRole('button', { name: '首屏高度任务' }).click();
+
+  const editor = dashboard.locator('#task-editor');
+  await expect(editor.locator('.editor-group[open]')).toHaveCount(0);
+
+  const measured = await editor.evaluate((node) => {
+    const drawerBody = node.querySelector('.drawer-body');
+    const bodyRect = drawerBody.getBoundingClientRect();
+    const fields = ['任务名称', '计划日期', '优先级'].map((label) => {
+      const field = [...node.querySelectorAll('.field')]
+        .find((item) => item.textContent.trim().startsWith(label));
+      const rect = field.getBoundingClientRect();
+      return rect.top >= bodyRect.top && rect.bottom <= bodyRect.bottom;
+    });
+    return {
+      fieldsInside: fields.every((inside) => inside),
+      scrollHeight: drawerBody.scrollHeight,
+      clientHeight: drawerBody.clientHeight,
+    };
+  });
+
+  expect(measured.fieldsInside).toBe(true);
+  // 首屏就是全部内容：六组默认收起时抽屉主体不该需要滚动。
+  expect(measured.scrollHeight).toBeLessThanOrEqual(measured.clientHeight + 1);
+});
+
+test('关闭抽屉后重新打开，次级区仍全部收起', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await createTodayTask(dashboard, '收起状态任务');
+  await dashboard.getByRole('button', { name: '收起状态任务' }).click();
+
+  const editor = dashboard.locator('#task-editor');
+  const group = await openEditorGroup(dashboard, 'tags');
+  await expect(group).toHaveAttribute('open', '');
+
+  await editor.getByRole('button', { name: '取消' }).click();
+  await expect(editor).toBeHidden();
+
+  await dashboard.getByRole('button', { name: '收起状态任务' }).click();
+  await expect(editor).toBeVisible();
+  await expect(editor.locator('.editor-group[open]')).toHaveCount(0);
 });
 
 test('分区标题已删除且只保留一套折叠词汇', async ({ extension }) => {

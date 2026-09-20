@@ -76,6 +76,13 @@ export function createTaskEditor({
     if (row !== undefined) row.hidden = !visible;
   }
 
+  /* details[open] 是常驻 DOM 状态，抽屉关闭后仍留在元素上。
+     不重置的话，用户展开过的组在下一次打开时还是展开的——展开六组就退回字段墙，
+     正是这次改造要消灭的东西。所以每次打开都从头收起。 */
+  function collapseGroups() {
+    groupRows.forEach((row) => { row.open = false; });
+  }
+
   const groupValues = new Map(
     [...dialog.querySelectorAll('[data-group-value]')]
       .map((node) => [node.dataset.groupValue, node]),
@@ -237,6 +244,7 @@ export function createTaskEditor({
 
   async function openNew(defaults = {}) {
     clearSectionMessages();
+    collapseGroups();
     currentTask = null;
     anchorTaskId = null;
     trigger = document.activeElement;
@@ -264,6 +272,7 @@ export function createTaskEditor({
 
   async function openTask(task, sourceElement = document.activeElement) {
     clearSectionMessages();
+    collapseGroups();
     if (!dialog.open) anchorTaskId = task.id;
     currentTask = task;
     trigger = sourceElement;

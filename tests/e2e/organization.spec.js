@@ -15,6 +15,7 @@ test('任务编辑器可以创建、选择并保留标签', async ({ extension }
   await editor.getByRole('button', { name: '保存任务' }).click();
 
   await page.getByRole('button', { name: '整理报价' }).click();
+  await openEditorGroup(page, 'tags');
   await expect(editor.getByRole('checkbox', { name: '客户' })).toBeChecked();
 });
 
@@ -218,6 +219,7 @@ test('标签和子任务在键盘与 390px 视口下不溢出并恢复焦点', a
   await expect(page.getByRole('button', { name: '窄屏组织任务' })).toBeFocused();
 
   await page.getByRole('button', { name: '窄屏组织任务' }).click();
+  await openEditorGroup(page, 'tags');
   await editor.getByRole('checkbox', { name: longTag, exact: true }).check();
   await editor.getByRole('button', { name: '保存任务' }).click();
   await page.getByLabel('记录一个新事项').fill('无标签窄屏任务');
