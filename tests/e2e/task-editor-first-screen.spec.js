@@ -118,3 +118,29 @@ test('切换列表与勾选标签后摘要立即更新', async ({ extension }) =
   await tagGroup.getByRole('checkbox', { name: '摘要标签' }).check();
   await expect(editor.locator('[data-group-value="tags"]')).toHaveText('1 个');
 });
+
+test('星标开关切换字形与可访问名，并能被键盘操作', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await createTodayTask(dashboard, '星标任务');
+  await dashboard.getByRole('button', { name: '星标任务' }).click();
+
+  const editor = dashboard.locator('#task-editor');
+  const toggle = editor.locator('[data-star-toggle]');
+  const checkbox = toggle.locator('input[name="starred"]');
+
+  // 形状变化不能是唯一的信息来源：可访问名必须跟着状态走。
+  // 用 exact 匹配，否则"已标记为星标，点击取消"也会被当成匹配。
+  await expect(editor.getByRole('checkbox', { name: '标记为星标', exact: true })).toBeVisible();
+  await expect(toggle.locator('[data-star-glyph]')).toHaveText('☆');
+
+  await checkbox.focus();
+  await dashboard.keyboard.press('Space');
+  await expect(checkbox).toBeChecked();
+  await expect(editor.getByRole('checkbox', { name: '已标记为星标，点击取消', exact: true })).toBeVisible();
+  await expect(toggle.locator('[data-star-glyph]')).toHaveText('★');
+
+  await editor.getByRole('button', { name: '保存任务' }).click();
+  await dashboard.getByRole('button', { name: '星标任务' }).click();
+  await expect(editor.locator('input[name="starred"]')).toBeChecked();
+  await expect(editor.locator('[data-star-glyph]')).toHaveText('★');
+});

@@ -81,6 +81,17 @@ export function createTaskEditor({
       .map((node) => [node.dataset.groupValue, node]),
   );
 
+  const starGlyph = dialog.querySelector('[data-star-glyph]');
+  const starText = dialog.querySelector('[data-star-text]');
+
+  /* 星标只靠 ☆/★ 字形表达状态时，读屏与色觉障碍用户无法判断，
+     所以可访问名必须跟着状态走。 */
+  function renderStar() {
+    const checked = field(form, 'starred').checked;
+    starGlyph.textContent = checked ? '★' : '☆';
+    starText.textContent = checked ? '已标记为星标，点击取消' : '标记为星标';
+  }
+
   const FREQUENCY_LABELS = Object.freeze({
     daily: '每天',
     weekdays: '每个工作日',
@@ -242,6 +253,7 @@ export function createTaskEditor({
     field(form, 'title').value = defaults.title ?? '';
     field(form, 'scheduledDate').value = defaults.scheduledDate ?? '';
     field(form, 'priority').value = defaults.priority ?? 'none';
+    renderStar();
     conflict.hidden = true;
     showMessage('');
     await renderSubtasks();
@@ -270,6 +282,7 @@ export function createTaskEditor({
     field(form, 'startTime').value = task.startTime ?? '';
     field(form, 'dueTime').value = task.dueTime ?? '';
     field(form, 'starred').checked = Boolean(task.starred);
+    renderStar();
     conflict.hidden = true;
     showMessage('');
     await renderSubtasks();
@@ -375,6 +388,7 @@ export function createTaskEditor({
   form.addEventListener('change', () => {
     markDirty();
     renderGroupSummaries();
+    renderStar();
   });
   dialog.querySelectorAll('[data-editor-close]').forEach((button) => {
     button.addEventListener('click', () => {
