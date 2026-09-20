@@ -117,6 +117,19 @@
   padding-inline: var(--sp-3);
 }
 
+/* 设置是次级入口，层级差由分隔线与颜色承担，不由尺寸承担：
+   44px 是既有触控目标，缩小字号也违反规范 §6.1。
+   这组规则必须排在选中态规则之后——特异性与 .nav button[aria-current="page"]
+   相同，靠顺序决定胜负，顺序写反会让选中态退回灰色。 */
+.nav__footer {
+  margin-top: 0;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+.nav__footer button { color: var(--muted); }
+.nav__footer button:hover { color: var(--ink); }
+.nav__footer button[aria-current="page"] { color: var(--teal); }
+
 .content {
   flex: 1 1 auto;
   display: flex;
