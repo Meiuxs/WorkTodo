@@ -1,4 +1,4 @@
-import { test, expect, openDashboard } from './fixtures.js';
+import { test, expect, openDashboard, openEditorGroup } from './fixtures.js';
 
 test('页面快捷键可以导航并聚焦快速新增', async ({ extension }) => {
   const page = await openDashboard(extension);
@@ -25,6 +25,7 @@ test('任务编辑器可以创建重复任务模板和首个实例', async ({ ex
     return date.toISOString().slice(0, 10);
   });
   await page.locator('#task-editor input[name="scheduledDate"]').fill(scheduledDate);
+  await openEditorGroup(page, 'recurring');
   await page.getByLabel('按规则自动创建下一项').check();
   await page.locator('#task-editor select[name="recurrenceFrequency"]').selectOption('weekly');
   await page.locator('#task-editor input[name="recurrenceInterval"]').fill('1');

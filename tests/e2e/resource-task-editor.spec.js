@@ -1,4 +1,4 @@
-import { test, expect, openDashboard } from './fixtures.js';
+import { test, expect, openDashboard, openEditorGroup } from './fixtures.js';
 
 test('任务可以关联网页资料、文本片段和本地文件元数据', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
@@ -9,7 +9,7 @@ test('任务可以关联网页资料、文本片段和本地文件元数据', as
   const task = dashboard.getByRole('button', { name: '准备评审' });
   await task.click();
   const editor = dashboard.getByRole('dialog').first();
-  await editor.getByText(/相关资料/).click();
+  await openEditorGroup(dashboard, 'resources');
   await editor.getByRole('button', { name: '添加资料' }).click();
 
   const resourceDialog = dashboard.getByRole('dialog').last();

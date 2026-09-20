@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { test, expect, openDashboard } from './fixtures.js';
+import { test, expect, openDashboard, openEditorGroup } from './fixtures.js';
 
 test('导出包含版本信息，导入经过预览后可合并', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
@@ -8,7 +8,7 @@ test('导出包含版本信息，导入经过预览后可合并', async ({ exten
   await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
   await dashboard.getByRole('button', { name: '备份任务' }).click();
   const editor = dashboard.getByRole('dialog').first();
-  await editor.getByText(/相关资料/).click();
+  await openEditorGroup(dashboard, 'resources');
   await editor.getByRole('button', { name: '添加资料' }).click();
   const resourceDialog = dashboard.getByRole('dialog').last();
   await resourceDialog.getByLabel('资料名称').fill('备份资料');
