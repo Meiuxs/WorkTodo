@@ -76,11 +76,65 @@ export function createTaskEditor({
     if (row !== undefined) row.hidden = !visible;
   }
 
+  const groupValues = new Map(
+    [...dialog.querySelectorAll('[data-group-value]')]
+      .map((node) => [node.dataset.groupValue, node]),
+  );
+
+  const FREQUENCY_LABELS = Object.freeze({
+    daily: '每天',
+    weekdays: '每个工作日',
+    weekly: '每周',
+    monthly: '每月',
+    yearly: '每年',
+  });
+  const UNIT_LABELS = Object.freeze({ day: '天', week: '周', month: '月' });
+
+  function setGroupValue(name, text) {
+    const node = groupValues.get(name);
+    if (node !== undefined) node.textContent = text;
+  }
+
+  function recurringSummary() {
+    if (!recurring.checked) return '不重复';
+    const frequency = field(form, 'recurrenceFrequency').value;
+    const interval = Number(field(form, 'recurrenceInterval').value);
+    if (frequency === 'custom') {
+      return `每 ${interval} ${UNIT_LABELS[field(form, 'recurrenceUnit').value] ?? '天'}`;
+    }
+    if (interval > 1) return `每 ${interval} ${frequency === 'weekly' ? '周' : '天'}`;
+    return FREQUENCY_LABELS[frequency] ?? '不重复';
+  }
+
+  /* 收起不丢信息：摘要是用户在收起状态下判断这条任务现状的唯一依据，
+     所以每次改动都要重算，而不是只在打开抽屉时算一次。 */
+  function renderGroupSummaries() {
+    setGroupValue('category', category.selectedOptions[0]?.textContent ?? '未归入列表');
+
+    const tagCount = selectedTagIds().length;
+    setGroupValue('tags', tagCount === 0 ? '未添加' : `${tagCount} 个`);
+
+    setGroupValue('recurring', recurringSummary());
+
+    const resourceTotal = resourceList.querySelectorAll('[data-resource-detach]').length;
+    setGroupValue('resources', resourceTotal === 0 ? '无' : `${resourceTotal} 条`);
+
+    const subtaskTotal = subtaskList.querySelectorAll('[data-subtask-id]').length;
+    const subtaskDone = subtaskList.querySelectorAll('[data-subtask-id][data-subtask-done]').length;
+    setGroupValue('subtasks', subtaskTotal === 0 ? '无' : `${subtaskDone}/${subtaskTotal} 完成`);
+
+    const filled = field(form, 'description').value.trim().length > 0
+      || field(form, 'startTime').value.length > 0
+      || field(form, 'dueTime').value.length > 0;
+    setGroupValue('more', filled ? '已填写' : '未填写');
+  }
+
   async function renderResources() {
     if (currentTask === null || resourceService === undefined) {
       setGroupVisible('resources', false);
       resourceList.replaceChildren();
       resourceCount.textContent = '0';
+      renderGroupSummaries();
       return;
     }
     const items = await resourceService.listForTask(currentTask.id);
@@ -89,12 +143,14 @@ export function createTaskEditor({
     resourceList.innerHTML = items.length === 0
       ? '<p class="muted">还没有关联资料。</p>'
       : items.map((resource) => `<div class="editor-resource-row"><span><strong>${escapeHtml(resource.title)}</strong><small>${resource.type === 'url' ? '网页链接' : resource.type === 'file' ? `本地文件 · ${escapeHtml(resource.fileName)}` : '文本片段'}</small></span><button type="button" data-resource-detach="${escapeHtml(resource.id)}">解除关联</button></div>`).join('');
+    renderGroupSummaries();
   }
 
   function populateCategories(categories, selectedId) {
     category.innerHTML = '<option value="">未归入列表</option>'
       + categories.map((item) => `<option value="${item.id}">${item.name.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')}</option>`).join('');
     category.value = selectedId ?? '';
+    renderGroupSummaries();
   }
 
   function populateTags(items, selectedIds = []) {
@@ -102,6 +158,7 @@ export function createTaskEditor({
     tagOptions.innerHTML = items.length === 0
       ? '<p class="muted">尚未创建标签。</p>'
       : items.map((tag) => `<label class="tag-option"><input type="checkbox" name="tagIds" value="${escapeHtml(tag.id)}" ${selected.has(tag.id) ? 'checked' : ''}> ${escapeHtml(tag.name)}</label>`).join('');
+    renderGroupSummaries();
   }
 
   function selectedTagIds() {
@@ -119,6 +176,7 @@ export function createTaskEditor({
     if (!canManage) {
       subtaskList.replaceChildren();
       subtaskTitle.value = '';
+      renderGroupSummaries();
       return;
     }
     const items = await subtaskService.list(currentTask.id);
@@ -126,8 +184,10 @@ export function createTaskEditor({
       ? '<p class="empty">还没有子任务。</p>'
       : items.map((task) => {
         const status = subtaskStatus(task);
-        return `<button type="button" class="subtask-row" data-subtask-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)}，${status}">${escapeHtml(task.title)} <span>${status}</span></button>`;
+        const done = task.lifecycle === 'completed' ? ' data-subtask-done' : '';
+        return `<button type="button" class="subtask-row" data-subtask-id="${escapeHtml(task.id)}"${done} aria-label="${escapeHtml(task.title)}，${status}">${escapeHtml(task.title)} <span>${status}</span></button>`;
       }).join('');
+    renderGroupSummaries();
   }
 
   function readChanges() {
@@ -308,8 +368,14 @@ export function createTaskEditor({
     event.preventDefault();
     save();
   });
-  form.addEventListener('input', markDirty);
-  form.addEventListener('change', markDirty);
+  form.addEventListener('input', () => {
+    markDirty();
+    renderGroupSummaries();
+  });
+  form.addEventListener('change', () => {
+    markDirty();
+    renderGroupSummaries();
+  });
   dialog.querySelectorAll('[data-editor-close]').forEach((button) => {
     button.addEventListener('click', () => {
       close().catch(() => {});
