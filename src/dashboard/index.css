@@ -1208,15 +1208,20 @@ input::placeholder { color: var(--muted); }
   }
   .brand-lockup { margin: 0 0 var(--sp-2); }
   /* flex-start 必需：默认伸展会把只有一条目的分组拉成和最长分组等高，
-     使"今天"变成一个一百多像素高的方块。 */
-  .nav { flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-2); }
+     使"今天"变成一个一百多像素高的方块。
+     overflow: visible 关掉 base 的 overflow-y: auto：窄屏侧栏是 height: auto，
+     导航永远不需要滚动，而 auto 配上 base 的 scrollbar-gutter: stable 会平白
+     预留一条 15px 滚动条槽，把导航内容压窄。 */
+  .nav { flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-2); overflow: visible; }
   .nav__group { flex: 1 1 140px; }
   .nav__group--primary { margin-top: 0; }
   .nav__label { display: none; }
   /* 条目在窄屏不自适应居中：尾部还有角标和快捷键提示，
      居中会让每行文字起点参差；统一左对齐后整列起点一致，尾部靠右成组。 */
   .nav button { flex: 1 1 auto; border-left: 0; border-bottom: 2px solid transparent; border-radius: var(--r-sm) var(--r-sm) 0 0; padding: var(--sp-2) var(--sp-3); }
-  .nav__footer { margin-top: var(--sp-2); }
+  /* 窄屏下 .nav 是横向 wrap 容器，底部区必须独占一行才不会被压成内容宽：
+     否则分隔线与设置条会缩到「设置」两个字的宽度，与改动前满宽的观感不符。 */
+  .nav__footer { flex: 1 1 100%; margin-top: var(--sp-2); }
   .content { padding: var(--sp-7) var(--sp-5) var(--sp-7); }
   .quick-add { align-items: stretch; padding: var(--sp-4); }
   .quick-add__lead, .quick-add__row, .quick-add__options { flex-basis: 100%; }

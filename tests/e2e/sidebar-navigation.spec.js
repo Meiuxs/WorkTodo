@@ -191,3 +191,39 @@ test('200% 缩放的等效视口下侧栏不产生横向溢出', async ({ extens
   }));
   expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
 });
+
+test('390px 下导航容器不裁切内容，且设置入口与分隔线占满整行', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await dashboard.setViewportSize({ width: 390, height: 844 });
+  await expect(dashboard.locator('.app')).toBeVisible();
+
+  const measured = await dashboard.evaluate(() => {
+    const nav = document.querySelector('.nav');
+    const footer = document.querySelector('.nav__footer');
+    const sidebar = document.querySelector('.sidebar');
+    const sidebarStyle = getComputedStyle(sidebar);
+    return {
+      navWidth: nav.getBoundingClientRect().width,
+      navClientWidth: nav.clientWidth,
+      navScrollWidth: nav.scrollWidth,
+      navScrollHeight: nav.scrollHeight,
+      navClientHeight: nav.clientHeight,
+      footerWidth: footer.getBoundingClientRect().width,
+      // 侧栏内容宽：.nav 是它的拉伸子项，两者相等才说明没有预留滚动条槽。
+      sidebarContentWidth: sidebar.clientWidth
+        - parseFloat(sidebarStyle.paddingLeft) - parseFloat(sidebarStyle.paddingRight),
+    };
+  });
+
+  // 容器级裁切检查：toBeVisible() 不考虑祖先 overflow，只看文档级溢出会漏掉
+  // 「.nav 自己把条目裁掉」这种失效。
+  expect(measured.navScrollWidth).toBeLessThanOrEqual(measured.navClientWidth + 1);
+  expect(measured.navScrollHeight).toBeLessThanOrEqual(measured.navClientHeight + 1);
+  expect(Math.abs(measured.navWidth - measured.sidebarContentWidth)).toBeLessThanOrEqual(1);
+  // clientWidth 与边框盒宽度一致：说明窄屏回落到 base 的 overflow-y: auto 之后
+  // 并没有为滚动条预留槽位，删除 A 段的 overflow: visible 确实是行为中性的。
+  expect(Math.abs(measured.navWidth - measured.navClientWidth)).toBeLessThanOrEqual(1);
+
+  // 设置入口与它的分隔线占满整行，与改动前的窄屏观感一致。
+  expect(Math.abs(measured.footerWidth - measured.navClientWidth)).toBeLessThanOrEqual(1);
+});
