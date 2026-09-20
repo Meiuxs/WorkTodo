@@ -118,3 +118,59 @@ test('设置条目与普通导航项共用同一组基础样式', async ({ exten
   // 颜色与上边框是刻意保留的差异，所以这里只比对几何与排版。
   expect(await read('settings')).toEqual(await read('history'));
 });
+
+test('390px 下侧栏排布、选中态与分隔线保持不变', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await dashboard.setViewportSize({ width: 390, height: 844 });
+
+  const nav = await dashboard.evaluate(() => {
+    const navStyle = getComputedStyle(document.querySelector('.nav'));
+    return {
+      direction: navStyle.flexDirection,
+      wrap: navStyle.flexWrap,
+      groupBasis: getComputedStyle(document.querySelector('.nav__group')).flexBasis,
+      sidebarPosition: getComputedStyle(document.querySelector('.sidebar')).position,
+      labelDisplay: getComputedStyle(document.querySelector('.nav__label')).display,
+      footerBorder: getComputedStyle(document.querySelector('.nav__footer')).borderTopWidth,
+    };
+  });
+  expect(nav.direction).toBe('row');
+  expect(nav.wrap).toBe('wrap');
+  expect(nav.groupBasis).toBe('140px');
+  expect(nav.sidebarPosition).toBe('static');
+  expect(nav.labelDisplay).toBe('none');
+  expect(nav.footerBorder).toBe('1px');
+
+  // 窄屏选中标记从左侧竖条换成下边框。
+  await dashboard.getByRole('button', { name: '明天', exact: true }).click();
+  // button 有 120ms 的 border-color 过渡，下边框是从 transparent 过渡来的，
+  // 直接读会拿到 rgba 半透明中间帧，必须等到过渡结束。
+  await expect.poll(() => dashboard.evaluate(() => {
+    const style = getComputedStyle(document.querySelector('[data-route="tomorrow"]'));
+    return `${style.borderBottomColor} ${style.borderLeftWidth}`;
+  })).toBe('rgb(39, 107, 108) 0px');
+});
+
+test('390px 下导航条目全部可见且没有横向溢出', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await dashboard.setViewportSize({ width: 390, height: 844 });
+
+  const labels = ['今天', '明天', '本周', '月历', '收集箱', '资料收集箱', '全部任务', '已完成', '回收站', '工作记录', '设置'];
+  for (const label of labels) {
+    await expect(dashboard.getByRole('button', { name: label, exact: true })).toBeVisible();
+  }
+
+  await dashboard.getByLabel('记录一个新事项').fill('窄屏侧栏任务');
+  await dashboard.locator('#quick-add-date').selectOption('today');
+  await dashboard.getByRole('button', { name: '记录', exact: true }).click();
+  await expect(dashboard.getByRole('button', { name: '窄屏侧栏任务' })).toBeVisible();
+
+  const layout = await dashboard.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+    contentPaddingBottom: getComputedStyle(document.querySelector('.content')).paddingBottom,
+  }));
+  expect(layout.scrollWidth).toBeLessThanOrEqual(layout.clientWidth + 1);
+  // A 段那个 140px 底部内边距早已被 B 段覆盖，取两者中生效的值。
+  expect(layout.contentPaddingBottom).toBe('24px');
+});

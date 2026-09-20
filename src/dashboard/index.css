@@ -1140,31 +1140,10 @@ input::placeholder { color: var(--muted); }
 }
 
 @media (max-width: 680px) {
-  .app { grid-template-columns: 1fr; }
   .toast { left: 50%; bottom: var(--sp-4); }
-  .sidebar {
-    position: static;
-    gap: var(--sp-3);
-    height: auto;
-    overflow: visible;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-    padding: var(--sp-4) var(--sp-5);
-  }
   .brand { margin: 0 0 var(--sp-2); }
-  .nav { grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; }
-  .nav__label { display: none; }
-  .nav button {
-    border-left: 0;
-    border-bottom: 2px solid transparent;
-    border-radius: var(--r-sm) var(--r-sm) 0 0;
-    padding: var(--sp-2) var(--sp-3);
-    font-size: var(--fs-body);
-  }
+  /* 窄屏下边框选中态的唯一来源：左侧竖条在窄屏被换成下边框。 */
   .nav button[aria-current="page"] { border-bottom-color: var(--teal); }
-  .nav__settings { margin-top: var(--sp-2); padding-inline: var(--sp-3); }
-  /* 底部要给两行高的快速记录栏让位，否则最后一条任务会被压在下面。 */
-  .content { padding: var(--sp-7) var(--sp-5) 140px; }
   .workspace-header h1 { font-size: var(--fs-metric); }
   .section-heading { display: block; }
   .section-heading > :last-child:not(:first-child) { margin-top: var(--sp-3); }
@@ -1188,7 +1167,6 @@ input::placeholder { color: var(--muted); }
   .filters { grid-template-columns: 1fr; }
   .filter-search { grid-column: auto; }
   .metrics { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
-  .history-report-top { grid-template-columns: 1fr; }
   .history-breakdown__heading { display: grid; gap: var(--sp-1); }
   .category-row { grid-template-columns: 1fr; }
   .field-grid { grid-template-columns: 1fr; }
@@ -1218,21 +1196,27 @@ input::placeholder { color: var(--muted); }
    已合并回各自的组件区块（见上方“线性”单列流定义），这里只保留窄屏断点下的覆盖。 */
 @media (max-width: 680px) {
   .app { display: block; }
-  .sidebar { flex: none; }
+  .sidebar {
+    flex: none;
+    position: static;
+    gap: var(--sp-3);
+    height: auto;
+    overflow: visible;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: var(--sp-4) var(--sp-5);
+  }
   .brand-lockup { margin: 0 0 var(--sp-2); }
   /* flex-start 必需：默认伸展会把只有一条目的分组拉成和最长分组等高，
      使"今天"变成一个一百多像素高的方块。 */
   .nav { flex-direction: row; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-2); }
   .nav__group { flex: 1 1 140px; }
   .nav__group--primary { margin-top: 0; }
-  .nav__group .nav__label, .nav__footer .nav__label { display: none; }
+  .nav__label { display: none; }
   /* 条目在窄屏不自适应居中：尾部还有角标和快捷键提示，
      居中会让每行文字起点参差；统一左对齐后整列起点一致，尾部靠右成组。 */
   .nav button { flex: 1 1 auto; border-left: 0; border-bottom: 2px solid transparent; border-radius: var(--r-sm) var(--r-sm) 0 0; padding: var(--sp-2) var(--sp-3); }
   .nav__footer { margin-top: var(--sp-2); }
-  /* 窄屏选中标记从左侧竖条换成下边框。 */
-  .nav__settings { width: 100%; margin-top: 0; border-left: 0; border-bottom: 2px solid transparent; border-radius: var(--r-sm) var(--r-sm) 0 0; }
-  .nav__settings[aria-current="page"] { border-bottom-color: var(--teal); }
   .content { padding: var(--sp-7) var(--sp-5) var(--sp-7); }
   .quick-add { align-items: stretch; padding: var(--sp-4); }
   .quick-add__lead, .quick-add__row, .quick-add__options { flex-basis: 100%; }
