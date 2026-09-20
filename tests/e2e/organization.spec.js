@@ -1,4 +1,4 @@
-import { test, expect, openDashboard } from './fixtures.js';
+import { test, expect, openDashboard, openEditorGroup } from './fixtures.js';
 
 test('任务编辑器可以创建、选择并保留标签', async ({ extension }) => {
   const page = await openDashboard(extension);
@@ -8,6 +8,7 @@ test('任务编辑器可以创建、选择并保留标签', async ({ extension }
   await page.getByRole('button', { name: '整理报价' }).click();
 
   const editor = page.locator('#task-editor');
+  await openEditorGroup(page, 'tags');
   await editor.getByLabel('新标签').fill('客户');
   await editor.getByRole('button', { name: '创建标签' }).click();
   await editor.getByRole('checkbox', { name: '客户' }).check();
@@ -24,6 +25,7 @@ test('全部任务可以按标签筛选并显示标签文字', async ({ extensio
   await page.getByRole('button', { name: '记录', exact: true }).click();
   await page.getByRole('button', { name: '客户甲报价' }).click();
   const editor = page.locator('#task-editor');
+  await openEditorGroup(page, 'tags');
   await editor.getByLabel('新标签').fill('客户');
   await editor.getByRole('button', { name: '创建标签' }).click();
   await editor.getByRole('checkbox', { name: '客户' }).check();
@@ -48,6 +50,7 @@ test('通过更多字段新增任务并保存标签后可筛选', async ({ exten
   const editor = page.locator('#task-editor');
   await expect(editor).toBeVisible();
   await expect(editor.getByLabel('任务名称')).toHaveValue('编辑器标签任务');
+  await openEditorGroup(page, 'tags');
   await editor.getByLabel('新标签').fill('编辑器标签');
   await editor.getByRole('button', { name: '创建标签' }).click();
   await editor.getByRole('checkbox', { name: '编辑器标签' }).check();
@@ -71,6 +74,7 @@ test('父任务编辑器可以新增并持久化子任务', async ({ extension }
   await page.getByRole('button', { name: '准备投标' }).click();
 
   const editor = page.locator('#task-editor');
+  await openEditorGroup(page, 'subtasks');
   await editor.getByLabel('添加子任务').fill('整理资质文件');
   await editor.getByRole('button', { name: '添加子任务', exact: true }).click();
   await expect(editor.getByRole('button', { name: '整理资质文件，待办', exact: true })).toBeVisible();
@@ -78,6 +82,7 @@ test('父任务编辑器可以新增并持久化子任务', async ({ extension }
 
   await page.reload();
   await page.getByRole('button', { name: '准备投标' }).click();
+  await openEditorGroup(page, 'subtasks');
   await expect(editor.getByRole('button', { name: '整理资质文件，待办', exact: true })).toBeVisible();
 });
 
@@ -89,6 +94,7 @@ test('保存子任务后焦点返回父任务编辑按钮', async ({ extension }
   await page.getByRole('button', { name: '准备投标' }).click();
 
   const editor = page.locator('#task-editor');
+  await openEditorGroup(page, 'subtasks');
   await editor.getByLabel('添加子任务').fill('整理资质文件');
   await editor.getByRole('button', { name: '添加子任务', exact: true }).click();
   await editor.getByRole('button', { name: '整理资质文件' }).click();
@@ -104,6 +110,7 @@ test('子任务内联嵌套在父行下并可单独勾选更新进度', async ({
   await page.getByRole('button', { name: '记录', exact: true }).click();
   await page.getByRole('button', { name: '编写文档' }).click();
   const editor = page.locator('#task-editor');
+  await openEditorGroup(page, 'subtasks');
   await editor.getByLabel('添加子任务').fill('拟初稿');
   await editor.getByRole('button', { name: '添加子任务', exact: true }).click();
   await editor.getByLabel('添加子任务').fill('同行评审');
@@ -126,6 +133,7 @@ test('完成父任务会先确认并级联完成子任务', async ({ extension }
   await page.getByRole('button', { name: '记录', exact: true }).click();
   await page.getByRole('button', { name: '发布版本' }).click();
   const editor = page.locator('#task-editor');
+  await openEditorGroup(page, 'subtasks');
   await editor.getByLabel('添加子任务').fill('执行回归测试');
   await editor.getByRole('button', { name: '添加子任务', exact: true }).click();
   await editor.getByRole('button', { name: '保存任务' }).click();
@@ -160,12 +168,14 @@ test('标签和子任务在键盘与 390px 视口下不溢出并恢复焦点', a
 
   const editor = page.locator('#task-editor');
   await expect(editor.getByLabel('任务名称')).toBeFocused();
+  await openEditorGroup(page, 'tags');
   await editor.getByLabel('新标签').fill(longTag);
   await editor.getByLabel('新标签').press('Enter');
   await expect(editor.getByRole('checkbox', { name: longTag, exact: true })).toBeVisible();
   await expect(editor).toBeVisible();
   await editor.getByRole('checkbox', { name: longTag, exact: true }).check();
 
+  await openEditorGroup(page, 'subtasks');
   await editor.getByLabel('添加子任务').fill(longSubtask);
   await editor.getByLabel('添加子任务').press('Enter');
   const subtaskLabel = `${longSubtask}，待办`;

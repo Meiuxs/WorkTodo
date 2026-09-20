@@ -46,7 +46,6 @@ export function createTaskEditor({
   const tagOptions = dialog.querySelector('[data-tag-options]');
   const newTag = dialog.querySelector('#new-tag');
   const tagMessage = dialog.querySelector('[data-tag-message]');
-  const subtasks = dialog.querySelector('[data-editor-subtasks]');
   const subtaskList = dialog.querySelector('[data-subtask-list]');
   const subtaskTitle = dialog.querySelector('#subtask-title');
   const subtaskMessage = dialog.querySelector('[data-subtask-message]');
@@ -63,20 +62,29 @@ export function createTaskEditor({
   }
   const recurring = field(form, 'recurring');
   const recurringFields = dialog.querySelector('[data-recurring-fields]');
-  const recurringPicker = dialog.querySelector('[data-recurring-picker]');
-  const resources = dialog.querySelector('[data-editor-resources]');
   const resourceCount = dialog.querySelector('[data-resource-count]');
   const resourceList = dialog.querySelector('[data-resource-list]');
+  const groupRows = new Map(
+    [...dialog.querySelectorAll('[data-editor-group]')]
+      .map((row) => [row.dataset.editorGroup, row]),
+  );
+
+  /* 行统一留在 DOM 里靠 hidden 控制：与既有的 resources.hidden / subtasks.hidden
+     写法一致，也让"哪几行出现"集中在一处可读。 */
+  function setGroupVisible(name, visible) {
+    const row = groupRows.get(name);
+    if (row !== undefined) row.hidden = !visible;
+  }
 
   async function renderResources() {
     if (currentTask === null || resourceService === undefined) {
-      resources.hidden = true;
+      setGroupVisible('resources', false);
       resourceList.replaceChildren();
       resourceCount.textContent = '0';
       return;
     }
     const items = await resourceService.listForTask(currentTask.id);
-    resources.hidden = false;
+    setGroupVisible('resources', true);
     resourceCount.textContent = String(items.length);
     resourceList.innerHTML = items.length === 0
       ? '<p class="muted">还没有关联资料。</p>'
@@ -107,7 +115,7 @@ export function createTaskEditor({
 
   async function renderSubtasks() {
     const canManage = currentTask !== null && currentTask.parentId === null;
-    subtasks.hidden = !canManage;
+    setGroupVisible('subtasks', canManage);
     if (!canManage) {
       subtaskList.replaceChildren();
       subtaskTitle.value = '';
@@ -165,7 +173,9 @@ export function createTaskEditor({
     form.reset();
     dirty = false;
     recurring.checked = false;
-    recurringPicker.hidden = false;
+    setGroupVisible('recurring', true);
+    setGroupVisible('resources', false);
+    setGroupVisible('subtasks', false);
     updateRecurringVisibility();
     populateCategories(await getCategories(), defaults.categoryId ?? null);
     await loadTags(defaults.tagIds ?? []);
@@ -189,7 +199,7 @@ export function createTaskEditor({
     form.reset();
     dirty = false;
     recurring.checked = false;
-    recurringPicker.hidden = true;
+    setGroupVisible('recurring', false);
     updateRecurringVisibility();
     populateCategories(await getCategories(), task.categoryId);
     await loadTags(task.tagIds ?? []);

@@ -90,58 +90,77 @@
           <button type="button" class="icon-button" data-editor-close aria-label="关闭任务编辑器">×</button>
         </header>
         <div class="drawer-body">
-          <p class="drawer-section-label">先确定</p>
-          <label class="field">任务名称<input name="title" maxlength="200" required></label>
+          <div class="title-row">
+            <label class="field">任务名称<input name="title" maxlength="200" required></label>
+            <label class="star-toggle" data-star-toggle>
+              <input class="sr-only" name="starred" type="checkbox">
+              <span class="star-toggle__glyph" data-star-glyph aria-hidden="true">☆</span>
+              <span class="sr-only" data-star-text>标记为星标</span>
+            </label>
+          </div>
           <p class="field-hint">先填标题和计划日期，其他可以稍后补。</p>
           <div class="field-grid">
             <label class="field">计划日期<input name="scheduledDate" type="date"></label>
             <label class="field">优先级<select name="priority"><option value="none">无</option><option value="low">低</option><option value="medium">中</option><option value="high">高</option></select></label>
           </div>
-          <p class="drawer-section-label drawer-section-label--spaced">组织任务</p>
-            <label class="field">列表<select name="categoryId"></select></label>
-          <fieldset class="recurring-picker" data-recurring-picker>
-            <legend>重复任务</legend>
-            <label class="check-field"><input name="recurring" type="checkbox"> 按规则自动创建下一项</label>
-            <div class="field-grid" data-recurring-fields hidden>
-              <label class="field">重复方式<select name="recurrenceFrequency"><option value="daily">每天</option><option value="weekdays">每个工作日</option><option value="weekly">每周</option><option value="monthly">每月</option><option value="yearly">每年</option><option value="custom">自定义间隔</option></select></label>
-              <label class="field">间隔<input name="recurrenceInterval" type="number" min="1" max="90" value="1"></label>
-              <label class="field" data-recurrence-unit>自定义单位<select name="recurrenceUnit"><option value="day">天</option><option value="week">周</option><option value="month">月</option></select></label>
-            </div>
-          </fieldset>
-          <fieldset class="tag-picker" data-tag-picker>
-            <legend>标签</legend>
-            <div class="tag-picker__options" data-tag-options></div>
-            <div class="tag-picker__create">
-              <label for="new-tag">新标签</label>
-              <input id="new-tag" maxlength="50">
-              <button type="button" data-create-tag>创建标签</button>
-            </div>
-            <p class="form-message" data-tag-message role="alert"></p>
-          </fieldset>
-          <section class="editor-resources" data-editor-resources hidden>
-            <div class="editor-section-heading"><h3>相关资料 <span class="editor-section-count" data-resource-count>0</span></h3><button type="button" class="button-secondary" data-resource-add>添加资料</button></div>
-            <div class="editor-resource-list" data-resource-list></div>
-          </section>
-          <label class="check-field"><input name="starred" type="checkbox"> 标记为星标</label>
-          <p class="drawer-section-label drawer-section-label--spaced">需要时再补充</p>
-          <details class="editor-more">
-            <summary>更多信息</summary>
-            <label class="field">描述<textarea name="description" rows="4" maxlength="10000"></textarea></label>
-            <div class="field-grid">
-              <label class="field">开始时间<input name="startTime" type="time"></label>
-              <label class="field">截止时间<input name="dueTime" type="time"></label>
-            </div>
-          </details>
-          <section class="editor-subtasks" data-editor-subtasks hidden>
-            <h3>子任务</h3>
-            <div class="subtask-list" data-subtask-list></div>
-            <div class="subtask-create">
-              <label for="subtask-title">添加子任务</label>
-              <input id="subtask-title" maxlength="200">
-              <button type="button" data-subtask-create>添加子任务</button>
-            </div>
-            <p class="form-message" data-subtask-message role="alert"></p>
-          </section>
+          <div class="editor-groups">
+            <details class="editor-group" data-editor-group="category">
+              <summary><span class="editor-group__label">列表</span><span class="editor-group__value" data-group-value="category">未归入列表</span></summary>
+              <label class="field">列表<select name="categoryId"></select></label>
+            </details>
+            <details class="editor-group" data-editor-group="tags">
+              <summary><span class="editor-group__label">标签</span><span class="editor-group__value" data-group-value="tags">未添加</span></summary>
+              <fieldset class="tag-picker" data-tag-picker>
+                <legend class="sr-only">标签</legend>
+                <div class="tag-picker__options" data-tag-options></div>
+                <div class="tag-picker__create">
+                  <label for="new-tag">新标签</label>
+                  <input id="new-tag" maxlength="50">
+                  <button type="button" data-create-tag>创建标签</button>
+                </div>
+                <p class="form-message" data-tag-message role="alert"></p>
+              </fieldset>
+            </details>
+            <details class="editor-group" data-editor-group="recurring" hidden>
+              <summary><span class="editor-group__label">重复任务</span><span class="editor-group__value" data-group-value="recurring">不重复</span></summary>
+              <fieldset class="recurring-picker" data-recurring-picker>
+                <legend class="sr-only">重复任务</legend>
+                <label class="check-field"><input name="recurring" type="checkbox"> 按规则自动创建下一项</label>
+                <div class="field-grid" data-recurring-fields hidden>
+                  <label class="field">重复方式<select name="recurrenceFrequency"><option value="daily">每天</option><option value="weekdays">每个工作日</option><option value="weekly">每周</option><option value="monthly">每月</option><option value="yearly">每年</option><option value="custom">自定义间隔</option></select></label>
+                  <label class="field">间隔<input name="recurrenceInterval" type="number" min="1" max="90" value="1"></label>
+                  <label class="field" data-recurrence-unit>自定义单位<select name="recurrenceUnit"><option value="day">天</option><option value="week">周</option><option value="month">月</option></select></label>
+                </div>
+              </fieldset>
+            </details>
+            <details class="editor-group" data-editor-group="resources" hidden>
+              <summary><span class="editor-group__label">资料</span><span class="editor-group__value" data-group-value="resources">无</span></summary>
+              <section class="editor-resources" data-editor-resources>
+                <div class="editor-section-heading"><h3 class="sr-only">相关资料 <span data-resource-count>0</span></h3><button type="button" class="button-secondary" data-resource-add>添加资料</button></div>
+                <div class="editor-resource-list" data-resource-list></div>
+              </section>
+            </details>
+            <details class="editor-group" data-editor-group="subtasks" hidden>
+              <summary><span class="editor-group__label">子任务</span><span class="editor-group__value" data-group-value="subtasks">无</span></summary>
+              <section class="editor-subtasks" data-editor-subtasks>
+                <div class="subtask-list" data-subtask-list></div>
+                <div class="subtask-create">
+                  <label for="subtask-title">添加子任务</label>
+                  <input id="subtask-title" maxlength="200">
+                  <button type="button" data-subtask-create>添加子任务</button>
+                </div>
+                <p class="form-message" data-subtask-message role="alert"></p>
+              </section>
+            </details>
+            <details class="editor-group" data-editor-group="more">
+              <summary><span class="editor-group__label">更多信息</span><span class="editor-group__value" data-group-value="more">未填写</span></summary>
+              <label class="field">描述<textarea name="description" rows="4" maxlength="10000"></textarea></label>
+              <div class="field-grid">
+                <label class="field">开始时间<input name="startTime" type="time"></label>
+                <label class="field">截止时间<input name="dueTime" type="time"></label>
+              </div>
+            </details>
+          </div>
           <p class="form-message" data-editor-message role="alert"></p>
           <div class="conflict-panel" data-editor-conflict hidden>
             <p>这个任务刚刚在另一个窗口更新过。你可以保留当前修改为新任务，或载入最新版本。</p>

@@ -116,4 +116,13 @@ export const test = base.extend({
   },
 });
 
+/* 抽屉的次级区默认收起。幂等：已展开时不重复点击，避免把组收回去。 */
+export async function openEditorGroup(page, groupValue) {
+  const group = page.locator(`#task-editor [data-editor-group="${groupValue}"]`);
+  if (!(await group.evaluate((node) => node.open))) {
+    await group.locator('summary').click();
+  }
+  return group;
+}
+
 export { expect };

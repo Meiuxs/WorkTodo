@@ -16,7 +16,7 @@ test('编辑抽屉校验失败保持打开，Esc 关闭并恢复焦点', async (
   const dialog = dashboard.getByRole('dialog');
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText('先填标题和计划日期，其他可以稍后补')).toBeVisible();
-  await expect(dialog.locator('[data-recurring-picker]')).toBeHidden();
+  await expect(dialog.locator('[data-editor-group="recurring"]')).toBeHidden();
   await dialog.getByText('更多信息').click();
   await dialog.getByLabel('开始时间').fill('10:00');
   await dialog.getByLabel('截止时间').fill('09:00');

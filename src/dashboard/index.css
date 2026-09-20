@@ -681,7 +681,7 @@ input::placeholder { color: var(--muted); }
 /* 重复任务和标签都是"分组选项"，统一去掉浏览器默认 fieldset 边框，
    靠 legend 标题和间距分层，避免抽屉里出现两种分组外观。 */
 .tag-picker,
-.recurring-picker { margin: var(--sp-5) 0 0; border: 0; padding: 0; }
+.recurring-picker { margin: 0; border: 0; padding: 0; }
 .tag-picker legend,
 .recurring-picker legend {
   margin-bottom: var(--sp-2);
@@ -1014,31 +1014,48 @@ input::placeholder { color: var(--muted); }
 .field-hint { margin: var(--sp-2) 0 0; color: var(--muted); font-size: var(--fs-caption); }
 .field-grid { display: flex; flex-wrap: wrap; gap: var(--sp-4); margin-top: var(--sp-5); }
 .field-grid > .field { flex: 1 1 180px; }
-.drawer-body > .field,
-.drawer-body > .check-field { margin-top: var(--sp-5); }
-.drawer-body > .field:first-child { margin-top: 0; }
 .check-field { display: flex; align-items: center; gap: var(--sp-3); color: var(--ink); font-size: var(--fs-body); }
-.editor-more {
-  margin-top: var(--sp-6);
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+/* 名称行：输入框占满，右侧是星标开关。 */
+.title-row { display: flex; align-items: flex-end; gap: var(--sp-3); }
+.title-row > .field { flex: 1 1 auto; min-width: 0; }
+.star-toggle {
+  display: grid;
+  place-items: center;
+  width: var(--control-h-lg);
+  height: var(--control-h-lg);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface-raised);
+  color: var(--muted);
+  cursor: pointer;
 }
-.editor-more summary {
+.star-toggle__glyph { font-size: var(--fs-lead); line-height: 1; }
+.star-toggle:has(input:checked) { border-color: var(--teal); color: var(--teal); }
+.star-toggle:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* 入口行：容器一条上边线、每行一条下边线，避免相邻行叠成双线。 */
+.editor-groups { margin-top: var(--sp-6); border-top: 1px solid var(--line); }
+.editor-group { border-bottom: 1px solid var(--line); }
+.editor-group > summary {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
-  cursor: pointer;
-  color: var(--teal);
-  list-style: none;
-  padding: var(--sp-4) 0;
+  gap: var(--sp-3);
+  min-height: 44px;
+  padding: var(--sp-2) 0;
   font-size: var(--fs-body);
-  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
 }
-.editor-more summary::-webkit-details-marker { display: none; }
-.editor-more summary::before { content: "▸"; color: var(--muted); }
-.editor-more[open] > summary::before { content: "▾"; }
-.editor-more[open] > summary { margin-bottom: var(--sp-5); }
-.editor-subtasks { margin-top: var(--sp-6); border-top: 1px solid var(--line); padding-top: var(--sp-5); }
+.editor-group__label { color: var(--ink); }
+.editor-group__value { margin-left: auto; color: var(--muted); font-size: var(--fs-ui); text-align: right; }
+.editor-group > summary::-webkit-details-marker { display: none; }
+.editor-group > summary::before { content: "▸"; color: var(--muted); }
+.editor-group[open] > summary::before { content: "▾"; }
+.editor-group[open] > summary + * { margin-top: var(--sp-3); }
+/* 资料行的可见标题已降为 sr-only（脱离文档流），只剩"添加资料"按钮，
+   否则 .editor-section-heading 的 space-between 会把按钮顶到左边。 */
+.editor-group .editor-section-heading { justify-content: flex-end; }
+.editor-subtasks { margin-top: 0; border-top: 0; padding-top: 0; }
 .editor-subtasks h3 { margin: 0 0 var(--sp-3); font-size: var(--fs-h3); line-height: var(--lh-heading); }
 .subtask-list { display: grid; border-top: 1px solid var(--line); }
 .subtask-row {
@@ -1059,12 +1076,6 @@ input::placeholder { color: var(--muted); }
 .subtask-create { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--sp-4); align-items: end; }
 .subtask-create label { flex: 0 0 100%; color: var(--muted); font-size: var(--fs-caption); }
 .subtask-create input { flex: 1 1 200px; }
-/* 分区标题：青绿色全大写小标签，把抽屉里的字段分组。 */
-.drawer-section-label { margin: 0 0 var(--sp-3); color: var(--teal); font-size: var(--fs-caption); font-weight: 700; letter-spacing: var(--tracking-caps); }
-.drawer-section-label--spaced { margin-top: var(--sp-7); }
-.drawer-section-label + .field { margin-top: 0; }
-.drawer-section-label + .field-grid { margin-top: var(--sp-4); }
-.drawer-section-label ~ .editor-more { margin-top: var(--sp-3); }
 .conflict-panel {
   margin-top: var(--sp-5);
   border-left: 3px solid var(--coral);
