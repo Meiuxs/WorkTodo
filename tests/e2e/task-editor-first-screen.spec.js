@@ -144,3 +144,26 @@ test('星标开关切换字形与可访问名，并能被键盘操作', async ({
   await expect(editor.locator('input[name="starred"]')).toBeChecked();
   await expect(editor.locator('[data-star-glyph]')).toHaveText('★');
 });
+
+test('并发冲突时冲突面板可见且焦点落在载入最新版本', async ({ extension }) => {
+  const first = await openDashboard(extension);
+  await createTodayTask(first, '冲突焦点任务');
+  const second = await openDashboard(extension);
+  const secondTitle = second.getByRole('button', { name: '冲突焦点任务' });
+  await expect(secondTitle).toBeVisible();
+
+  await secondTitle.click();
+  const dialog = second.locator('#task-editor');
+  await dialog.getByLabel('任务名称').fill('本地修改');
+  await first.getByRole('checkbox', { name: '完成任务' }).first().click();
+  await dialog.getByRole('button', { name: '保存任务' }).click();
+
+  const reload = dialog.getByRole('button', { name: '载入最新版本' });
+  await expect(reload).toBeFocused();
+  // 面板在抽屉底部，必须真的落在视口内——用户看不到出口就等于没有出口。
+  const inViewport = await reload.evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    return rect.top >= 0 && rect.bottom <= window.innerHeight;
+  });
+  expect(inViewport).toBe(true);
+});

@@ -335,7 +335,14 @@ export function createTaskEditor({
       return result;
     } catch (error) {
       showMessage(errorMessage(error));
-      if (error?.name === 'ConflictError') conflict.hidden = false;
+      if (error?.name === 'ConflictError') {
+        conflict.hidden = false;
+        // 面板在抽屉底部，收起改造后更容易落在视口外：用户只看到一行报错，
+        // 不知道还有两个出口。先让它可见，再把焦点放到推荐动作上。
+        conflict.scrollIntoView({ block: 'nearest' });
+        dialog.querySelector('[data-editor-reload]').focus();
+        return null;
+      }
       field(form, 'title').focus();
       return null;
     } finally {
