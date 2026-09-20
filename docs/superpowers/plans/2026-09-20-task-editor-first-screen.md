@@ -153,10 +153,11 @@ test('新建任务时首屏只有三行字段，次级区全部收起', async ({
   // 次级区默认全部收起。
   await expect(editor.locator('.editor-group[open]')).toHaveCount(0);
 
-  // 新建时出现四行，不出现资料与子任务。
-  await expect(editor.locator('[data-editor-group]')).toHaveCount(4);
-  await expect(editor.locator('[data-editor-group="resources"]')).toHaveCount(0);
-  await expect(editor.locator('[data-editor-group="subtasks"]')).toHaveCount(0);
+  // 新建时出现四行（列表/标签/重复任务/更多信息）；资料与子任务不出现。
+  // 行统一留在 DOM 里靠 hidden 控制，所以断言可见性而不是元素数量。
+  await expect(editor.locator('[data-editor-group]:not([hidden])')).toHaveCount(4);
+  await expect(editor.locator('[data-editor-group="resources"]')).toBeHidden();
+  await expect(editor.locator('[data-editor-group="subtasks"]')).toBeHidden();
 });
 
 test('已有任务时首屏三行字段可见，出现资料与子任务行而不出现重复行', async ({ extension }) => {
@@ -167,10 +168,10 @@ test('已有任务时首屏三行字段可见，出现资料与子任务行而�
   const editor = dashboard.locator('#task-editor');
   await expect(editor.getByLabel('任务名称')).toHaveValue('已有任务');
   await expect(editor.locator('.editor-group[open]')).toHaveCount(0);
-  await expect(editor.locator('[data-editor-group]')).toHaveCount(5);
+  await expect(editor.locator('[data-editor-group]:not([hidden])')).toHaveCount(5);
   await expect(editor.locator('[data-editor-group="resources"]')).toBeVisible();
   await expect(editor.locator('[data-editor-group="subtasks"]')).toBeVisible();
-  await expect(editor.locator('[data-editor-group="recurring"]')).toHaveCount(0);
+  await expect(editor.locator('[data-editor-group="recurring"]')).toBeHidden();
 });
 
 test('入口行可键盘展开，展开后内部控件可聚焦', async ({ extension }) => {
@@ -194,7 +195,7 @@ test('分区标题已删除且只保留一套折叠词汇', async ({ extension }
   const editor = dashboard.locator('#task-editor');
   await expect(editor.locator('.drawer-section-label')).toHaveCount(0);
   await expect(editor.locator('.editor-more')).toHaveCount(0);
-  await expect(editor.locator('.editor-group')).toHaveCount(5);
+  await expect(editor.locator('.editor-group:not([hidden])')).toHaveCount(5);
 });
 ```
 
@@ -291,7 +292,7 @@ Expected: 四个用例全部失败。第一条在 `toHaveCount(0)`（`.editor-gr
 
 注意：`data-editor-resources` 与 `data-editor-subtasks` 从原来的 `<section>` 挪到了内层 `<section>` 上保持同名，`task-editor.js` 里 `resources.hidden = …` / `subtasks.hidden = …` 的写法因此会改到 body 而不是行（Task 3 处理行本身的显隐）。
 
-- [ ] **Step 5: 加样式并清掉作废规则**
+- [ ] **Step 5: 加样式、清掉作废规则，并让入口行按出现条件显隐**
 
 `src/dashboard/index.css` 中：
 
@@ -351,6 +352,31 @@ Expected: 四个用例全部失败。第一条在 `toHaveCount(0)`（`.editor-gr
 
 已核对：`.editor-resources` 自身没有独立样式规则，无需改动。`data-resource-count` 保留在 `sr-only` 的 `<h3>` 内，`renderResources()` 里那两处 `resourceCount.textContent` 因此不必改动。
 
+(e) `src/dashboard/task-editor.js`：**入口行的出现条件属于结构，本步一并做掉**（摘要在 Task 3）。在 `createTaskEditor` 顶部加：
+
+```js
+  const groupRows = new Map(
+    [...dialog.querySelectorAll('[data-editor-group]')]
+      .map((row) => [row.dataset.editorGroup, row]),
+  );
+
+  /* 行统一留在 DOM 里靠 hidden 控制：与既有的 resources.hidden / subtasks.hidden
+     写法一致，也让"哪几行出现"集中在一处可读。 */
+  function setGroupVisible(name, visible) {
+    const row = groupRows.get(name);
+    if (row !== undefined) row.hidden = !visible;
+  }
+```
+
+然后替换四处显隐写法：
+
+- `openNew()`：`recurringPicker.hidden = false;` → `setGroupVisible('recurring', true); setGroupVisible('resources', false); setGroupVisible('subtasks', false);`
+- `openTask()`：`recurringPicker.hidden = true;` → `setGroupVisible('recurring', false);`
+- `renderResources()`：`resources.hidden = true;` → `setGroupVisible('resources', false);`；`resources.hidden = false;` → `setGroupVisible('resources', true);`
+- `renderSubtasks()`：`subtasks.hidden = !canManage;` → `setGroupVisible('subtasks', canManage);`
+
+`const recurringPicker = dialog.querySelector('[data-recurring-picker]');` 在这两处替换后不再被引用，**连同这行一起删除**。
+
 - [ ] **Step 6: 运行新测试确认通过**
 
 Run: `npx playwright test tests/e2e/task-editor-first-screen.spec.js --output=.superpowers/pw-te2`
@@ -368,8 +394,8 @@ Expected: 4 passed。
 - `tests/e2e/editor-conflict.spec.js` 第 19 行，把
   `await expect(dialog.locator('[data-recurring-picker]')).toBeHidden();`
   改为
-  `await expect(dialog.locator('[data-editor-group="recurring"]')).toHaveCount(0);`
-  （已有任务不再显示重复入口行，而不是"隐藏一个一直存在的控件"）。
+  `await expect(dialog.locator('[data-editor-group="recurring"]')).toBeHidden();`
+  （重复规则从"一直存在但被隐藏的控件"改成"按出现条件显隐的入口行"，断言语义随之改变）。
 - 各文件顶部 import 里补上 `openEditorGroup`。
 
 - [ ] **Step 8: 跑受影响的 spec 确认通过**
@@ -454,22 +480,13 @@ Expected: 2 failed——摘要在实现前始终是 HTML 里的占位文案（`�
 
 - [ ] **Step 3: 实现 `renderGroupSummaries()`**
 
-在 `src/dashboard/task-editor.js` 内，`createTaskEditor` 顶部拿到六个行与摘要元素：
+在 `src/dashboard/task-editor.js` 内，`createTaskEditor` 顶部拿到六个摘要元素（行的显隐已由 Task 2 的 `setGroupVisible` 负责，本任务不碰）：
 
 ```js
-  const groupRows = new Map(
-    [...dialog.querySelectorAll('[data-editor-group]')]
-      .map((row) => [row.dataset.editorGroup, row]),
-  );
   const groupValues = new Map(
     [...dialog.querySelectorAll('[data-group-value]')]
       .map((node) => [node.dataset.groupValue, node]),
   );
-
-  function setGroupVisible(name, visible) {
-    const row = groupRows.get(name);
-    if (row !== undefined) row.hidden = !visible;
-  }
 
   function setGroupValue(name, text) {
     const node = groupValues.get(name);
@@ -526,10 +543,8 @@ Expected: 2 failed——摘要在实现前始终是 HTML 里的占位文案（`�
 
 - [ ] **Step 4: 接上调用点与行显隐**
 
-- `renderSubtasks()`：把 `subtasks.hidden = !canManage` 改为同时管理行——`setGroupVisible('subtasks', canManage)`，并保留 section 自身可见；渲染完列表后调用 `renderGroupSummaries()`。
-- `renderResources()`：把 `resources.hidden = …` 改为 `setGroupVisible('resources', currentTask !== null && resourceService !== undefined)`；渲染完列表后调用 `renderGroupSummaries()`。
-- `openNew()`：`recurringPicker` 那一行改为 `setGroupVisible('recurring', true)`；`recurring.checked = false` 保留。
-- `openTask()`：`setGroupVisible('recurring', false)`（取代原来的 `recurringPicker.hidden = true`）。
+- `renderSubtasks()`：渲染完列表后调用 `renderGroupSummaries()`。
+- `renderResources()`：渲染完列表后调用 `renderGroupSummaries()`。
 - `populateTags()` 与 `populateCategories()` 末尾各加一次 `renderGroupSummaries()`。
 - `form.addEventListener('input', …)` 与 `'change'` 的既有监听里，在 `markDirty()` 之后追加 `renderGroupSummaries()`。
 - `createSubtask()` 与标签创建成功后，`renderSubtasks()` / `loadTags()` 已经会触发重算。
