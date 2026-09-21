@@ -292,6 +292,18 @@
 
 .task__check[aria-checked="true"],
 .task__check:hover { background: var(--teal); }
+.task__check--restore {
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+.task__check--restore:hover {
+  background: var(--teal);
+  color: var(--surface-raised);
+}
+.task--completed .task__check--restore {
+  background: var(--teal);
+  color: var(--surface-raised);
+}
 .task__body { min-width: 0; padding: var(--sp-4) 0; }
 .task__title-line {
   display: flex;
@@ -340,18 +352,38 @@
 
 .task__danger:hover { border-color: var(--line); background: var(--coral-soft); }
 
+/* 元信息拆成两块：可截断的文本段 + 不参与截断的标签块。
+   整行共用一个省略号时，排在日期、优先级后面的标签会先被吃掉——用户反而看不到归属。 */
 .task__meta {
-  display: block;
-  overflow: hidden;
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
   color: var(--muted);
   font-size: var(--fs-caption);
   line-height: var(--lh-caption);
+}
+.task__meta-text {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .task__status { color: var(--ink); font-weight: 700; }
-.task__tags { color: var(--teal); font-weight: 700; }
-.task__priority { color: var(--muted); font-weight: 600; }
+.task__tags {
+  flex: 0 1 auto;
+  min-width: 0;
+  /* 标签再多也只占半行，余量留给日期和状态。 */
+  max-width: 50%;
+  overflow: hidden;
+  color: var(--teal);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 分隔符由样式提供，标签文本内部只剩标签本身，读屏不会念出孤立的间隔符。 */
+.task__tags::before { content: ' · '; color: var(--muted); font-weight: 400; }
+.task__priority { color: var(--muted); }
 .task__priority--medium { color: var(--teal); }
 .task__priority--high { color: var(--ink); font-weight: 700; }
 .task-list__more { display: block; margin: var(--sp-4) auto; }
@@ -1257,7 +1289,14 @@ input::placeholder { color: var(--muted); }
   .month-day .task__more { position: static; opacity: 1; }
   /* 移动端月历是密度概览，但状态须保留非颜色化表达（AGENTS 要求），故恢复元信息显示。 */
   .month-day .task__title { font-size: var(--fs-micro); }
-  .month-day .task__meta { display: block; font-size: var(--fs-micro); line-height: var(--lh-micro); }
+  /* 390px 月历格只有几十像素宽：允许换行，状态文字与标签各占一行，
+     否则它们在同一行里互相挤压，宽度被压到 0 就等于把状态藏了。 */
+  .month-day .task__meta {
+    display: flex;
+    flex-wrap: wrap;
+    font-size: var(--fs-micro);
+    line-height: var(--lh-micro);
+  }
   .task { grid-template-columns: 30px minmax(0, 1fr) auto; gap: var(--sp-3); }
   .task__menu { position: fixed; top: auto; right: 12px; bottom: 12px; left: 12px; max-width: none; }
   .metrics { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }

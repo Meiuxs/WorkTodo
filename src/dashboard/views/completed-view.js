@@ -1,7 +1,7 @@
 import { renderTaskList, renderTaskRow, arrangeSubtasks, emptyStateMarkup } from '../task-list.js';
 import { patchTaskContainers } from '../list-patch.js';
 
-export function createCompletedView({ root, query, today, onAction, onEdit, onError, getResourceCounts }) {
+export function createCompletedView({ root, query, tagService, today, onAction, onEdit, onError, getResourceCounts }) {
   function completedEmpty() {
     return emptyStateMarkup({
       title: '还没有已完成任务',
@@ -10,9 +10,13 @@ export function createCompletedView({ root, query, today, onAction, onEdit, onEr
   }
 
   async function loadData(signal) {
-    const [completed, cancelled] = await Promise.all([query.completed(), query.cancelled()]);
+    const [completed, cancelled, tags] = await Promise.all([
+      query.completed(),
+      query.cancelled(),
+      tagService.list(),
+    ]);
     if (signal?.aborted) return null;
-    return { completed, cancelled };
+    return { completed, cancelled, tags };
   }
 
   /* 已完成与已取消两个列表各自把子任务归位到父行下；合并 childrenByParent 供共享的 renderRow 使用。 */
@@ -32,7 +36,7 @@ export function createCompletedView({ root, query, today, onAction, onEdit, onEr
     async render(signal) {
       const data = await loadData(signal);
       if (data === null) return;
-      const { completed, cancelled } = data;
+      const { completed, cancelled, tags } = data;
       const { completedTop, cancelledTop, childrenByParent } = await arrange(completed, cancelled);
       const resourceCounts = await getResourceCounts?.(completedTop) ?? new Map();
       root.innerHTML = `<section class="view-section" aria-labelledby="completed-heading">
@@ -43,7 +47,7 @@ export function createCompletedView({ root, query, today, onAction, onEdit, onEr
         <summary id="cancelled-count">已取消 ${cancelledTop.length} 项</summary>
         <div id="cancelled-list"></div>
       </details>`;
-      const options = { today: today(), onAction, onEdit, onError, resourceCounts, childrenByParent };
+      const options = { today: today(), tags, onAction, onEdit, onError, resourceCounts, childrenByParent };
       const completedList = root.querySelector('#completed-list');
       if (completedTop.length === 0) {
         completedList.innerHTML = completedEmpty();
@@ -59,7 +63,7 @@ export function createCompletedView({ root, query, today, onAction, onEdit, onEr
     async patch(signal) {
       const data = await loadData(signal);
       if (data === null) return;
-      const { completed, cancelled } = data;
+      const { completed, cancelled, tags } = data;
       const { completedTop, cancelledTop, childrenByParent } = await arrange(completed, cancelled);
       const resourceCounts = await getResourceCounts?.(completedTop) ?? new Map();
       if (signal?.aborted) return;
@@ -72,7 +76,7 @@ export function createCompletedView({ root, query, today, onAction, onEdit, onEr
         },
         { container: root.querySelector('#cancelled-list'), tasks: cancelledTop },
       ], {
-        renderRow: (task) => renderTaskRow(task, { today: today(), resourceCounts, childrenByParent }),
+        renderRow: (task) => renderTaskRow(task, { today: today(), tags, resourceCounts, childrenByParent }),
         collectCounts: () => ({
           '#completed-count': String(completedTop.length),
           '#cancelled-count': `已取消 ${cancelledTop.length} 项`,

@@ -88,7 +88,7 @@
      UOS → Noto / Source Han；macOS → PingFang；Windows → 优先 YaHei UI
      （UI 版在 12–14px 小字号下比普通版更清晰，Windows 10 起随系统提供）。 */
   --font-sans: "Noto Sans CJK SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
-  --fs-micro: 11px;
+  --fs-micro: 12px;
   --fs-caption: 12px;
   --fs-ui: 13px;
   --fs-body: 14px;

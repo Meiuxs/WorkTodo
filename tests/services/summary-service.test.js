@@ -305,6 +305,7 @@ test('History 视图在日模式和周模式显示新增指标标签', async () 
   const view = createHistoryView({
     root,
     query: { async completed() { return []; } },
+    tagService: { async list() { return []; } },
     statistics,
     summaryService: {},
     today: () => '2026-09-17',
@@ -353,6 +354,7 @@ test('History 视图在没有计划时不把完成率读成 0%', async () => {
   const view = createHistoryView({
     root,
     query: { async completed() { return []; } },
+    tagService: { async list() { return []; } },
     statistics: {
       async weekly() { return emptySummary; },
       async weeklyDaily() { return []; },
@@ -378,6 +380,7 @@ test('History 视图默认按周显示七天真实完成节奏', async () => {
   const view = createHistoryView({
     root,
     query: { async completed() { return []; } },
+    tagService: { async list() { return []; } },
     statistics: {
       async weekly() {
         return {
@@ -430,6 +433,7 @@ test('History 视图资源统计迟到后不会覆盖最新渲染', async () => 
   const view = createHistoryView({
     root,
     query: { async completed() { return []; } },
+    tagService: { async list() { return []; } },
     statistics: {
       async weekly() {
         weeklyCalls += 1;

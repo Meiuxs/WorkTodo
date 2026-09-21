@@ -35,12 +35,12 @@ function rowFromMarkup(markup, list, id) {
 
 /* 更新已有行的外层属性与内容，但保留节点身份：协调器后续还要把这行
    从来源列表摘下并搬到目标列表，直接 replaceWith 会让来源游标失效。 */
-function updateRowMarkup(row, markup) {
+function updateRowMarkup(row, markup, preserveMenuState = false) {
   const template = document.createElement('div');
   template.innerHTML = markup;
   const replacement = template.firstElementChild;
   if (replacement === null) return row;
-  const wasOpen = row.querySelector('.task__more[open]') !== null;
+  const wasOpen = preserveMenuState && row.querySelector('.task__more[open]') !== null;
   for (const attribute of [...row.attributes]) {
     if (!replacement.hasAttribute(attribute.name)) row.removeAttribute(attribute.name);
   }
@@ -164,7 +164,9 @@ export function patchTaskContainers(root, containers, { renderRow, collectCounts
       // 可能已经变化（例如“已完成”恢复到“今天”后必须重新变成“待办”）。
       // 同列表重排也按最新任务重绘，避免复用带着旧 revision/状态的 DOM。
       if (reused !== null && renderRow !== undefined) {
-        row = updateRowMarkup(reused, renderRow(task));
+        // 菜单展开态只对同一列表内的行更新保留；跨列表移动后必须从收起状态开始，
+        // 否则从“已完成”恢复到“今天”会把原菜单一起带过去。
+        row = updateRowMarkup(reused, renderRow(task), holder?.list === plan.list);
       }
       // 新建的行也要登记，后续容器才能把它识别成“可迁移的已有节点”而不是孤儿。
       managed.set(task.id, { nodes: plan.nodes, list: plan.list });

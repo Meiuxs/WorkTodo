@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getScheduleOptions, taskMeta, taskPriorityLabel, taskTagLabel } from '../../src/dashboard/task-list.js';
+import { getScheduleOptions, taskMeta, taskPriorityLabel, taskTagLabel, taskTagSummary } from '../../src/dashboard/task-list.js';
 
 function task(overrides = {}) {
   return {
@@ -37,6 +37,22 @@ test('任务行标签使用文本表达而不是只靠颜色', () => {
   const tags = [{ id: 'customer', name: '客户' }, { id: 'quote', name: '报价' }];
   assert.equal(taskTagLabel({ tagIds: ['customer', 'missing'] }, tags), '#客户');
   assert.equal(taskTagLabel({ tagIds: [] }, tags), '');
+});
+
+test('任务行只展示前两个标签，其余折叠为 +N 并把完整清单留给 title', () => {
+  const tags = [
+    { id: 'customer', name: '客户' },
+    { id: 'quote', name: '报价' },
+    { id: 'week', name: '本周' },
+  ];
+  assert.deepEqual(taskTagSummary({ tagIds: ['customer', 'quote', 'week'] }, tags), {
+    text: '#客户 #报价 +1',
+    full: '#客户 #报价 #本周',
+  });
+  assert.deepEqual(taskTagSummary({ tagIds: ['customer'] }, tags), { text: '#客户', full: '#客户' });
+  assert.equal(taskTagSummary({ tagIds: [] }, tags), null);
+  // 引用了已删除的标签时不渲染空块，避免元信息里出现孤立的“ · ”。
+  assert.equal(taskTagSummary({ tagIds: ['missing'] }, tags), null);
 });
 
 test('日期快捷操作覆盖计划常用日期', () => {

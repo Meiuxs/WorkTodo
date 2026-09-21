@@ -21,6 +21,7 @@ function weekdayLabel(date) {
 export function createMonthView({
   root,
   query,
+  tagService,
   today,
   onAction,
   onEdit,
@@ -34,8 +35,9 @@ export function createMonthView({
       const requestVersion = ++renderVersion;
       const requestedAnchor = anchor;
       let calendar;
+      let tags;
       try {
-        calendar = await query.month(requestedAnchor);
+        [calendar, tags] = await Promise.all([query.month(requestedAnchor), tagService.list()]);
       } catch (error) {
         if (signal?.aborted || requestVersion !== renderVersion) return;
         throw error;
@@ -80,6 +82,7 @@ export function createMonthView({
       for (const cell of root.querySelectorAll('[data-date]')) {
         renderTaskList(cell.querySelector('.month-day__tasks'), calendar.byDate[cell.dataset.date] ?? [], {
           today: requestedAnchor,
+          tags,
           onAction,
           onEdit,
           onError,

@@ -16,6 +16,28 @@ test('安排今天并完成后进入实际完成的工作记录', async ({ exten
   await expect(dashboard.getByText('实际完成', { exact: true })).toBeVisible();
 });
 
+test('完成任务后今日摘要、下一步和数量同步更新', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  for (const title of ['先完成的任务', '继续推进的任务']) {
+    await dashboard.getByLabel('记录一个新事项').fill(title);
+    await dashboard.locator('#quick-add-date').selectOption('today');
+    await dashboard.getByRole('button', { name: '记录', exact: true }).click();
+  }
+
+  await expect(dashboard.locator('.today-summary__metric strong')).toHaveText('0 / 2');
+  await expect(dashboard.locator('.progress-block .eyebrow')).toHaveText('完成率 0%');
+  await expect(dashboard.locator('#today-tasks-heading')).toHaveText('今天 · 2');
+
+  const firstTask = dashboard.locator('[data-task-id]').filter({ hasText: '先完成的任务' });
+  await firstTask.getByRole('checkbox', { name: '完成任务' }).click();
+
+  await expect(dashboard.locator('.today-summary__metric strong')).toHaveText('1 / 2');
+  await expect(dashboard.locator('.progress-block .eyebrow')).toHaveText('完成率 50%');
+  await expect(dashboard.locator('#today-tasks-heading')).toHaveText('今天 · 1');
+  await expect(dashboard.locator('[data-next-task]')).toHaveText('继续推进的任务');
+  await expect(dashboard.locator('#completed-today-count')).toHaveText('已完成 1 项');
+});
+
 test('完成首个任务后，已完成折叠区的更多动作仍可用', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('已完成菜单任务');
@@ -70,6 +92,7 @@ test('今日已完成折叠区恢复待办后任务状态正确', async ({ exten
   const restoredRow = dashboard.locator('#today-list [data-task-id]').filter({ hasText: '折叠区恢复任务' });
   await expect(restoredRow).toContainText('待办');
   await expect(restoredRow.locator('.task__check')).toHaveAttribute('aria-label', '完成任务');
+  await expect(restoredRow.locator('.task__more[open]')).toHaveCount(0);
 });
 
 test('今日页突出下一步任务并保留可直接记录的入口', async ({ extension }) => {

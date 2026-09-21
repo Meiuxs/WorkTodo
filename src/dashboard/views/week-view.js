@@ -5,6 +5,7 @@ import { patchTaskContainers } from '../list-patch.js';
 export function createWeekView({
   root,
   query,
+  tagService,
   today,
   onAction,
   onEdit,
@@ -15,16 +16,20 @@ export function createWeekView({
   async function loadData(signal) {
     const anchor = today();
     const tomorrow = addLocalDays(anchor, 1);
+    const [planned, tags] = await Promise.all([
+      singleDate ? query.tomorrow(anchor) : query.week(anchor),
+      tagService.list(),
+    ]);
+    if (signal?.aborted) return null;
     const result = singleDate
       ? {
           startDate: tomorrow,
           endDate: tomorrow,
           days: [tomorrow],
-          byDate: { [tomorrow]: await query.tomorrow(anchor) },
+          byDate: { [tomorrow]: planned },
         }
-      : await query.week(anchor);
-    if (signal?.aborted) return null;
-    return { anchor, result };
+      : planned;
+    return { anchor, result, tags };
   }
 
   function plannedListOf(anchor, result) {
@@ -35,7 +40,7 @@ export function createWeekView({
     async render(signal) {
       const data = await loadData(signal);
       if (data === null) return;
-      const { anchor, result } = data;
+      const { anchor, result, tags } = data;
       const allTasks = result.days.flatMap((date) => result.byDate[date] ?? []);
       const plannedDays = plannedListOf(anchor, result);
       const resourceCounts = await getResourceCounts?.(allTasks) ?? new Map();
@@ -82,6 +87,7 @@ export function createWeekView({
         grid.append(section);
         renderTaskList(section.querySelector('.week-day__tasks'), tasks, {
           today: anchor,
+          tags,
           onAction,
           onEdit,
           onError,
@@ -95,7 +101,7 @@ export function createWeekView({
     async patch(signal) {
       const data = await loadData(signal);
       if (data === null) return;
-      const { anchor, result } = data;
+      const { anchor, result, tags } = data;
       const allTasks = result.days.flatMap((date) => result.byDate[date] ?? []);
       const plannedDays = plannedListOf(anchor, result);
       const resourceCounts = await getResourceCounts?.(allTasks) ?? new Map();
@@ -106,7 +112,7 @@ export function createWeekView({
         container: root.querySelector(`[data-day-tasks="${date}"]`),
         tasks: result.byDate[date] ?? [],
       })), {
-        renderRow: (task) => renderTaskRow(task, { today: anchor, resourceCounts, childrenByParent }),
+        renderRow: (task) => renderTaskRow(task, { today: anchor, tags, resourceCounts, childrenByParent }),
         // 标题里的日期范围不变；单日页与多日页共用 #week-range-summary，按页型写入对应文案。
         collectCounts: () => Object.fromEntries([
           ['#week-range-summary', singleDate

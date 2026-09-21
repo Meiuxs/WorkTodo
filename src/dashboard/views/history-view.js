@@ -46,6 +46,7 @@ export function createHistoryView({
   root,
   query,
   statistics,
+  tagService,
   summaryService,
   today,
   onAction,
@@ -98,13 +99,15 @@ export function createHistoryView({
       let summary;
       let completed;
       let weeklyDays;
+      let tags;
       try {
-        [summary, completed, weeklyDays] = await Promise.all([
+        [summary, completed, weeklyDays, tags] = await Promise.all([
           requestedMode === 'daily' ? statistics.daily(requestedAnchor) : statistics.weekly(fromDate),
           query.completed({ completedFrom: fromDate, completedTo: toDate }),
           requestedMode === 'weekly' && typeof statistics.weeklyDaily === 'function'
             ? statistics.weeklyDaily(fromDate)
             : [],
+          tagService.list(),
         ]);
       } catch (error) {
         if (signal?.aborted || requestVersion !== renderVersion) return;
@@ -248,6 +251,7 @@ export function createHistoryView({
       });
       renderTaskList(root.querySelector('#history-list'), completed, {
         today: today(),
+        tags,
         onAction,
         onEdit,
         onError,

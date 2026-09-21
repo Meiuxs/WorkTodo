@@ -62,6 +62,8 @@ test('任务菜单用动作名称表达破坏性操作并只保留一个编辑�
   const completedRow = dashboard.locator('[data-task-id]').filter({ hasText: '术语检查任务' });
   await expect(completedRow.locator('.task__check')).toHaveAttribute('aria-label', '恢复任务');
   await expect(completedRow.locator('.task__check')).not.toHaveAttribute('role', 'checkbox');
+  await expect(completedRow.locator('.task__check')).toHaveClass(/task__check--restore/);
+  await expect(completedRow.locator('.task__check')).toHaveText('✓');
 });
 
 test('加星标与取消星标的 Toast 报出新状态，不只说“已更新”', async ({ extension }) => {
@@ -102,6 +104,34 @@ test('列表从满到空后页面级空状态原地补回', async ({ extension }
   await dashboard.getByRole('button', { name: '撤销' }).click();
   await expect(dashboard.locator('[data-task-id]').filter({ hasText: '最后一个今天任务' })).toBeVisible();
   await expect(dashboard.locator('.empty-state')).toHaveCount(0);
+});
+
+test('任务行标签独立成块，超过两个折叠为 +N 且全文留在 title', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await createTodayTask(dashboard, '标签展示任务');
+  await dashboard.getByRole('button', { name: '标签展示任务', exact: true }).click();
+  const dialog = dashboard.getByRole('dialog');
+  await dialog.locator('[data-editor-group="tags"] > summary').click();
+  for (const name of ['客户', '报价', '本周']) {
+    await dialog.locator('#new-tag').fill(name);
+    await dialog.locator('[data-create-tag]').click();
+    await dialog.getByRole('checkbox', { name, exact: true }).check();
+  }
+  await expect(dialog.locator('input[name="tagIds"]:checked')).toHaveCount(3);
+  await dialog.getByRole('button', { name: '保存任务' }).click();
+  await expect(dialog).toBeHidden();
+
+  const row = dashboard.locator('[data-task-id]').filter({ hasText: '标签展示任务' });
+  // 标签不跟日期、优先级抢整行的省略号：前两个平铺，其余折叠成计数。
+  // 标签顺序由任务自身的 tagIds 决定，这里只断言"两个 + 计数"，不锁定具体顺序。
+  await expect(row.locator('.task__tags')).toHaveText(/^#[^\s#]+ #[^\s#]+ \+1$/);
+  const tagTitle = await row.locator('.task__tags').getAttribute('title');
+  for (const name of ['#客户', '#报价', '#本周']) {
+    expect(tagTitle).toContain(name);
+  }
+  // 标签块与可截断文本段并列，宽度不足时只压缩文本段。
+  expect(await row.locator('.task__meta').evaluate((node) => [...node.children].map((child) => child.className)))
+    .toEqual(['task__meta-text', 'task__tags']);
 });
 
 test('抽屉有未保存修改时关闭前先确认', async ({ extension }) => {

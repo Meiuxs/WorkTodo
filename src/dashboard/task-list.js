@@ -107,13 +107,30 @@ function taskActions(task, today) {
   return actions.join('');
 }
 
-export function taskTagLabel(task, tags) {
+/* 任务行只展示前几个标签：标签数量不设上限，全部铺开会把元信息行挤成第二行标题。
+   超出的部分折叠成 +N，完整清单交给 title，悬停和读屏都还能拿到全部归属。 */
+const VISIBLE_TAG_LIMIT = 2;
+
+function resolveTagNames(task, tags) {
   const names = new Map(tags.map((tag) => [tag.id, tag.name]));
   return (task.tagIds ?? [])
     .map((id) => names.get(id))
-    .filter(Boolean)
-    .map((name) => `#${name}`)
-    .join(' ');
+    .filter(Boolean);
+}
+
+export function taskTagLabel(task, tags) {
+  return resolveTagNames(task, tags).map((name) => `#${name}`).join(' ');
+}
+
+/* 返回 null 表示这条任务没有可显示的标签，调用方据此决定是否渲染标签块。 */
+export function taskTagSummary(task, tags, limit = VISIBLE_TAG_LIMIT) {
+  const names = resolveTagNames(task, tags);
+  if (names.length === 0) return null;
+  const visible = names.slice(0, limit).map((name) => `#${name}`).join(' ');
+  return {
+    text: names.length > limit ? `${visible} +${names.length - limit}` : visible,
+    full: names.map((name) => `#${name}`).join(' '),
+  };
 }
 
 export function taskPriorityLabel(priority) {
@@ -140,10 +157,12 @@ function taskMarkup(task, today, tags, resourceCounts, children = []) {
   const checkboxAction = trashed ? 'untrash' : canRestore ? 'restore' : 'complete';
   const checked = !trashed && task.lifecycle === 'completed';
   const status = taskStatus(task, today);
-  const tagText = taskTagLabel(task, tags);
-  const tagMarkup = tagText.length === 0
+  const tagSummary = taskTagSummary(task, tags);
+  // 标签是元信息里唯一的归属线索，渲染成独立块（分隔符由 CSS 提供），
+  // 免得它排在日期、优先级后面时先被整行的省略号吃掉。
+  const tagMarkup = tagSummary === null
     ? ''
-    : ` · <span class="task__tags">${escapeHtml(tagText)}</span>`;
+    : `<span class="task__tags" title="${escapeHtml(tagSummary.full)}">${escapeHtml(tagSummary.text)}</span>`;
   const overdue = task.scheduledDate !== null
     && task.scheduledDate < today
     && ACTIVE_LIFECYCLES.has(task.lifecycle);
@@ -152,6 +171,7 @@ function taskMarkup(task, today, tags, resourceCounts, children = []) {
   const subtaskLabel = children.length > 0
     ? ` · 子任务 ${children.filter((child) => child.lifecycle === 'completed').length}/${children.length}`
     : '';
+  const checkClass = canRestore ? 'task__check task__check--restore' : 'task__check';
   const priorityLabel = taskPriorityLabel(task.priority);
   // 无优先级是默认状态，不在任务行重复展示；P 键仍通过缺省值继续从“无优先级”开始循环。
   const priorityMarkup = task.priority === 'none'
@@ -175,13 +195,13 @@ function taskMarkup(task, today, tags, resourceCounts, children = []) {
       </div>
     </details>`;
   return `<article class="task task--${escapeHtml(task.lifecycle)}${overdue ? ' task--overdue' : ''}" data-task-id="${escapeHtml(task.id)}" data-revision="${task.revision}" role="listitem">
-    <button class="task__check" type="button" ${checkAttributes} data-action="${checkboxAction}">${checked ? '✓' : ''}</button>
+    <button class="${checkClass}" type="button" ${checkAttributes} data-action="${checkboxAction}">${checked ? '✓' : ''}</button>
     <div class="task__body">
       <div class="task__title-line">
         ${starMarkup}
         <button class="task__title" type="button" data-action="edit" title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</button>
       </div>
-      <span class="task__meta"><span class="task__status">${status}</span> · ${escapeHtml(taskMeta(task, today))}${priorityMarkup}${tagMarkup}${subtaskLabel}${resourceLabel}</span>
+      <span class="task__meta"><span class="task__meta-text"><span class="task__status">${status}</span> · ${escapeHtml(taskMeta(task, today))}${priorityMarkup}${subtaskLabel}${resourceLabel}</span>${tagMarkup}</span>
     </div>
     ${moreMarkup}
     ${children.length === 0 ? '' : `<ul class="task__subtasks" role="group" aria-label="子任务">${children.map((child) => subtaskMarkup(child, today)).join('')}</ul>`}

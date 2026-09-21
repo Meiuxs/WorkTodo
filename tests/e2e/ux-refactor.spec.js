@@ -125,6 +125,9 @@ test('完成任务后滚动位置与其他行菜单展开态保持', async ({ ex
     await dashboard.getByLabel('记录一个新事项').fill(`滚动保持任务 ${index}`);
     await dashboard.locator('#quick-add-date').selectOption('today');
     await dashboard.getByRole('button', { name: '记录', exact: true }).click();
+    // 等这一行出现再填下一条：提交是异步的，若清空输入发生在下一次 fill 之后，
+    // 会把刚填的标题擦掉，第 N+1 条就以空标题失败——整套并行跑时最容易踩到。
+    await expect(dashboard.getByRole('button', { name: `滚动保持任务 ${index}`, exact: true })).toBeVisible();
   }
 
   // 等 8 行全部渲染完再设滚动位置。列表没渲染完时文档不够高，scrollTo 会被钳成 0：

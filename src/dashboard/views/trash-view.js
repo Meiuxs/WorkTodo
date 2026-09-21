@@ -1,9 +1,9 @@
 import { renderTaskList } from '../task-list.js';
 
-export function createTrashView({ root, query, today, onAction, onEdit, onError, getResourceCounts }) {
+export function createTrashView({ root, query, tagService, today, onAction, onEdit, onError, getResourceCounts }) {
   return {
     async render(signal) {
-      const tasks = await query.trashed();
+      const [tasks, tags] = await Promise.all([query.trashed(), tagService.list()]);
       if (signal?.aborted) return;
       const resourceCounts = await getResourceCounts?.(tasks) ?? new Map();
 
@@ -20,6 +20,7 @@ export function createTrashView({ root, query, today, onAction, onEdit, onError,
       } else {
         renderTaskList(list, tasks, {
           today: today(),
+          tags,
           onAction,
           onEdit,
           onError,

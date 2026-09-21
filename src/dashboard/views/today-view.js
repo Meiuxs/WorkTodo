@@ -10,7 +10,7 @@ function formatDate(date) {
   }).format(new Date(`${date}T00:00:00`));
 }
 
-export function createTodayView({ root, query, statistics, today, onAction, onEdit, onError, getResourceCounts }) {
+export function createTodayView({ root, query, statistics, tagService, today, onAction, onEdit, onError, getResourceCounts }) {
   // 首屏空状态：不止告诉用户"没有任务"，还要把唯一的下一步动作递到手上。
   function plannedEmpty() {
     return emptyStateMarkup({
@@ -25,12 +25,46 @@ export function createTodayView({ root, query, statistics, today, onAction, onEd
     });
   }
 
+  function bindNextTaskAction() {
+    const nextTask = root.querySelector('[data-next-task]');
+    nextTask?.addEventListener('click', () => onEdit(nextTask.dataset.nextTask));
+  }
+
+  function updateTodaySummary({ overdue, planned, summary }) {
+    const nextTask = overdue[0] ?? planned[0] ?? null;
+    const progress = summary.completionRate === null ? 0 : Math.round(summary.completionRate * 100);
+    const metric = root.querySelector('.today-summary__metric strong');
+    const progressLabel = root.querySelector('.progress-block .eyebrow');
+    const progressBar = root.querySelector('.progress-block progress');
+    const next = root.querySelector('[data-next-action]');
+    const todayHeading = root.querySelector('#today-tasks-heading');
+    const overdueHeading = root.querySelector('#overdue-heading');
+
+    if (metric !== null) metric.textContent = `${summary.completedCount} / ${summary.plannedCount}`;
+    if (progressLabel !== null) {
+      progressLabel.textContent = `完成率 ${summary.completionRate === null ? '暂无计划' : `${progress}%`}`;
+    }
+    if (progressBar !== null) {
+      progressBar.value = progress;
+      progressBar.textContent = `${progress}%`;
+    }
+    if (todayHeading !== null) todayHeading.textContent = `今天 · ${planned.length}`;
+    if (overdueHeading !== null) overdueHeading.textContent = `逾期 · ${overdue.length}`;
+    if (next !== null) {
+      next.innerHTML = nextTask === null
+        ? '<span class="eyebrow">下一步</span><strong>记录第一件事</strong><span>从上方快速记录开始</span>'
+        : `<span class="eyebrow">下一步</span><button type="button" class="today-summary__task" aria-label="下一步任务" data-next-task="${escapeHtml(nextTask.id)}">${escapeHtml(nextTask.title)}</button><span>${overdue.length > 0 ? '先处理逾期事项' : '今天可以推进'}</span>`;
+      bindNextTaskAction();
+    }
+  }
+
   async function loadData(signal) {
     const date = today();
-    const [tasks, completed, summary] = await Promise.all([
+    const [tasks, completed, summary, tags] = await Promise.all([
       query.today(date),
       query.completed({ completedDate: date }),
       statistics.daily(date),
+      tagService.list(),
     ]);
     if (signal?.aborted) return null;
     const rawOverdue = tasks.filter((task) => task.scheduledDate !== null && task.scheduledDate < date);
@@ -55,6 +89,7 @@ export function createTodayView({ root, query, statistics, today, onAction, onEd
       completed: completedArr.topLevel,
       summary,
       childrenByParent,
+      tags,
     };
   }
 
@@ -62,7 +97,7 @@ export function createTodayView({ root, query, statistics, today, onAction, onEd
     async render(signal) {
       const data = await loadData(signal);
       if (data === null) return;
-      const { date, overdue, planned, completed, summary, childrenByParent } = data;
+      const { date, overdue, planned, completed, summary, childrenByParent, tags } = data;
       const nextTask = overdue[0] ?? planned[0] ?? null;
       const resourceCounts = await getResourceCounts?.([...overdue, ...planned, ...completed]) ?? new Map();
       const progress = summary.completionRate === null ? 0 : Math.round(summary.completionRate * 100);
@@ -92,7 +127,7 @@ export function createTodayView({ root, query, statistics, today, onAction, onEd
         <div id="completed-today-list"></div>
       </details>`;
 
-      const listOptions = { today: date, onAction, onEdit, onError, resourceCounts, childrenByParent };
+      const listOptions = { today: date, tags, onAction, onEdit, onError, resourceCounts, childrenByParent };
       if (overdue.length > 0) {
         renderTaskList(root.querySelector('#overdue-list'), overdue, {
           ...listOptions,
@@ -109,19 +144,18 @@ export function createTodayView({ root, query, statistics, today, onAction, onEd
         emptyMessage: '今天还没有完成记录。',
       });
       bindEmptyStateActions();
-      root.querySelector('[data-next-task]')?.addEventListener('click', () => {
-        onEdit(root.querySelector('[data-next-task]').dataset.nextTask);
-      });
+      bindNextTaskAction();
     },
 
     /* 动作后重取数据：集合不变时只替换变化的行，否则整页重渲染。 */
     async patch(signal) {
       const data = await loadData(signal);
       if (data === null) return;
-      const { date, overdue, planned, completed, childrenByParent } = data;
+      const { date, overdue, planned, completed, summary, childrenByParent, tags } = data;
       const resourceCounts = await getResourceCounts?.([...overdue, ...planned, ...completed]) ?? new Map();
       if (signal?.aborted) return;
-      const rowOptions = { today: date, resourceCounts, childrenByParent };
+      updateTodaySummary({ overdue, planned, summary });
+      const rowOptions = { today: date, tags, resourceCounts, childrenByParent };
       // 折叠区的完成列表也在受管范围内：刚完成的任务从“今天”迁进“已完成”时，
       // 协调算法能搬移节点而不是把它当成孤儿回退整页渲染。
       const containers = [

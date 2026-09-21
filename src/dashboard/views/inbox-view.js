@@ -1,7 +1,7 @@
 import { renderTaskList, renderTaskRow, arrangeSubtasks, emptyStateMarkup } from '../task-list.js';
 import { patchTaskContainers } from '../list-patch.js';
 
-export function createInboxView({ root, query, today, onAction, onEdit, onError, getResourceCounts }) {
+export function createInboxView({ root, query, tagService, today, onAction, onEdit, onError, getResourceCounts }) {
   function inboxEmpty() {
     return emptyStateMarkup({
       title: '收集箱是空的',
@@ -16,16 +16,17 @@ export function createInboxView({ root, query, today, onAction, onEdit, onError,
   }
 
   async function loadTasks(signal) {
-    const tasks = await query.inbox();
+    const [tasks, tags] = await Promise.all([query.inbox(), tagService.list()]);
     if (signal?.aborted) return null;
-    return arrangeSubtasks(query, tasks);
+    const arranged = await arrangeSubtasks(query, tasks);
+    return { ...arranged, tags };
   }
 
   return {
     async render(signal) {
       const arranged = await loadTasks(signal);
       if (arranged === null) return;
-      const { topLevel, childrenByParent } = arranged;
+      const { topLevel, childrenByParent, tags } = arranged;
       const resourceCounts = await getResourceCounts?.(topLevel) ?? new Map();
       root.innerHTML = `<section class="view-section" aria-labelledby="inbox-heading">
         <div class="section-heading">
@@ -39,6 +40,7 @@ export function createInboxView({ root, query, today, onAction, onEdit, onError,
       } else {
         renderTaskList(list, topLevel, {
           today: today(),
+          tags,
           onAction,
           onEdit,
           onError,
@@ -52,7 +54,7 @@ export function createInboxView({ root, query, today, onAction, onEdit, onError,
     async patch(signal) {
       const arranged = await loadTasks(signal);
       if (arranged === null) return;
-      const { topLevel, childrenByParent } = arranged;
+      const { topLevel, childrenByParent, tags } = arranged;
       const resourceCounts = await getResourceCounts?.(topLevel) ?? new Map();
       if (signal?.aborted) return;
       const patched = patchTaskContainers(root, [
@@ -65,7 +67,7 @@ export function createInboxView({ root, query, today, onAction, onEdit, onError,
           },
         },
       ], {
-        renderRow: (task) => renderTaskRow(task, { today: today(), resourceCounts, childrenByParent }),
+        renderRow: (task) => renderTaskRow(task, { today: today(), tags, resourceCounts, childrenByParent }),
         collectCounts: () => ({ '#inbox-count': String(topLevel.length) }),
       });
       if (patched === false) await this.render(signal);
