@@ -21,10 +21,11 @@ export class UndoController {
       : { message: this.#pending.message };
   }
 
-  offer(action) {
+  /* duration 可按动作加长撤销窗口（例如取消确认框后只活一条 Toast 的撤销入口）。 */
+  offer(action, duration = this.#timeout) {
     this.dismiss();
     this.#pending = action;
-    this.#timer = this.#setTimeout(() => this.dismiss(), this.#timeout);
+    this.#timer = this.#setTimeout(() => this.dismiss(), duration);
     return this.pending;
   }
 

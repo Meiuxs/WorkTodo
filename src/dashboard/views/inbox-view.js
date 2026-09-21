@@ -1,7 +1,20 @@
-import { renderTaskList, renderTaskRow, arrangeSubtasks } from '../task-list.js';
+import { renderTaskList, renderTaskRow, arrangeSubtasks, emptyStateMarkup } from '../task-list.js';
 import { patchTaskContainers } from '../list-patch.js';
 
 export function createInboxView({ root, query, today, onAction, onEdit, onError, getResourceCounts }) {
+  function inboxEmpty() {
+    return emptyStateMarkup({
+      title: '收集箱是空的',
+      text: '想到的事情先放进来，整理可以晚一点。',
+      action: '记录一件事',
+    });
+  }
+  function bindEmptyStateActions() {
+    root.querySelector('[data-focus-quick-add]')?.addEventListener('click', () => {
+      document.querySelector('#quick-add-title')?.focus();
+    });
+  }
+
   async function loadTasks(signal) {
     const tasks = await query.inbox();
     if (signal?.aborted) return null;
@@ -22,11 +35,7 @@ export function createInboxView({ root, query, today, onAction, onEdit, onError,
       </section>`;
       const list = root.querySelector('#inbox-list');
       if (topLevel.length === 0) {
-        list.innerHTML = `<div class="empty-state">
-          <p class="empty-state__title">收集箱是空的</p>
-          <p class="empty-state__text">想到的事情先放进来，整理可以晚一点。</p>
-          <button type="button" class="button-primary empty-state__action" data-focus-quick-add>记录一件事</button>
-        </div>`;
+        list.innerHTML = inboxEmpty();
       } else {
         renderTaskList(list, topLevel, {
           today: today(),
@@ -37,9 +46,7 @@ export function createInboxView({ root, query, today, onAction, onEdit, onError,
           childrenByParent,
         });
       }
-      root.querySelector('[data-focus-quick-add]')?.addEventListener('click', () => {
-        document.querySelector('#quick-add-title')?.focus();
-      });
+      bindEmptyStateActions();
     },
 
     async patch(signal) {
@@ -49,7 +56,14 @@ export function createInboxView({ root, query, today, onAction, onEdit, onError,
       const resourceCounts = await getResourceCounts?.(topLevel) ?? new Map();
       if (signal?.aborted) return;
       const patched = patchTaskContainers(root, [
-        { container: root.querySelector('#inbox-list'), tasks: topLevel },
+        {
+          container: root.querySelector('#inbox-list'),
+          tasks: topLevel,
+          onEmpty: () => {
+            root.querySelector('#inbox-list').innerHTML = inboxEmpty();
+            bindEmptyStateActions();
+          },
+        },
       ], {
         renderRow: (task) => renderTaskRow(task, { today: today(), resourceCounts, childrenByParent }),
         collectCounts: () => ({ '#inbox-count': String(topLevel.length) }),

@@ -150,7 +150,7 @@ a {
 
 .skip-link:focus-visible { transform: translateY(0); }
 
-/* skip-link 的落点：预留给吸顶头部的高度，键盘直达主体时目标不会被头部盖住。 */
+/* skip-link 的落点：键盘直达主体时给目标留一点余量；主骨架不用吸顶，将来引入头部吸顶时在这里调大。 */
 #view-root { scroll-margin-top: var(--sp-5); }
 
 button:focus-visible,

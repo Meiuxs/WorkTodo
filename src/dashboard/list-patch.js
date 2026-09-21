@@ -33,6 +33,26 @@ function rowFromMarkup(markup, list, id) {
   return row;
 }
 
+/* 更新已有行的外层属性与内容，但保留节点身份：协调器后续还要把这行
+   从来源列表摘下并搬到目标列表，直接 replaceWith 会让来源游标失效。 */
+function updateRowMarkup(row, markup) {
+  const template = document.createElement('div');
+  template.innerHTML = markup;
+  const replacement = template.firstElementChild;
+  if (replacement === null) return row;
+  const wasOpen = row.querySelector('.task__more[open]') !== null;
+  for (const attribute of [...row.attributes]) {
+    if (!replacement.hasAttribute(attribute.name)) row.removeAttribute(attribute.name);
+  }
+  for (const attribute of replacement.attributes) {
+    row.setAttribute(attribute.name, attribute.value);
+  }
+  row.replaceChildren(...[...replacement.childNodes].map((node) => node.cloneNode(true)));
+  const details = row.querySelector('.task__more');
+  if (details !== null && wasOpen) details.open = true;
+  return row;
+}
+
 /* 行被替换时用户视角只是内容刷新：新行里的菜单若比旧行多开/少关，
    在插入前把展开态同步过去，避免“改完优先级菜单就收起”。 */
 function carryMenuOpenState(oldRow, newRow) {
@@ -47,20 +67,25 @@ function moveFocusToNeighbor(neighbor) {
   if (target !== null && target !== undefined) target.focus();
 }
 
-/* containers: [{ container, tasks }]；renderRow(task) 返回单行 markup。 */
+/* containers: [{ container, tasks, onEmpty }]；renderRow(task) 返回单行 markup。
+   onEmpty 是可选的页面级空状态填充：行集归零时由视图补回空状态，
+   保住引导文案与动作入口。 */
 export function patchTaskContainers(root, containers, { renderRow, collectCounts } = {}) {
   if (root === null || root.isConnected === false) return false;
   const plans = [];
   const managed = new Map();
-  for (const { container, tasks } of containers) {
+  for (const { container, tasks, onEmpty } of containers) {
     if (!(container instanceof HTMLElement)) return false;
     const list = container.querySelector(':scope > .task-list');
     if (list === null) {
       // 容器里还没有行（只有空状态占位）：
       // 新集合也为空时保持占位不动；有行时清掉占位、在游离列表里建行后整体挂入。
       if (tasks.length === 0) continue;
+      // .empty-state 是页面级占位（今天/收集箱首屏）：清掉它走与 .empty 同一重建路径，
+      // 否则会被当成"视图结构已变化"而回退整页渲染。
       const onlyEmptyPlaceholder = container.childElementCount === 0
-        || (container.childElementCount === 1 && container.firstElementChild.classList.contains('empty'));
+        || (container.childElementCount === 1
+          && container.firstElementChild.matches('.empty, .empty-state'));
       if (onlyEmptyPlaceholder !== false) {
         container.replaceChildren();
         const ghost = document.createElement('div');
@@ -79,7 +104,26 @@ export function patchTaskContainers(root, containers, { renderRow, collectCounts
       nodes.set(id, child);
       managed.set(id, { nodes, list });
     }
-    if (tasks.length === 0 && list.childElementCount === 0) continue;
+    if (tasks.length === 0) {
+      // 满→空过渡：行数归零不是"没变化"。
+      if (typeof onEmpty === 'function') {
+        // 有页面级空状态的容器：就地清空行并补回空状态，
+        // 否则用户完成最后一个任务后只剩一片空白，丢掉引导与动作入口。
+        // 焦点兜底不用在这里处理：被删行断开后由下方的焦点块统一交给快速记录。
+        if (container.childElementCount > 0) {
+          while (list.firstElementChild !== null) {
+            managed.delete(list.firstElementChild.dataset.taskId);
+            list.firstElementChild.remove();
+          }
+          container.replaceChildren();
+          onEmpty();
+        }
+        continue;
+      }
+      // 没有页面级空状态的容器（例如"已完成"折叠区）：撤销把行搬去别的列表后，
+      // 这里仍要把清空后的行集交给 plans 循环，由游标统一移除残留孤行。
+      if (list.childElementCount === 0) continue;
+    }
     plans.push({ container, list, nodes, tasks });
   }
   // 出现了不属于任何受管容器的行（视图结构已变化）时不敢局部动手。
@@ -114,8 +158,14 @@ export function patchTaskContainers(root, containers, { renderRow, collectCounts
       }
       const holder = managed.get(task.id);
       const reused = holder ? detachNode(task.id, holder.nodes, managed) : null;
-      const row = reused ?? makeRow(task, renderRow, plan.nodes);
+      let row = reused ?? makeRow(task, renderRow, plan.nodes);
       if (row === null) continue;
+      // 跨列表移动时不能直接复用旧行：任务状态、圆环动作和菜单内容
+      // 可能已经变化（例如“已完成”恢复到“今天”后必须重新变成“待办”）。
+      // 同列表重排也按最新任务重绘，避免复用带着旧 revision/状态的 DOM。
+      if (reused !== null && renderRow !== undefined) {
+        row = updateRowMarkup(reused, renderRow(task));
+      }
       // 新建的行也要登记，后续容器才能把它识别成“可迁移的已有节点”而不是孤儿。
       managed.set(task.id, { nodes: plan.nodes, list: plan.list });
       if (ref === null) plan.list.append(row);
@@ -142,7 +192,10 @@ export function patchTaskContainers(root, containers, { renderRow, collectCounts
     }
   }
   if (removedAncestor !== null && !removedAncestor.isConnected) {
-    moveFocusToNeighbor(focusFallback);
+    // 满→空后没有了"相邻行"：把焦点交给空状态要引导去的地方（快速记录），
+    // 不让它随被删节点掉回 body。
+    if (focusFallback === null) document.querySelector('#quick-add-title')?.focus();
+    else moveFocusToNeighbor(focusFallback);
   }
   return true;
 }

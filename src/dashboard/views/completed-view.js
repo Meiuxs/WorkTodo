@@ -1,7 +1,14 @@
-import { renderTaskList, renderTaskRow, arrangeSubtasks } from '../task-list.js';
+import { renderTaskList, renderTaskRow, arrangeSubtasks, emptyStateMarkup } from '../task-list.js';
 import { patchTaskContainers } from '../list-patch.js';
 
 export function createCompletedView({ root, query, today, onAction, onEdit, onError, getResourceCounts }) {
+  function completedEmpty() {
+    return emptyStateMarkup({
+      title: '还没有已完成任务',
+      text: '点任务行左侧的圆圈即可完成，完成记录会按实际完成日期出现在这里。',
+    });
+  }
+
   async function loadData(signal) {
     const [completed, cancelled] = await Promise.all([query.completed(), query.cancelled()]);
     if (signal?.aborted) return null;
@@ -39,10 +46,7 @@ export function createCompletedView({ root, query, today, onAction, onEdit, onEr
       const options = { today: today(), onAction, onEdit, onError, resourceCounts, childrenByParent };
       const completedList = root.querySelector('#completed-list');
       if (completedTop.length === 0) {
-        completedList.innerHTML = `<div class="empty-state">
-          <p class="empty-state__title">还没有已完成任务</p>
-          <p class="empty-state__text">点任务行左侧的圆圈即可完成，完成记录会按实际完成日期出现在这里。</p>
-        </div>`;
+        completedList.innerHTML = completedEmpty();
       } else {
         renderTaskList(completedList, completedTop, options);
       }
@@ -60,7 +64,12 @@ export function createCompletedView({ root, query, today, onAction, onEdit, onEr
       const resourceCounts = await getResourceCounts?.(completedTop) ?? new Map();
       if (signal?.aborted) return;
       const patched = patchTaskContainers(root, [
-        { container: root.querySelector('#completed-list'), tasks: completedTop },
+        {
+          container: root.querySelector('#completed-list'),
+          tasks: completedTop,
+          // 恢复掉最后一个已完成项时补回页面级空状态，不留一片空白。
+          onEmpty: () => { root.querySelector('#completed-list').innerHTML = completedEmpty(); },
+        },
         { container: root.querySelector('#cancelled-list'), tasks: cancelledTop },
       ], {
         renderRow: (task) => renderTaskRow(task, { today: today(), resourceCounts, childrenByParent }),

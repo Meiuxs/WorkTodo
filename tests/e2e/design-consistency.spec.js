@@ -50,7 +50,7 @@ test('任务菜单用动作名称表达破坏性操作并只保留一个编辑�
   await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
 
   const row = dashboard.locator('[data-task-id]').filter({ hasText: '术语检查任务' });
-  await row.locator('summary[aria-label="更多任务操作"]').click();
+  await row.locator('summary[aria-label^="更多任务操作"]').click();
   await expect(row.getByRole('button', { name: '移入回收站', exact: true })).toBeVisible();
   await expect(row.getByRole('button', { name: '删除', exact: true })).toHaveCount(0);
   await expect(row.getByRole('button', { name: '编辑任务', exact: true })).toHaveCount(1);
@@ -62,6 +62,46 @@ test('任务菜单用动作名称表达破坏性操作并只保留一个编辑�
   const completedRow = dashboard.locator('[data-task-id]').filter({ hasText: '术语检查任务' });
   await expect(completedRow.locator('.task__check')).toHaveAttribute('aria-label', '恢复任务');
   await expect(completedRow.locator('.task__check')).not.toHaveAttribute('role', 'checkbox');
+});
+
+test('加星标与取消星标的 Toast 报出新状态，不只说“已更新”', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await dashboard.getByLabel('记录一个新事项').fill('星标反馈任务');
+  await dashboard.getByRole('button', { name: '记录', exact: true }).click();
+  await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
+
+  const row = dashboard.locator('[data-task-id]').filter({ hasText: '星标反馈任务' });
+  await row.locator('summary[aria-label^="更多任务操作"]').click();
+  await row.getByRole('button', { name: '加星标', exact: true }).click();
+  await expect(dashboard.getByText('已加星标')).toBeVisible();
+  await expect(row.locator('.task__star')).toHaveAttribute('aria-label', '已标记星标');
+  expect(await row.locator('.task__title-line').evaluate((node) => [...node.children].map((child) => child.className)))
+    .toEqual(['task__star', 'task__title']);
+
+  // 行内动作会原地刷新、菜单保持展开（见 list-patch carryMenuOpenState）：
+  // “取消星标”已在开着的菜单里，直接点它而不是再展开一次（再点会把菜单收起）。
+  await expect(row.locator('summary[aria-label^="更多任务操作"]')).toBeVisible();
+  await row.getByRole('button', { name: '取消星标', exact: true }).click();
+  await expect(dashboard.getByText('已取消星标')).toBeVisible();
+  await expect(row.locator('.task__star')).toHaveCount(0);
+  await expect(row).not.toContainText('已星标');
+});
+
+test('列表从满到空后页面级空状态原地补回', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await createTodayTask(dashboard, '最后一个今天任务');
+  const row = dashboard.locator('[data-task-id]').filter({ hasText: '最后一个今天任务' });
+  await expect(row).toBeVisible();
+
+  // 完成最后一个任务后不能只剩空白：空状态要带着引导文案和入口回到原位。
+  await row.getByRole('checkbox', { name: '完成任务' }).click();
+  await expect(dashboard.locator('.empty-state__title')).toHaveText('今天还没有待办');
+  await expect(dashboard.locator('.empty-state__action')).toBeVisible();
+
+  // 撤销把行搬回来时，空状态占位被同一套协调算法清掉，不留双重表达。
+  await dashboard.getByRole('button', { name: '撤销' }).click();
+  await expect(dashboard.locator('[data-task-id]').filter({ hasText: '最后一个今天任务' })).toBeVisible();
+  await expect(dashboard.locator('.empty-state')).toHaveCount(0);
 });
 
 test('抽屉有未保存修改时关闭前先确认', async ({ extension }) => {
@@ -95,10 +135,11 @@ test('抽屉有未保存修改时关闭前先确认', async ({ extension }) => {
 test('月历用方向键在日期之间移动焦点', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByRole('button', { name: '月历', exact: true }).click();
-  await expect(dashboard.getByRole('grid')).toBeVisible();
+  // 月历不声明 grid/gridcell（格子内多个 Tab 停留点与复合角色冲突），按结构断言。
+  await expect(dashboard.locator('.month-grid')).toBeVisible();
 
   const dates = await dashboard.locator('[data-date]').evaluateAll((cells) => cells.map((cell) => cell.dataset.date));
-  const todayCell = dashboard.locator('[role="gridcell"][aria-current="date"]');
+  const todayCell = dashboard.locator('[data-date][aria-current="date"]');
   await expect(todayCell).toHaveAttribute('tabindex', '0');
   const today = await todayCell.getAttribute('data-date');
   const index = dates.indexOf(today);

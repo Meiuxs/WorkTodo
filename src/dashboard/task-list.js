@@ -82,7 +82,8 @@ function taskActions(task, today) {
   if (task.trashedAt !== null) {
     // 恢复由行首圆环按钮承担，所以这里只剩一个低频的破坏性动作。
     // 单个动作藏进「更多」要多一次展开，因此它不套菜单外壳，直接作为行内按钮。
-    actions.push('<button type="button" class="task__danger" data-action="delete-permanently">永久删除</button>');
+    // 可访问名带上任务标题：回收站里每行都有同名按钮时，读屏无法分辨动作对象。
+    actions.push(`<button type="button" class="task__danger" data-action="delete-permanently" aria-label="永久删除 ${escapeHtml(task.title)}">永久删除</button>`);
     return actions.join('');
   }
   if (task.lifecycle === 'todo') actions.push('<button type="button" data-action="start">开始</button>');
@@ -152,8 +153,13 @@ function taskMarkup(task, today, tags, resourceCounts, children = []) {
     ? ` · 子任务 ${children.filter((child) => child.lifecycle === 'completed').length}/${children.length}`
     : '';
   const priorityLabel = taskPriorityLabel(task.priority);
-  // 隐藏的元信息锚点兼作 P 键循环的当前值载体，避免为快捷键再渲染一个可见控件。
-  const priorityMarkup = ` · <span class="task__priority" data-action="cycle-priority" data-priority="${escapeHtml(task.priority)}">${priorityLabel}</span>`;
+  // 无优先级是默认状态，不在任务行重复展示；P 键仍通过缺省值继续从“无优先级”开始循环。
+  const priorityMarkup = task.priority === 'none'
+    ? ''
+    : ` · <span class="task__priority task__priority--${escapeHtml(task.priority)}" data-action="cycle-priority" data-priority="${escapeHtml(task.priority)}">${priorityLabel}</span>`;
+  const starMarkup = task.starred
+    ? '<span class="task__star" role="img" aria-label="已标记星标" title="已标记星标">★</span>'
+    : '';
   // 恢复不是勾选行为：可恢复的行用普通按钮，避免读屏把动作读成复选框的状态切换。
   const checkAttributes = canRestore
     ? 'aria-label="恢复任务"'
@@ -163,7 +169,7 @@ function taskMarkup(task, today, tags, resourceCounts, children = []) {
   const moreMarkup = trashed
     ? taskActions(task, today)
     : `<details class="task__more">
-      <summary aria-label="更多任务操作" aria-haspopup="true" aria-expanded="false">更多</summary>
+      <summary aria-label="更多任务操作：${escapeHtml(task.title)}" aria-haspopup="true" aria-expanded="false">更多</summary>
       <div class="task__menu">
         ${taskActions(task, today)}
       </div>
@@ -171,50 +177,38 @@ function taskMarkup(task, today, tags, resourceCounts, children = []) {
   return `<article class="task task--${escapeHtml(task.lifecycle)}${overdue ? ' task--overdue' : ''}" data-task-id="${escapeHtml(task.id)}" data-revision="${task.revision}" role="listitem">
     <button class="task__check" type="button" ${checkAttributes} data-action="${checkboxAction}">${checked ? '✓' : ''}</button>
     <div class="task__body">
-      <button class="task__title" type="button" data-action="edit" title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</button>
-      <span class="task__meta"><span class="task__status">${status}</span> · ${escapeHtml(taskMeta(task, today))}${priorityMarkup}${task.starred ? ' · 已星标' : ''}${tagMarkup}${subtaskLabel}${resourceLabel}</span>
+      <div class="task__title-line">
+        ${starMarkup}
+        <button class="task__title" type="button" data-action="edit" title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</button>
+      </div>
+      <span class="task__meta"><span class="task__status">${status}</span> · ${escapeHtml(taskMeta(task, today))}${priorityMarkup}${tagMarkup}${subtaskLabel}${resourceLabel}</span>
     </div>
     ${moreMarkup}
     ${children.length === 0 ? '' : `<ul class="task__subtasks" role="group" aria-label="子任务">${children.map((child) => subtaskMarkup(child, today)).join('')}</ul>`}
   </article>`;
 }
 
+/* 页面级空状态唯一结构（规范 §5.1）：标题 + 说明 + 可选的唯一主入口。
+   首屏渲染与列表"满→空"过渡共用同一函数，避免两处文案/结构漂移。 */
+export function emptyStateMarkup({ title, text, action }) {
+  return `<div class="empty-state">
+    <p class="empty-state__title">${escapeHtml(title)}</p>
+    <p class="empty-state__text">${escapeHtml(text)}</p>
+    ${action === undefined ? '' : `<button type="button" class="button-primary empty-state__action" data-focus-quick-add>${escapeHtml(action)}</button>`}
+  </div>`;
+}
+
 export function renderTaskRow(task, { today, tags = [], resourceCounts = new Map(), childrenByParent = new Map() } = {}) {
   return taskMarkup(task, today, tags, resourceCounts, childrenByParent.get(task.id) ?? []);
 }
 
-export function renderTaskList(container, tasks, {
-  today,
-  onAction,
-  onEdit,
-  onError = () => {},
-  emptyMessage = '这里暂时没有任务。',
-  tags = [],
-  resourceCounts = new Map(),
-  childrenByParent = new Map(),
-} = {}) {
-  if (!Array.isArray(tasks) || tasks.length === 0) {
-    // 月历格传空字符串表示"这一格不需要占位文案"。此时必须什么都不渲染，
-    // 否则空的 <p class="empty"> 会在每个空格子里留下一条悬空横线（.empty 自带下边框）。
-    container.innerHTML = emptyMessage === '' ? '' : `<p class="empty">${escapeHtml(emptyMessage)}</p>`;
-    container.onclick = null;
-    return;
-  }
-
-  let visibleCount = Math.min(tasks.length, 200);
-  const renderVisible = () => {
-    const visibleTasks = tasks.slice(0, visibleCount);
-    const more = visibleCount < tasks.length
-      ? `<button type="button" class="button-secondary task-list__more" data-load-more>加载更多（还有 ${tasks.length - visibleCount} 项）</button>`
-      : '';
-    container.innerHTML = `<div class="task-list" role="list">${visibleTasks.map((task) => taskMarkup(task, today, tags, resourceCounts, childrenByParent.get(task.id) ?? [])).join('')}</div>${more}`;
-  };
-  renderVisible();
+/* 事件委托必须在列表为空时也绑定：动作后 list-patch 可能把第一行直接插入
+   原本只有空状态的容器，如果此时才绑定，菜单能展开但里面的动作没有入口。 */
+function bindTaskListInteractions(container, { onAction, onEdit, onError, onLoadMore = null }) {
   container.onclick = async (event) => {
     const loadMore = event.target.closest('[data-load-more]');
     if (loadMore !== null) {
-      visibleCount = Math.min(visibleCount + 200, tasks.length);
-      renderVisible();
+      await onLoadMore?.();
       return;
     }
     const button = event.target.closest('button[data-action]');
@@ -295,6 +289,44 @@ export function renderTaskList(container, tasks, {
     details.open = true;
     firstDate.focus();
   };
+}
+
+export function renderTaskList(container, tasks, {
+  today,
+  onAction,
+  onEdit,
+  onError = () => {},
+  emptyMessage = '这里暂时没有任务。',
+  tags = [],
+  resourceCounts = new Map(),
+  childrenByParent = new Map(),
+} = {}) {
+  if (!Array.isArray(tasks) || tasks.length === 0) {
+    // 月历格传空字符串表示"这一格不需要占位文案"。此时必须什么都不渲染，
+    // 否则空的 <p class="empty"> 会在每个空格子里留下一条悬空横线（.empty 自带下边框）。
+    container.innerHTML = emptyMessage === '' ? '' : `<p class="empty">${escapeHtml(emptyMessage)}</p>`;
+    bindTaskListInteractions(container, { onAction, onEdit, onError });
+    return;
+  }
+
+  let visibleCount = Math.min(tasks.length, 200);
+  const renderVisible = () => {
+    const visibleTasks = tasks.slice(0, visibleCount);
+    const more = visibleCount < tasks.length
+      ? `<button type="button" class="button-secondary task-list__more" data-load-more>加载更多（还有 ${tasks.length - visibleCount} 项）</button>`
+      : '';
+    container.innerHTML = `<div class="task-list" role="list">${visibleTasks.map((task) => taskMarkup(task, today, tags, resourceCounts, childrenByParent.get(task.id) ?? [])).join('')}</div>${more}`;
+  };
+  renderVisible();
+  bindTaskListInteractions(container, {
+    onAction,
+    onEdit,
+    onError,
+    onLoadMore: () => {
+      visibleCount = Math.min(visibleCount + 200, tasks.length);
+      renderVisible();
+    },
+  });
 }
 
 /* 本模块也被 Node 单测引用，DOM 级监听只在浏览器环境注册。 */

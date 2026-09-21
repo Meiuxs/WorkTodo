@@ -95,7 +95,8 @@ export function createAllTasksView({ root, query, taskService, tagService, today
       tags,
       resourceCounts,
       childrenByParent,
-      emptyMessage: '没有符合当前筛选条件的任务。',
+      // 筛选后为空要把下一步说清：“清空筛选”是表单里常驻按钮，不声明方位也能找到。
+      emptyMessage: '没有符合当前筛选条件的任务，调整条件或清空筛选即可回到全部结果。',
     });
     filterCount.textContent = `显示 ${topLevel.length} 项`;
   }

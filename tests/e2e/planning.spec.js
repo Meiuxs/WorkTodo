@@ -186,7 +186,7 @@ test('月历展示当前月份任务并支持切换月份', async ({ extension }
 
   await page.getByRole('button', { name: '月历', exact: true }).click();
   await expect(page.locator('#page-title')).toHaveText('月历');
-  await expect(page.getByRole('grid')).toBeVisible();
+  await expect(page.locator('.month-grid')).toBeVisible();
   await expect(page.getByRole('button', { name: '月历任务', exact: true })).toBeVisible();
   const currentMonth = await page.locator('[data-month-label]').textContent();
   await page.getByRole('button', { name: '下个月', exact: true }).click();
@@ -228,7 +228,7 @@ test('月历在 390px 下可键盘打开任务且没有横向溢出', async ({ e
 test('月历连续切换月份时旧请求不会覆盖最新月份', async ({ extension }) => {
   const page = await openDashboard(extension);
   await page.getByRole('button', { name: '月历', exact: true }).click();
-  await expect(page.getByRole('grid')).toBeVisible();
+  await expect(page.locator('.month-grid')).toBeVisible();
 
   const initialMonth = await page.locator('[data-month-label]').textContent();
   const expectedMonth = await page.evaluate((label) => {
@@ -266,7 +266,7 @@ test('月历旧月份请求失败时静默丢弃', async ({ extension }) => {
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
   await page.getByRole('button', { name: '月历', exact: true }).click();
-  await expect(page.getByRole('grid')).toBeVisible();
+  await expect(page.locator('.month-grid')).toBeVisible();
 
   await page.evaluate(async () => {
     window.__planningErrors = [];

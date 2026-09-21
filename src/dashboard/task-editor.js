@@ -159,7 +159,7 @@ export function createTaskEditor({
     setGroupVisible('resources', true);
     resourceCount.textContent = String(items.length);
     resourceList.innerHTML = items.length === 0
-      ? '<p class="muted">还没有关联资料。</p>'
+      ? '<p class="empty">还没有关联资料。</p>'
       : items.map((resource) => `<div class="editor-resource-row"><span><strong>${escapeHtml(resource.title)}</strong><small>${resource.type === 'url' ? '网页链接' : resource.type === 'file' ? `本地文件 · ${escapeHtml(resource.fileName)}` : '文本片段'}</small></span><button type="button" data-resource-detach="${escapeHtml(resource.id)}">解除关联</button></div>`).join('');
     renderGroupSummaries();
   }
@@ -174,7 +174,7 @@ export function createTaskEditor({
   function populateTags(items, selectedIds = []) {
     const selected = new Set(selectedIds);
     tagOptions.innerHTML = items.length === 0
-      ? '<p class="muted">尚未创建标签。</p>'
+      ? '<p class="empty">还没有标签。新建标签后可在这里勾选。</p>'
       : items.map((tag) => `<label class="tag-option"><input type="checkbox" name="tagIds" value="${escapeHtml(tag.id)}" ${selected.has(tag.id) ? 'checked' : ''}> ${escapeHtml(tag.name)}</label>`).join('');
     renderGroupSummaries();
   }

@@ -28,8 +28,8 @@ test('窄屏下回收站行内删除与设置页危险动作都不产生横向�
     has: dashboard.getByRole('button', { name: '窄屏删除任务' }),
   });
   await row.getByText('更多', { exact: true }).click();
+  // 移入回收站已取消确认框：一次点击直接执行。
   await row.getByRole('button', { name: '移入回收站', exact: true }).click();
-  await dashboard.locator('#confirm-dialog').getByRole('button', { name: '移入回收站' }).click();
 
   const measure = () => dashboard.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,

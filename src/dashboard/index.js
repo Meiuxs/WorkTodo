@@ -76,6 +76,9 @@ const app = document.querySelector('.app');
 let controller;
 let toastTimer;
 const undoController = new UndoController();
+// 移出可见列表且无确认框的动作（移入回收站、取消）用的加长撤销窗口：
+// 行一旦离开视线就没有二次机会，5 秒不够把手放回鼠标。
+const TRASH_UNDO_WINDOW = 10000;
 
 async function getResourceCounts(tasks) {
   return new Map(await Promise.all(tasks.map(async (task) => [task.id, (await resourceService.listTaskIds(task.id)).length])));
@@ -90,11 +93,11 @@ function formatWorkspaceDate(date) {
     .format(new Date(`${date}T00:00:00`));
 }
 
-function showToast(message, { actionLabel = null, onAction = null } = {}) {
+function showToast(message, { actionLabel = null, onAction = null, duration = 5000 } = {}) {
   clearTimeout(toastTimer);
   toast.replaceChildren(document.createTextNode(message));
   if (actionLabel !== null && onAction !== null) {
-    undoController.offer({ message, undo: onAction });
+    undoController.offer({ message, undo: onAction }, duration);
     const button = document.createElement('button');
     button.type = 'button';
     button.textContent = actionLabel;
@@ -114,7 +117,7 @@ function showToast(message, { actionLabel = null, onAction = null } = {}) {
   toastTimer = setTimeout(() => {
     toast.hidden = true;
     undoController.dismiss();
-  }, 5000);
+  }, duration);
 }
 
 function confirmAction({ title, message, confirmLabel = null }) {
@@ -165,22 +168,18 @@ async function onAction(action, taskId, revision, value) {
     showToast(children.length > 0 ? `已完成父任务和 ${children.length} 个子任务` : '已完成任务', {
       actionLabel: '撤销',
       onAction: async () => {
-        await controller.handleTaskAction('restore', taskId, result.task.revision).catch(onError);
-        for (const child of children) {
-          await controller.handleTaskAction('restore', child.id, child.revision).catch(onError);
+        try {
+          await controller.handleTaskAction('restore', taskId, result.task.revision);
+          for (const child of children) {
+            await controller.handleTaskAction('restore', child.id, child.revision);
+          }
+          showToast(children.length > 0 ? '已撤销完成' : '已恢复为待办');
+        } catch (error) {
+          onError(error);
         }
       },
     });
     return result;
-  }
-
-  if (action === 'trash') {
-    const confirmed = await confirmAction({
-      title: '移入回收站？',
-      message: '任务会从当前列表移除，但历史字段会保留。你可以在五秒内撤销。',
-      confirmLabel: '移入回收站',
-    });
-    if (!confirmed) return null;
   }
 
   if (action === 'delete-permanently') {
@@ -196,17 +195,38 @@ async function onAction(action, taskId, revision, value) {
   if (action === 'cancel') {
     showToast('已取消任务', {
       actionLabel: '撤销',
-      onAction: () => controller.handleTaskAction('restore', taskId, result.task.revision).catch(onError),
+      duration: TRASH_UNDO_WINDOW,
+      onAction: async () => {
+        try {
+          await controller.handleTaskAction('restore', taskId, result.task.revision);
+          showToast('已恢复为待办');
+        } catch (error) {
+          onError(error);
+        }
+      },
     });
   } else if (action === 'trash') {
-    showToast('已移入回收站', {
+    // 移入回收站不再叠加确认框：它本来就可撤销，确认 + 撤销是双摩擦。
+    // 代价是误触即走，所以把撤销窗口加长，并把它写进 Toast 文案。
+    showToast('已移入回收站，10 秒内可撤销', {
       actionLabel: '撤销',
-      onAction: () => controller.handleTaskAction('untrash', taskId, result.task.revision).catch(onError),
+      duration: TRASH_UNDO_WINDOW,
+      onAction: async () => {
+        try {
+          await controller.handleTaskAction('untrash', taskId, result.task.revision);
+          showToast('已恢复任务');
+        } catch (error) {
+          onError(error);
+        }
+      },
     });
   } else if (action === 'cycle-priority') {
     // P 键循环优先级：菜单里没有对应按钮，Toast 是唯一的结果反馈，必须报出新档位。
     const labels = { none: '无优先级', low: '低优先级', medium: '中优先级', high: '高优先级' };
     showToast(`已设为${labels[result.task.priority] ?? '无优先级'}`);
+  } else if (action === 'set-starred') {
+    // 开关类动作必须报出新状态，否则用户只能重开菜单确认；与 P 键同等处理。
+    showToast(result.task.starred ? '已加星标' : '已取消星标');
   } else if (action === 'postpone') {
     // 日期在界面上只写中文格式，ISO 只留在数据层与导出文件里。
     showToast(value ? `已延期到 ${formatLocalDay(value)}` : '任务已更新');
@@ -218,6 +238,8 @@ async function onAction(action, taskId, revision, value) {
     showToast('已永久删除');
   } else if (action === 'untrash') {
     showToast('已恢复任务');
+  } else if (action === 'restore') {
+    showToast('已恢复为待办');
   } else {
     showToast('任务已更新');
   }

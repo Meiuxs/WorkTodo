@@ -134,7 +134,7 @@ export function createHistoryView({
           <p class="history-day-summary">${summary.completedCount === 0 ? '今天还没有完成记录，先完成一件小事，再回来看看进度。' : `今天完成 ${summary.completedCount} 项，计划任务 ${summary.plannedCount} 项。`}</p>`;
       root.innerHTML = `<section class="view-section" aria-labelledby="history-heading">
         <div class="section-heading">
-          <div><h2 id="history-heading">工作记录</h2><p>完成记录按实际完成日期统计；计划任务按计划日期统计。</p></div>
+          <div><h2 id="history-heading">工作记录</h2><p>完成记录看实际完成日期，计划任务看计划日期。</p></div>
           <div class="segmented-control" role="group" aria-label="记录范围">
             <button type="button" data-history-mode="daily" aria-pressed="${requestedMode === 'daily'}">按日</button>
             <button type="button" data-history-mode="weekly" aria-pressed="${requestedMode === 'weekly'}">按周</button>
@@ -168,7 +168,7 @@ export function createHistoryView({
         <section class="summary-panel" aria-labelledby="history-summary-heading">
           <div>
             <h3 id="history-summary-heading">规则模板总结</h3>
-            <p>只使用本地统计和已完成任务标题生成纯文本。</p>
+            <p>总结在本机生成，不上传任何内容。</p>
           </div>
           <div class="summary-actions" role="group" aria-label="生成总结">
             <button type="button" class="button-secondary" data-summary-kind="week">生成本周总结</button>

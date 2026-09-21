@@ -1,4 +1,4 @@
-import { renderTaskList, renderTaskRow, arrangeSubtasks } from '../task-list.js';
+import { renderTaskList, renderTaskRow, arrangeSubtasks, emptyStateMarkup } from '../task-list.js';
 import { patchTaskContainers } from '../list-patch.js';
 import { escapeHtml } from '../../shared/ui.js';
 
@@ -11,6 +11,20 @@ function formatDate(date) {
 }
 
 export function createTodayView({ root, query, statistics, today, onAction, onEdit, onError, getResourceCounts }) {
+  // 首屏空状态：不止告诉用户"没有任务"，还要把唯一的下一步动作递到手上。
+  function plannedEmpty() {
+    return emptyStateMarkup({
+      title: '今天还没有待办',
+      text: '在上方快速记录里写下一件要做的事，按 Enter 保存后就会出现在这里。',
+      action: '记录第一件事',
+    });
+  }
+  function bindEmptyStateActions() {
+    root.querySelector('[data-focus-quick-add]')?.addEventListener('click', () => {
+      document.querySelector('#quick-add-title')?.focus();
+    });
+  }
+
   async function loadData(signal) {
     const date = today();
     const [tasks, completed, summary] = await Promise.all([
@@ -85,14 +99,8 @@ export function createTodayView({ root, query, statistics, today, onAction, onEd
           emptyMessage: '没有逾期任务。',
         });
       }
-      // 首屏空状态：不止告诉用户"没有任务"，还要把唯一的下一步动作递到手上。
-      // 这个 [data-focus-quick-add] 按钮此前只存在于下方的事件绑定里、从未被渲染出来。
       if (planned.length === 0) {
-        root.querySelector('#today-list').innerHTML = `<div class="empty-state">
-          <p class="empty-state__title">今天还没有待办</p>
-          <p class="empty-state__text">在上方快速记录里写下一件要做的事，按 Enter 保存后就会出现在这里。</p>
-          <button type="button" class="button-primary empty-state__action" data-focus-quick-add>记录第一件事</button>
-        </div>`;
+        root.querySelector('#today-list').innerHTML = plannedEmpty();
       } else {
         renderTaskList(root.querySelector('#today-list'), planned, listOptions);
       }
@@ -100,9 +108,7 @@ export function createTodayView({ root, query, statistics, today, onAction, onEd
         ...listOptions,
         emptyMessage: '今天还没有完成记录。',
       });
-      root.querySelector('[data-focus-quick-add]')?.addEventListener('click', () => {
-        document.querySelector('#quick-add-title')?.focus();
-      });
+      bindEmptyStateActions();
       root.querySelector('[data-next-task]')?.addEventListener('click', () => {
         onEdit(root.querySelector('[data-next-task]').dataset.nextTask);
       });
@@ -119,7 +125,14 @@ export function createTodayView({ root, query, statistics, today, onAction, onEd
       // 折叠区的完成列表也在受管范围内：刚完成的任务从“今天”迁进“已完成”时，
       // 协调算法能搬移节点而不是把它当成孤儿回退整页渲染。
       const containers = [
-        { container: root.querySelector('#today-list'), tasks: planned },
+        {
+          container: root.querySelector('#today-list'),
+          tasks: planned,
+          onEmpty: () => {
+            root.querySelector('#today-list').innerHTML = plannedEmpty();
+            bindEmptyStateActions();
+          },
+        },
         { container: root.querySelector('#completed-today-list'), tasks: completed },
       ];
       if (overdue.length > 0) containers.unshift({ container: root.querySelector('#overdue-list'), tasks: overdue });

@@ -88,21 +88,22 @@ test('回收站可以恢复任务，永久删除任务需要二次确认', async
   await page.getByRole('button', { name: '记录', exact: true }).click();
   const row = page.locator('[data-task-id]').filter({ has: page.getByRole('button', { name: '待删除任务' }) });
   await row.getByText('更多', { exact: true }).click();
+  // 可撤销的移入回收站不再叠加确认：一次点击直接执行。
   await row.getByRole('button', { name: '移入回收站', exact: true }).click();
-  await page.locator('#confirm-dialog').getByRole('button', { name: '移入回收站' }).click();
 
   await page.getByRole('button', { name: '回收站', exact: true }).click();
-  await expect(page.getByRole('button', { name: '待删除任务' })).toBeVisible();
+  // 标题按钮用 exact：同行的「永久删除」可访问名含任务标题，子串匹配会撞出两个元素。
+  await expect(page.getByRole('button', { name: '待删除任务', exact: true })).toBeVisible();
   // 已删行只剩「永久删除」一个动作，因此不再套「更多」菜单，直接点行内按钮。
   await row.getByRole('button', { name: '永久删除' }).click();
   const confirmation = page.locator('#confirm-dialog');
   await expect(confirmation.getByRole('heading', { name: '永久删除任务？' })).toBeVisible();
   await confirmation.getByRole('button', { name: '取消' }).click();
-  await expect(page.getByRole('button', { name: '待删除任务' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '待删除任务', exact: true })).toBeVisible();
   // 取消后焦点回到触发按钮，不必重新展开任何菜单即可重试。
   await row.getByRole('button', { name: '永久删除' }).click();
   await confirmation.getByRole('button', { name: '永久删除' }).click();
-  await expect(page.getByRole('button', { name: '待删除任务' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '待删除任务', exact: true })).toHaveCount(0);
 });
 
 test('回收站主复选框恢复四种状态并只清空 trashedAt', async ({ extension }) => {
@@ -346,8 +347,8 @@ test('回收站行直接展示永久删除，不再套更多菜单', async ({ ex
 
   const row = page.locator('[data-task-id="trashed-row"]');
   // 唯一动作不再藏在菜单里。
-  await expect(row.locator('summary[aria-label="更多任务操作"]')).toHaveCount(0);
-  await expect(row.getByRole('button', { name: '永久删除', exact: true })).toBeVisible();
+  await expect(row.locator('summary[aria-label^="更多任务操作"]')).toHaveCount(0);
+  await expect(row.getByRole('button', { name: '永久删除 回收站行', exact: true })).toBeVisible();
   // 恢复仍由行首圆环承担，不得出现第二个恢复入口。
   await expect(row.locator('.task__check')).toHaveAttribute('data-action', 'untrash');
   await expect(row.getByRole('button', { name: '恢复任务', exact: true })).toHaveCount(1);

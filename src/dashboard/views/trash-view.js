@@ -8,7 +8,7 @@ export function createTrashView({ root, query, today, onAction, onEdit, onError,
       const resourceCounts = await getResourceCounts?.(tasks) ?? new Map();
 
       root.innerHTML = `<section class="view-section" aria-labelledby="trash-heading">
-        <div class="section-heading"><div><h2 id="trash-heading">回收站 · ${tasks.length}</h2></div></div>
+        <div class="section-heading"><div><h2 id="trash-heading">回收站 · ${tasks.length}</h2><p>删除的任务在这里等待恢复或永久删除；永久删除前会再次确认。</p></div></div>
         <div id="trash-list"></div>
       </section>`;
       const list = root.querySelector('#trash-list');

@@ -57,16 +57,18 @@ export function createMonthView({
             <button type="button" data-month-nav="1">下个月</button>
           </div>
         </div>
-        <div class="month-grid" role="grid" aria-label="${label}">
-          <div class="month-weekdays" role="row">
-            ${weekdays.map((weekday) => `<span class="month-weekday" role="columnheader">${weekday}</span>`).join('')}
+        <div class="month-grid" aria-label="${label}">
+          <div class="month-weekdays" aria-hidden="true">
+            ${weekdays.map((weekday) => `<span class="month-weekday">${weekday}</span>`).join('')}
           </div>
-          ${calendar.weeks.map((week) => `<div class="month-week" role="row">
+          ${calendar.weeks.map((week) => `<div class="month-week">
             ${week.map((date) => {
               const inMonth = date >= calendar.startDate && date <= calendar.endDate;
               const isToday = date === currentDate;
               const taskCount = (calendar.byDate[date] ?? []).length;
-              return `<section class="month-day${inMonth ? '' : ' month-day--muted'}${isToday ? ' month-day--today' : ''}${taskCount > 0 ? ' month-day--planned' : ''}" role="gridcell"${isToday ? ' aria-current="date"' : ''} data-date="${date}">
+              // 不声明 grid/gridcell：格子里有完成、编辑、菜单等多个 Tab 停留点，
+              // 复合角色的箭头键浏览模式会和内部控件打架；星期由日期格自己的标签表达。
+              return `<section class="month-day${inMonth ? '' : ' month-day--muted'}${isToday ? ' month-day--today' : ''}${taskCount > 0 ? ' month-day--planned' : ''}" aria-label="${formatLocalDay(date)} ${weekdayLabel(date)}${isToday ? '，今天' : ''}"${isToday ? ' aria-current="date"' : ''} data-date="${date}">
                 <div class="month-day__header"><h3>${formatLocalDay(date)}</h3>${taskCount > 0 ? `<span class="month-day__count">${taskCount}</span>` : ''}</div>
                 <div class="month-day__tasks"></div>
               </section>`;
@@ -85,7 +87,7 @@ export function createMonthView({
         });
       }
 
-      // 声明了 role="grid" 就要提供方向键导航：左右移动一天，上下移动一周，Home/End 到本周首尾。
+      // 日期格子之间的方向键增强（非复合角色要求）：左右移动一天，上下移动一周，Home/End 到本周首尾。
       const cells = [...root.querySelectorAll('[data-date]')];
       const startCell = cells.find((cell) => cell.dataset.date === currentDate) ?? cells[0];
       let focusedIndex = cells.indexOf(startCell);
