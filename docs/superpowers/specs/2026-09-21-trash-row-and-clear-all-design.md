@@ -103,7 +103,8 @@ function taskActions(task, today) {
 
 `settings-view.js` 的数据管理节新增，与现有 `.data-actions` 分开：
 
-- 一个独立容器（`.data-danger`），上方 `border-top: 1px solid var(--line)` 与 `--sp-5` 留白，把危险动作和「导出 JSON 备份 / 导出 CSV / 选择导入文件」三个安全按钮在视觉上断开。
+- 一个独立区块（`.view-section--danger` 里的 `.danger-zone`），位于设置页最下方，整块用 `1px solid var(--coral)` 边界包围、标题用 `--coral`，把危险动作和「导出 JSON 备份 / 导出 CSV / 选择导入文件」三个安全按钮分开在不同屏幕位置。
+- 后续修订（见主设计文档 §4.13）：危险动作不再留在数据管理区里的 `.data-danger` 分隔线下方，而是独立成「危险区域」区块；数据管理区只保留三个安全动作。
 - 一句说明文案，交代清除范围与保留项，让用户在点之前就知道会发生什么。
 - 按钮 `class="button-danger"`（`index.css:648-650` 已有，hover 用更深的 `--coral-strong`），文案「清除所有数据」。
 - 结果反馈复用现有 `#data-state` 区域（`role="status"`）。

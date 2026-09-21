@@ -256,7 +256,7 @@ export function createSettingsView({
     if (signal?.aborted) return;
     const metadata = metadataValue ?? {};
     const selectedTheme = THEME_SETTINGS.includes(settings?.theme) ? settings.theme : 'system';
-    root.innerHTML = `<section class="view-section" aria-labelledby="appearance-heading">
+    root.innerHTML = `<section class="view-section view-section--panel" aria-labelledby="appearance-heading">
       <div class="section-heading">
         <div><h2 id="appearance-heading">外观</h2></div>
       </div>
@@ -268,7 +268,7 @@ export function createSettingsView({
         </select>
       </label>
     </section>
-    <section class="view-section" aria-labelledby="data-management-heading">
+    <section class="view-section view-section--panel" aria-labelledby="data-management-heading">
       <div class="section-heading">
         <div><h2 id="data-management-heading">数据管理</h2><p>扩展卸载会清除本地数据。重要工作请定期导出 JSON 备份。</p></div>
         <span class="data-timestamp">最近导出：${metadata.lastExportedAt ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(metadata.lastExportedAt)) : '尚未导出'}</span>
@@ -278,10 +278,6 @@ export function createSettingsView({
         <button type="button" id="export-csv" class="button-secondary">导出 CSV</button>
         <label class="button-secondary file-picker">选择导入文件<input id="import-file" type="file" accept="application/json,.json"></label>
       </div>
-      <div class="data-danger">
-        <p class="data-danger__hint">清除本机的全部工作数据，保留主题等偏好设置。</p>
-        <button type="button" id="clear-all-data" class="button-danger">清除所有数据</button>
-      </div>
       <div id="data-state"></div>
       <dialog class="modal" id="import-confirm">
         <form method="dialog">
@@ -290,16 +286,8 @@ export function createSettingsView({
           <div class="dialog-actions"><button value="cancel">取消</button><button class="button-danger" value="confirm" data-import-confirm-submit>确认导入</button></div>
         </form>
       </dialog>
-      <dialog class="modal" id="clear-all-dialog">
-        <form method="dialog">
-          <h2>清除所有数据？</h2>
-          <p>会删除全部任务、列表、标签、资料、重复规则和工作记录，并清空回收站。主题等偏好设置会保留。</p>
-          <p>清除后无法恢复，也不能撤销。建议先导出 JSON 备份。</p>
-          <div class="dialog-actions"><button value="cancel">取消</button><button class="button-danger" value="confirm">清除所有数据</button></div>
-        </form>
-      </dialog>
     </section>
-    <section class="view-section" aria-labelledby="category-heading">
+    <section class="view-section view-section--panel" aria-labelledby="category-heading">
       <div class="section-heading">
         <div><h2 id="category-heading">列表</h2><p>删除列表时必须把任务迁移到未归入列表或其他列表，任务本身不会删除。</p></div>
       </div>
@@ -320,22 +308,39 @@ export function createSettingsView({
         </form>
       </dialog>
     </section>
-    <section class="view-section" aria-labelledby="shortcuts-heading">
+    <section class="view-section view-section--panel" aria-labelledby="shortcuts-heading">
       <div class="section-heading">
         <div><h2 id="shortcuts-heading">键盘快捷键</h2><p>焦点在输入框里时页面快捷键不生效；弹窗打开期间全局快捷键暂停。</p></div>
       </div>
-      <table class="shortcuts-table">
+      <table class="shortcuts-table" role="table">
         <caption class="sr-only">工作台键盘快捷键清单</caption>
-        <tbody>
-          <tr><th scope="row"><kbd class="kbd">T</kbd></td><td>回到今天</td></tr>
-          <tr><th scope="row"><kbd class="kbd">W</kbd></td><td>本周</td></tr>
-          <tr><th scope="row"><kbd class="kbd">M</kbd></td><td>月历</td></tr>
-          <tr><th scope="row"><kbd class="kbd">N</kbd></td><td>聚焦快速记录输入框</td></tr>
-          <tr><th scope="row"><kbd class="kbd">F</kbd></td><td>聚焦全部任务的搜索框</td></tr>
-          <tr><th scope="row"><kbd class="kbd">D</kbd></td><td>在任务行上：展开菜单并选中改期首项</td></tr>
-          <tr><th scope="row"><kbd class="kbd">P</kbd></td><td>在任务行上：循环优先级（无→低→中→高）</td></tr>
+        <tbody role="rowgroup">
+          <tr role="row"><th scope="row" role="rowheader"><kbd class="kbd">T</kbd></th><td role="cell">回到今天</td></tr>
+          <tr role="row"><th scope="row" role="rowheader"><kbd class="kbd">W</kbd></th><td role="cell">本周</td></tr>
+          <tr role="row"><th scope="row" role="rowheader"><kbd class="kbd">M</kbd></th><td role="cell">月历</td></tr>
+          <tr role="row"><th scope="row" role="rowheader"><kbd class="kbd">N</kbd></th><td role="cell">聚焦快速记录输入框</td></tr>
+          <tr role="row"><th scope="row" role="rowheader"><kbd class="kbd">F</kbd></th><td role="cell">聚焦全部任务的搜索框</td></tr>
+          <tr role="row"><th scope="row" role="rowheader"><kbd class="kbd">D</kbd></th><td role="cell">在任务行上：展开菜单并选中改期首项</td></tr>
+          <tr role="row"><th scope="row" role="rowheader"><kbd class="kbd">P</kbd></th><td role="cell">在任务行上：循环优先级（无→低→中→高）</td></tr>
         </tbody>
       </table>
+    </section>
+    <section class="view-section view-section--danger" aria-labelledby="danger-zone-heading">
+      <div class="danger-zone">
+        <div class="danger-zone__body">
+          <h2 id="danger-zone-heading">危险区域</h2>
+          <p>清除本机的全部任务、列表、标签、资料和工作记录，并清空回收站；主题等偏好设置会保留。清除后无法恢复，建议先导出 JSON 备份。</p>
+        </div>
+        <button type="button" id="clear-all-data" class="button-danger">清除所有数据</button>
+      </div>
+      <dialog class="modal" id="clear-all-dialog">
+        <form method="dialog">
+          <h2>清除所有数据？</h2>
+          <p>会删除全部任务、列表、标签、资料、重复规则和工作记录，并清空回收站。主题等偏好设置会保留。</p>
+          <p>清除后无法恢复，也不能撤销。建议先导出 JSON 备份。</p>
+          <div class="dialog-actions"><button value="cancel">取消</button><button class="button-danger" value="confirm">清除所有数据</button></div>
+        </form>
+      </dialog>
     </section>`;
 
     const themeSelect = root.querySelector('[data-theme-setting]');

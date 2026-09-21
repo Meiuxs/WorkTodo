@@ -997,6 +997,20 @@ input::placeholder { color: var(--muted); }
 }
 
 /* ============ 设置页 ============ */
+/* 外观、数据管理、列表、快捷键四类设置互不相关，各自装进一块分区面板：
+   视线在区块之间移动的距离比"只有一条分隔线"的松散长列表短得多。
+   面板只用 --shadow-card 这一档抬起暗示，完整投影留给抽屉、菜单和 Toast。
+   选择器带 :first-child 是因为共享的 .view-section:first-child 会抹掉首块的面板边界。 */
+.view-section--panel,
+.view-section--panel:first-child {
+  margin-top: var(--sp-6);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-card);
+  padding: var(--sp-6);
+}
+.view-section--panel:first-child { margin-top: 0; }
 .data-timestamp { color: var(--muted); font-size: var(--fs-caption); }
 .theme-setting { max-width: 260px; }
 /* 快捷键键帽：只在设置页的完整清单里出现，不在入口就地展示。 */
@@ -1014,29 +1028,52 @@ input::placeholder { color: var(--muted); }
   font-size: var(--fs-caption);
   font-weight: 700;
 }
-.shortcuts-table { width: 100%; border-collapse: collapse; }
+/* 快捷键清单：七条平铺会占掉大半屏设置页，宽屏排两列，≤680px 回落单列（见下方断点）。
+   排布改用 grid 后浏览器不再给出隐式 table 角色，所以在标记里补了显式 role，
+   读屏和 getByRole('cell') 拿到的语义与原来一致。 */
+.shortcuts-table { display: block; width: 100%; }
 .shortcuts-table caption { color: var(--muted); font-size: var(--fs-caption); font-weight: 400; text-align: left; }
+.shortcuts-table tbody {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--sp-8);
+}
+.shortcuts-table tr {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  padding: var(--sp-3) 0;
+}
 .shortcuts-table th,
-.shortcuts-table td { border-bottom: 1px solid var(--line); padding: var(--sp-3) 0; text-align: left; font-size: var(--fs-ui); font-weight: 400; }
-.shortcuts-table th { width: 72px; }
-.shortcuts-table tr:last-child th,
-.shortcuts-table tr:last-child td { border-bottom: 0; }
+.shortcuts-table td { text-align: left; font-size: var(--fs-ui); font-weight: 400; }
+.shortcuts-table th { display: block; padding: 0; }
 .data-actions,
 .category-create,
 .category-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
-.data-actions { margin-top: var(--sp-5); }
-/* 清除所有数据是不可逆动作，与三个安全动作之间用分隔线断开，
-   避免它挨着"导出 JSON 备份"被误点。 */
-.data-danger {
+/* 三个安全动作紧跟在分区标题之下，标题自带的 margin-bottom 已经够了。 */
+.data-actions { margin-top: 0; }
+/* 危险区域：清除所有数据不可逆，单独放到页面最下方并用珊瑚色边界圈起来。
+   它和数据管理区不再同屏相邻，误触路径比"一条分隔线"长得多。 */
+.view-section--danger {
+  margin-top: var(--sp-6);
+  border-top: 0;
+  padding-top: 0;
+}
+.danger-zone {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--sp-3);
-  margin-top: var(--sp-7);
-  border-top: 1px solid var(--line);
-  padding-top: var(--sp-5);
+  justify-content: space-between;
+  gap: var(--sp-5);
+  border: 1px solid var(--coral);
+  border-radius: var(--r-md);
+  background: var(--surface-raised);
+  padding: var(--sp-5) var(--sp-6);
 }
-.data-danger__hint { margin: 0; color: var(--muted); font-size: var(--fs-caption); }
+.danger-zone__body { flex: 1 1 420px; min-width: 0; }
+.danger-zone h2 { color: var(--coral); }
+.danger-zone p { max-width: 68ch; }
+.danger-zone .button-danger { flex: 0 0 auto; }
 .file-picker { position: relative; overflow: hidden; display: inline-flex; align-items: center; cursor: pointer; }
 .file-picker input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; }
 .file-picker:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -1065,7 +1102,8 @@ input::placeholder { color: var(--muted); }
   display: grid;
   grid-template-columns: minmax(88px, auto) minmax(0, 520px) auto;
   max-width: 720px;
-  margin: var(--sp-5) 0;
+  /* 上方间距由分区标题的 margin-bottom 提供，这里只留与列表之间的间隔。 */
+  margin: 0 0 var(--sp-5);
 }
 .category-create input { min-width: 0; }
 .category-list { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
@@ -1309,6 +1347,12 @@ input::placeholder { color: var(--muted); }
   .category-create input { grid-column: 1 / -1; }
   .category-create button { grid-column: 1; }
   .category-row { grid-template-columns: 1fr; }
+  /* 窄屏两列会把每条快捷键的描述压成三五行，回落单列反而更好扫读。 */
+  .shortcuts-table tbody { grid-template-columns: minmax(0, 1fr); }
+  /* 面板在窄屏收一档内边距，否则正文可用宽度只剩两三百像素。 */
+  .view-section--panel,
+  .view-section--panel:first-child { padding: var(--sp-5); }
+  .danger-zone { padding: var(--sp-5); }
   .field-grid { grid-template-columns: 1fr; }
   .drawer-body,
   .tag-picker,

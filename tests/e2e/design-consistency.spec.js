@@ -43,6 +43,47 @@ test('设置页按数据优先级排列，初始不显示数据状态且列表�
   expect(categoryFormWidth).toBeLessThanOrEqual(720);
 });
 
+test('设置页用分区面板组织，危险动作独立成最下方的危险区域', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await dashboard.setViewportSize({ width: 1280, height: 1000 });
+  await dashboard.getByRole('button', { name: '设置', exact: true }).click();
+
+  // 四块分区面板，顺序与信息优先级一致（规范 §4.13）。
+  await expect(dashboard.locator('#view-root > .view-section--panel')).toHaveCount(4);
+
+  // 危险动作不在数据管理区的动作排里，而是单独成块并排在页面最后。
+  await expect(dashboard.locator('#data-management .button-danger')).toHaveCount(0);
+  const sections = dashboard.locator('#view-root > .view-section');
+  await expect(sections).toHaveCount(5);
+  await expect(sections.nth(4)).toHaveClass(/view-section--danger/);
+  await expect(dashboard.locator('.danger-zone #clear-all-data')).toBeVisible();
+
+  // 危险区域用珊瑚色边界圈出，与普通面板的 --line 边界不同色。
+  const dangerBorder = await dashboard.locator('.danger-zone').evaluate((node) => getComputedStyle(node).borderTopColor);
+  const panelBorder = await dashboard.locator('.view-section--panel').first().evaluate((node) => getComputedStyle(node).borderTopColor);
+  expect(dangerBorder).not.toBe(panelBorder);
+});
+
+test('快捷键清单宽屏两列、窄屏单列，语义仍是表格', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await dashboard.setViewportSize({ width: 1280, height: 1000 });
+  await dashboard.getByRole('button', { name: '设置', exact: true }).click();
+
+  const table = dashboard.locator('.shortcuts-table');
+  // 换列只改视觉列数：单元格与行表头角色保持，读屏仍能逐条读到快捷键。
+  await expect(table.getByRole('rowheader')).toHaveCount(7);
+  await expect(table.getByRole('cell')).toHaveCount(7);
+
+  const rowTops = () => table.locator('tr').evaluateAll((rows) => rows.map((row) => Math.round(row.getBoundingClientRect().top)));
+  const wideTops = await rowTops();
+  expect(wideTops[0]).toBe(wideTops[1]);
+  expect(wideTops[2]).toBeGreaterThan(wideTops[0]);
+
+  await dashboard.setViewportSize({ width: 390, height: 844 });
+  const narrowTops = await rowTops();
+  expect(new Set(narrowTops).size).toBe(narrowTops.length);
+});
+
 test('任务菜单用动作名称表达破坏性操作并只保留一个编辑入口', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('术语检查任务');
