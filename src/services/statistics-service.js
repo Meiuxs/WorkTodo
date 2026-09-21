@@ -79,7 +79,14 @@ export class StatisticsService {
     });
     events.forEach((event) => {
       if (!PLANNED_EVENT_TYPES.has(event.type)) return;
-      addPlannedDate(event.taskId, isoLocalDate(event.occurredAt));
+      // 改期事件按落点日期计入计划：只有被安排到区间内的日期才算该天计划过。
+      // 从这一天移走（"放到其他日期"）或移除计划日期（toDate 为 null）都不新增计划；
+      // 早期无 detail 的事件退回发生日期，保持旧数据可统计。
+      const hasDetail = event.detail !== null && typeof event.detail === 'object';
+      const plannedDate = hasDetail
+        ? (typeof event.detail.toDate === 'string' ? event.detail.toDate : null)
+        : isoLocalDate(event.occurredAt);
+      addPlannedDate(event.taskId, plannedDate);
     });
 
     const createdCount = createdTasks.filter((task) => task.trashedAt === null).length;

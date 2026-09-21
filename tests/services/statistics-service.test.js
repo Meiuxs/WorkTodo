@@ -176,26 +176,88 @@ test('plannedCount 合并当前计划与计划事件，并按任务和本地日�
   assert.equal(weekly.postponedCount, 2);
 });
 
-test('计划事件使用 occurredAt 的本地日期，不使用 detail.toDate', async () => {
+test('计划事件按落点日期 detail.toDate 计入，而不是改期动作发生的日期', async () => {
   const statistics = createStatistics([
-    task({ id: 'event-in-range', scheduledDate: null, firstScheduledDate: null }),
-    task({ id: 'detail-in-range', scheduledDate: null, firstScheduledDate: null }),
+    // 曾计划在本周内（09-16），后被移出本周（当前 scheduledDate 为 09-25）。
+    task({
+      id: 'moved-away',
+      scheduledDate: '2026-09-25',
+      firstScheduledDate: '2026-09-16',
+    }),
+    // 仍安排在本周内且未移动。
+    task({
+      id: 'planned',
+      scheduledDate: '2026-09-18',
+      firstScheduledDate: '2026-09-18',
+    }),
   ], [
     event({
-      id: 'event-in-range',
-      taskId: 'event-in-range',
+      id: 'moved-away-reschedule',
+      taskId: 'moved-away',
+      type: 'RESCHEDULE',
       occurredAt: localNoon('2026-09-16'),
-      detail: { toDate: '2026-09-30' },
-    }),
-    event({
-      id: 'detail-in-range',
-      taskId: 'detail-in-range',
-      occurredAt: localNoon('2026-09-30'),
-      detail: { toDate: '2026-09-16' },
+      detail: { fromDate: '2026-09-16', toDate: '2026-09-25' },
     }),
   ]);
 
-  assert.equal((await statistics.weekly('2026-09-14')).plannedCount, 1);
+  const weekly = await statistics.weekly('2026-09-14');
+
+  // 移出的任务不再计入本周计划，只保留仍安排在本周的那一项。
+  assert.equal(weekly.plannedCount, 1);
+});
+
+test('今日任务被改到其他日期后不再计入今日计划总数', async () => {
+  // 复现缺陷：今天（09-17）的任务通过“放到其他日期”改到 09-18 后，
+  // 今日列表已看不到它，但“今日进度”的分母（plannedCount）应同步下降。
+  const statistics = createStatistics([
+    task({
+      id: 'moved-out',
+      scheduledDate: '2026-09-18',
+      firstScheduledDate: '2026-09-17',
+    }),
+    task({
+      id: 'stays-today',
+      scheduledDate: '2026-09-17',
+      firstScheduledDate: '2026-09-17',
+    }),
+  ], [
+    event({
+      id: 'moved-out-reschedule',
+      taskId: 'moved-out',
+      type: 'RESCHEDULE',
+      occurredAt: localNoon('2026-09-17'),
+      detail: { fromDate: '2026-09-17', toDate: '2026-09-18' },
+    }),
+  ]);
+
+  const daily = await statistics.daily('2026-09-17');
+
+  // 只有仍安排在今天的那一项计入今日计划总数。
+  assert.equal(daily.plannedCount, 1);
+});
+
+test('移除计划日期（改到 null）后不再计入当日计划总数', async () => {
+  // 今天（09-17）的任务把计划日期清空丢回收集箱（RESCHEDULE，toDate 为 null），
+  // 不应退回用发生日期继续计入今日。
+  const statistics = createStatistics([
+    task({
+      id: 'unplanned',
+      scheduledDate: null,
+      firstScheduledDate: '2026-09-17',
+    }),
+  ], [
+    event({
+      id: 'unplanned-reschedule',
+      taskId: 'unplanned',
+      type: 'RESCHEDULE',
+      occurredAt: localNoon('2026-09-17'),
+      detail: { fromDate: '2026-09-17', toDate: null },
+    }),
+  ]);
+
+  const daily = await statistics.daily('2026-09-17');
+
+  assert.equal(daily.plannedCount, 0);
 });
 
 test('已删除任务及其计划事件不进入统计', async () => {
