@@ -46,6 +46,32 @@ test('收集箱任务不能携带时间字段', () => {
   );
 });
 
+/* 这些提示原样显示在编辑抽屉和快速记录下方。用户看到的是界面字段名，
+   因此文案里不允许出现 title / startTime 这类内部字段（回归保护，见设计规范 §5.4）。 */
+test('任务校验提示使用界面字段名，不暴露内部字段名', () => {
+  const messageOf = (run) => {
+    try {
+      run();
+    } catch (error) {
+      return error.message;
+    }
+    throw new Error('预期这次调用会抛出校验错误');
+  };
+
+  const messages = [
+    messageOf(() => createTask({ title: '   ' }, NOW, 't1')),
+    messageOf(() => createTask({ title: '超长'.repeat(101) }, NOW, 't1')),
+    messageOf(() => createTask({ title: '报价', scheduledDate: '2026-09-17', startTime: '10:00', dueTime: '09:00' }, NOW, 't1')),
+    messageOf(() => createTask({ title: '报价', scheduledDate: '2026-09-17', startTime: '10:00' }, NOW, 't1')),
+    messageOf(() => createTask({ title: '报价', startTime: '10:00', dueTime: '11:00' }, NOW, 't1')),
+  ];
+
+  for (const message of messages) {
+    assert.doesNotMatch(message, /[A-Za-z]{3,}/, message);
+    assert.match(message, /[\u4e00-\u9fa5]/, message);
+  }
+});
+
 test('已完成任务恢复为 todo 并清空 completedAt', () => {
   const restored = transitionTask(
     { ...BASE_TASK, lifecycle: 'completed', completedAt: NOW },

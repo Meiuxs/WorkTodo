@@ -20,12 +20,14 @@ export function assertTimeRange(startTime, dueTime) {
     return;
   }
 
+  // 这两条会原样出现在任务编辑抽屉的错误行里，所以使用界面上的字段名，
+  // 用户才知道该去改哪个输入框（内部字段名 startTime/dueTime 不出现在界面）。
   if (!TIME_PATTERN.test(startTime ?? '') || !TIME_PATTERN.test(dueTime ?? '')) {
-    throw new ValidationError('startTime 和 dueTime 必须是成对的 HH:MM 时间');
+    throw new ValidationError('开始时间和截止时间需要同时填写');
   }
 
   if (startTime >= dueTime) {
-    throw new ValidationError('dueTime 必须晚于 startTime');
+    throw new ValidationError('截止时间必须晚于开始时间');
   }
 }
 

@@ -22,7 +22,7 @@ test('编辑抽屉校验失败保持打开，Esc 关闭并恢复焦点', async (
   await dialog.getByLabel('截止时间').fill('09:00');
   await dialog.getByRole('button', { name: '保存任务' }).click();
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText(/dueTime 必须晚于 startTime/)).toBeVisible();
+  await expect(dialog.getByText(/截止时间必须晚于开始时间/)).toBeVisible();
 
   await dialog.getByLabel('截止时间').fill('11:00');
   await dialog.getByLabel('任务名称').press('Enter');

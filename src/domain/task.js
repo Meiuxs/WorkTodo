@@ -19,14 +19,19 @@ function assertIdentifier(value, fieldName) {
   }
 }
 
+/* 校验文案会出现在编辑抽屉、快速记录和子任务输入框下方，因此一律用界面上的字段名。
+   空值与超长分开报：前者要用户补内容，后者要用户删到 200 字以内。 */
 function normalizeTitle(title) {
   if (typeof title !== 'string') {
-    throw new ValidationError('title 必须是字符串');
+    throw new ValidationError('任务名称必须是文本');
   }
 
   const normalized = title.trim();
-  if (normalized.length === 0 || normalized.length > 200) {
-    throw new ValidationError('title 必须为 1 到 200 个字符');
+  if (normalized.length === 0) {
+    throw new ValidationError('任务名称不能为空');
+  }
+  if (normalized.length > 200) {
+    throw new ValidationError('任务名称不能超过 200 个字符');
   }
   return normalized;
 }
@@ -65,11 +70,11 @@ function normalizeTagIds(tagIds) {
 function normalizeDescription(description) {
   if (description === undefined || description === null) return '';
   if (typeof description !== 'string') {
-    throw new ValidationError('description 必须是字符串');
+    throw new ValidationError('描述必须是文本');
   }
   const normalized = description.trim();
   if (normalized.length > 10_000) {
-    throw new ValidationError('description 不能超过 10000 个字符');
+    throw new ValidationError('描述不能超过 10000 个字符');
   }
   return normalized;
 }
@@ -121,7 +126,7 @@ export function validateTask(task) {
   assertTaskDate(task.firstScheduledDate, 'firstScheduledDate');
   assertTimeRange(task.startTime, task.dueTime);
   if (isInboxTask(task) && (task.startTime !== null || task.dueTime !== null)) {
-    throw new ValidationError('收集箱任务不能携带时间字段');
+    throw new ValidationError('没有计划日期的任务不能填写时间，请先选择计划日期');
   }
   if (task.lifecycle === 'completed' && task.completedAt === null) {
     throw new ValidationError('已完成任务必须有 completedAt');
