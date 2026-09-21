@@ -6,14 +6,16 @@ const TODAY_LIMIT = 3;
 export class PopupController {
   #taskService;
   #subtaskService;
+  #recurringService;
   #queryService;
   #statisticsService;
   #today;
   #sendMessage;
 
-  constructor({ taskService, subtaskService = null, queryService, statisticsService, today, sendMessage }) {
+  constructor({ taskService, subtaskService = null, recurringService = null, queryService, statisticsService, today, sendMessage }) {
     this.#taskService = taskService;
     this.#subtaskService = subtaskService;
+    this.#recurringService = recurringService;
     this.#queryService = queryService;
     this.#statisticsService = statisticsService;
     this.#today = today;
@@ -53,17 +55,20 @@ export class PopupController {
 
   /* Popup 里的“轻推进”：不弹确认，但级联语义与工作台完全一致 —
      完成带子任务的父任务时连带完成活动子任务，子任务不得变成孤儿待办。
-     撤销同样覆盖父与子；complete 不经过 RecurringService，与工作台普通完成同一底层方法。 */
+     重复任务也必须经由 RecurringService，完成后继续生成下一实例。 */
   async completeTask(id, revision) {
-    const complete = this.#subtaskService === null
+    const complete = this.#recurringService !== null
+      ? () => this.#recurringService.complete(id, revision, { force: true })
+      : this.#subtaskService === null
       ? () => this.#taskService.complete(id, revision)
       : () => this.#subtaskService.completeParent(id, revision, { force: true });
-    const { task, completedChildren = [] } = await complete();
+    const result = await complete();
+    const { task, completedChildren = [] } = result;
     await this.#sendMessage({ type: 'TASK_CHANGED', taskId: id });
     for (const child of completedChildren) {
       await this.#sendMessage({ type: 'TASK_CHANGED', taskId: child.id });
     }
-    return { task, completedChildren };
+    return { ...result, task, completedChildren };
   }
 
   async restoreTask(id, revision) {

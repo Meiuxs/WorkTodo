@@ -2,8 +2,11 @@ import { toLocalDate } from '../domain/dates.js';
 import { TaskRepository } from '../data/task-repository.js';
 import { TaskService } from '../services/task-service.js';
 import { SubtaskService } from '../services/subtask-service.js';
+import { RecurringTemplateRepository } from '../data/recurring-template-repository.js';
+import { RecurringService } from '../services/recurring-service.js';
 import { TaskQueryService } from '../services/task-query-service.js';
 import { StatisticsService } from '../services/statistics-service.js';
+import { generateId } from '../shared/ids.js';
 import { escapeHtml } from '../shared/ui.js';
 import { getQuickAddFeedback } from '../shared/ux.js';
 import { PopupController } from './popup-controller.js';
@@ -87,9 +90,18 @@ function taskMarkup(task, today) {
 
 const repository = new TaskRepository();
 const popupTaskService = new TaskService(repository);
+const popupSubtaskService = new SubtaskService(popupTaskService, repository);
+const popupRecurringService = new RecurringService({
+  taskService: popupTaskService,
+  taskRepository: repository,
+  templateRepository: new RecurringTemplateRepository(),
+  subtaskService: popupSubtaskService,
+  generateId,
+});
 const controller = new PopupController({
   taskService: popupTaskService,
-  subtaskService: new SubtaskService(popupTaskService, repository),
+  subtaskService: popupSubtaskService,
+  recurringService: popupRecurringService,
   queryService: new TaskQueryService(repository),
   statisticsService: new StatisticsService(repository),
   today: () => toLocalDate(new Date()),
