@@ -127,6 +127,10 @@ test('完成任务后滚动位置与其他行菜单展开态保持', async ({ ex
     await dashboard.getByRole('button', { name: '记录', exact: true }).click();
   }
 
+  // 等 8 行全部渲染完再设滚动位置。列表没渲染完时文档不够高，scrollTo 会被钳成 0：
+  // 基线于是记成 0，随后 Playwright 点击末行时先触发自动滚动把它滚入视口，
+  // 断言就变成在比"点击带来的滚动"而不是"完成操作是否保持滚动位置"。
+  await expect(dashboard.locator('#today-list [data-task-id]')).toHaveCount(8);
   await dashboard.evaluate(() => window.scrollTo(0, 300));
   const rowByTitle = (title) => dashboard.locator('#today-list [data-task-id]').filter({ has: dashboard.getByRole('button', { name: title, exact: true }) });
   const bystander = rowByTitle('滚动保持任务 1');
