@@ -589,6 +589,10 @@
 }
 
 /* ============ 空状态 ============ */
+/* 列表"满→空"过渡：清空后的 .task-list 只剩首条分隔线会悬空，补回的空状态
+   若再画下边线会叠成双线；两条规则一起把过渡后的线条收回到单一一条。 */
+.task-list:empty { border-top: 0; }
+.task-list:empty + .empty-state { border-bottom: 0; }
 .empty {
   margin: 0;
   border-bottom: 1px solid var(--line);
@@ -706,6 +710,9 @@ input::placeholder { color: var(--muted); }
   font-weight: 700;
 }
 .tag-picker__options { display: flex; flex-wrap: wrap; gap: var(--sp-2); min-height: 30px; }
+/* 平铺容器里只有一条空提示时，它会被 flex 压成文字宽度，下面的分隔线跟着短一截；
+   资料与子任务的空提示都是通栏，三处线条因此对不齐。让它占满整行。 */
+.tag-picker__options > .empty { flex: 1 1 100%; }
 .tag-option {
   display: flex;
   align-items: center;
@@ -719,9 +726,25 @@ input::placeholder { color: var(--muted); }
 }
 .tag-option:has(input:checked) { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
 .tag-option:has(input:checked)::after { content: "✓"; }
-.tag-picker__create { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-3); }
-.tag-picker__create label { color: var(--muted); font-size: var(--fs-ui); white-space: nowrap; }
-.tag-picker__create input { flex: 1; min-width: 0; }
+/* 抽屉里两处"输入 + 主操作"共用一套排布：字段名独占一行，输入与按钮在下一行。
+   名标签留在输入框左侧会把输入框右移一格，抽屉里就多出第二个左边界；
+   两处各写一套则同一屏出现两种对齐。 */
+.tag-picker__create,
+.subtask-create {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--sp-3);
+  margin-top: var(--sp-4);
+}
+.tag-picker__create label,
+.subtask-create label {
+  flex: 0 0 100%;
+  color: var(--muted);
+  font-size: var(--fs-caption);
+}
+.tag-picker__create input,
+.subtask-create input { flex: 1 1 200px; min-width: 0; }
 
 /* ============ 筛选与工具栏 ============ */
 .filters {
@@ -736,7 +759,6 @@ input::placeholder { color: var(--muted); }
 .filters > label { flex: 1 1 150px; }
 .filters label input,
 .filters label select { font-size: var(--fs-ui); }
-.filter-search { grid-column: span 2; }
 .filters .filter-search { flex: 2 1 260px; }
 .filter-count {
   color: var(--muted);
@@ -865,10 +887,10 @@ input::placeholder { color: var(--muted); }
 .history-details__card { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-raised); padding-inline: var(--sp-4); }
 .history-details__card .task-list { background: transparent; }
 
-.editor-section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
-.editor-section-heading h3 { margin: 0; }
-.editor-section-count { color: var(--teal); font-size: var(--fs-caption); }
-.editor-resource-list { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); }
+.editor-resource-list { display: flex; flex-direction: column; gap: var(--sp-2); }
+/* 资料的主操作跟在列表或空提示之后，左边界和"说明在前、动作在后"的顺序都与其他次级区一致。
+   放在标题行里右对齐时，说明文字被压到动作下面，整区只剩一条右对齐的按钮。 */
+.editor-resources [data-resource-add] { margin-top: var(--sp-4); }
 .editor-resource-row, .resource-existing-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-align: left; }
 .editor-resource-row span { display: grid; gap: var(--sp-1); min-width: 0; }
 .editor-resource-row small { color: var(--muted); }
@@ -884,6 +906,8 @@ input::placeholder { color: var(--muted); }
 .resources-list { display: flex; flex-direction: column; gap: var(--sp-3); }
 .resource-card { display: flex; justify-content: space-between; gap: var(--sp-5); border-top: 1px solid var(--line); padding: var(--sp-4) 0; }
 .resource-card h3 { margin: var(--sp-1) 0; }
+.resource-card__title { border: 0; background: transparent; color: var(--ink); padding: 0; font: inherit; font-weight: 700; text-align: left; }
+.resource-card__title:hover { background: transparent; color: var(--teal); text-decoration: underline; }
 /* 长链接和长文件名必须能换行，否则资料卡片会把整页撑出横向滚动条。 */
 .resource-card > div { min-width: 0; }
 .resource-card__type, .resource-card__source, .resource-card__note { margin: var(--sp-1) 0 0; color: var(--muted); font-size: var(--fs-caption); overflow-wrap: anywhere; }
@@ -975,6 +999,14 @@ input::placeholder { color: var(--muted); }
 .data-state--preview { border-left-color: var(--teal); }
 .data-state--error { border-left-color: var(--coral); }
 .data-state--result { border-left-color: var(--teal); }
+/* 备份缺口是数据风险提示，套用冲突面板同一套语言：珊瑚左边 + 软底。
+   之前只有类名没有样式，丢失副本的警告和正文长得一样。 */
+.data-warning {
+  border-left: 3px solid var(--coral);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  background: var(--coral-soft);
+  padding: var(--sp-3) var(--sp-4);
+}
 .data-state p { margin: 0; color: var(--ink); font-size: var(--fs-body); }
 .data-preview { margin-top: var(--sp-2) !important; font-weight: 700; }
 .import-mode { display: flex; flex-direction: column; gap: var(--sp-2); margin: var(--sp-5) 0; border: 0; padding: 0; }
@@ -1024,7 +1056,16 @@ input::placeholder { color: var(--muted); }
   padding: var(--sp-5) var(--sp-6);
 }
 .drawer-actions { border-top: 1px solid var(--line); border-bottom: 0; }
+/* 标题最长 200 字，而头部只需回答"我在改哪条任务"：不截断时头部长到 260px 以上，
+   把整列入口行挤出首屏，头部本身也成了第二遍正文（标题全文就在名称输入框里）。
+   截到两行既留住可辨识的上下文，也保证长标题下首屏仍然不用滚动。 */
+.drawer-header > div { flex: 1 1 auto; min-width: 0; }
 .drawer-header h2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
   margin: var(--sp-1) 0 0;
   font-size: var(--fs-h2);
   line-height: var(--lh-heading);
@@ -1085,9 +1126,6 @@ input::placeholder { color: var(--muted); }
 .editor-group > summary::before { content: "▸"; color: var(--muted); }
 .editor-group[open] > summary::before { content: "▾"; }
 .editor-group[open] > summary + * { margin-top: var(--sp-3); }
-/* 资料行的可见标题已降为 sr-only（脱离文档流），只剩"添加资料"按钮，
-   否则 .editor-section-heading 的 space-between 会把按钮顶到左边。 */
-.editor-group .editor-section-heading { justify-content: flex-end; }
 .editor-subtasks { margin-top: 0; border-top: 0; padding-top: 0; }
 .editor-subtasks h3 { margin: 0 0 var(--sp-3); font-size: var(--fs-h3); line-height: var(--lh-heading); }
 .subtask-list { display: grid; border-top: 1px solid var(--line); }
@@ -1106,9 +1144,6 @@ input::placeholder { color: var(--muted); }
 }
 .subtask-row:hover { background: var(--hover-tint); }
 .subtask-row span { color: var(--muted); font-size: var(--fs-caption); }
-.subtask-create { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--sp-4); align-items: end; }
-.subtask-create label { flex: 0 0 100%; color: var(--muted); font-size: var(--fs-caption); }
-.subtask-create input { flex: 1 1 200px; }
 .conflict-panel {
   margin-top: var(--sp-5);
   border-left: 3px solid var(--coral);
@@ -1139,6 +1174,8 @@ input::placeholder { color: var(--muted); }
 .modal h2 { margin: 0; font-size: var(--fs-h2); line-height: var(--lh-heading); }
 .modal p { color: var(--muted); font-size: var(--fs-body); }
 .modal label { display: grid; gap: var(--sp-2); margin: var(--sp-5) 0; color: var(--muted); font-size: var(--fs-caption); }
+.modal label.check-field { display: flex; align-items: center; gap: var(--sp-3); color: var(--ink); font-size: var(--fs-body); }
+.modal label.check-field input { flex: 0 0 auto; }
 .modal .dialog-actions { margin-top: var(--sp-6); border-top: 1px solid var(--line); padding-top: var(--sp-4); }
 
 /* ============ 反馈条 ============ */
@@ -1180,7 +1217,6 @@ input::placeholder { color: var(--muted); }
 
 @media (max-width: 900px) {
   .metrics { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-  .filters { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
 }
 
 @media (max-width: 680px) {
@@ -1191,8 +1227,9 @@ input::placeholder { color: var(--muted); }
   .workspace-header h1 { font-size: var(--fs-metric); }
   .section-heading { display: block; }
   .section-heading > :last-child:not(:first-child) { margin-top: var(--sp-3); }
-  .today-summary { grid-template-columns: 1fr; gap: var(--sp-5); }
-  .week-grid { grid-template-columns: 1fr; }
+  /* .today-summary/.week-grid/.filters/.quick-add 都是 flex 容器：
+     窄屏排布由各自的 flex-basis 与 wrap 真实承担（见下方 680 区块），
+     这里不再保留从未生效的 grid 属性残留。 */
   .week-day__header, .week-day__tasks { padding-inline: var(--sp-4); }
   .month-grid { min-width: 0; }
   .month-day { min-height: 76px; padding: var(--sp-2); }
@@ -1206,10 +1243,6 @@ input::placeholder { color: var(--muted); }
   .month-day .task__meta { display: block; font-size: var(--fs-micro); line-height: var(--lh-micro); }
   .task { grid-template-columns: 30px minmax(0, 1fr) auto; gap: var(--sp-3); }
   .task__menu { position: fixed; top: auto; right: 12px; bottom: 12px; left: 12px; max-width: none; }
-  .quick-add { grid-template-columns: minmax(0, 1fr) auto; }
-  .quick-add__custom { grid-column: 1 / -1; }
-  .filters { grid-template-columns: 1fr; }
-  .filter-search { grid-column: auto; }
   .metrics { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
   .history-breakdown__heading { display: grid; gap: var(--sp-1); }
   .category-create {
@@ -1231,11 +1264,16 @@ input::placeholder { color: var(--muted); }
   }
   .tag-option,
   .subtask-row { overflow-wrap: anywhere; }
-  .tag-picker__create { grid-template-columns: 1fr; display: grid; }
+  /* 窄屏："输入 + 主操作"一律纵向堆叠，按钮占满一行。 */
+  .tag-picker__create,
+  .subtask-create {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .tag-picker__create button,
+  .subtask-create button { width: 100%; }
   .tag-picker__options { align-items: stretch; }
   .tag-option { flex: 1 1 calc(50% - 7px); min-width: 0; }
-  .subtask-create { grid-template-columns: 1fr; }
-  .subtask-create button { width: 100%; }
 }
 
 @media (min-width: 1600px) {

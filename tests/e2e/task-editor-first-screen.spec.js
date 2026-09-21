@@ -235,6 +235,83 @@ test('深色主题下入口行细线可见且摘要用弱化色', async ({ exten
   expect(style.value).toBe('rgb(165, 184, 179)');  // --muted 深色 #a5b8b3
 });
 
+test('超长任务标题不会把入口行挤出首屏', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  // 200 字的标题是字段上限，也是头部最容易失控的输入。
+  const longTitle = '这是一个很长的任务标题'.repeat(12);
+  await createTodayTask(dashboard, longTitle);
+  await dashboard.getByRole('button', { name: longTitle }).click();
+
+  const editor = dashboard.locator('#task-editor');
+  const measured = await editor.evaluate((node) => {
+    const heading = node.querySelector('[data-editor-title]').getBoundingClientRect();
+    const body = node.querySelector('.drawer-body');
+    return {
+      headingLines: Math.round(heading.height / 26),
+      headingHeight: Math.round(heading.height),
+      scrollHeight: body.scrollHeight,
+      clientHeight: body.clientHeight,
+    };
+  });
+
+  // 头部只承担"我在改哪条任务"，全文在名称输入框里，所以最多两行。
+  expect(measured.headingLines).toBeLessThanOrEqual(2);
+  expect(measured.headingHeight).toBeLessThan(120);
+  // 全部入口行默认收起时，长标题下首屏同样不需要滚动。
+  expect(measured.scrollHeight).toBeLessThanOrEqual(measured.clientHeight + 1);
+});
+
+test('次级区的空提示与主操作共用同一左边界，且说明排在动作之前', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await createTodayTask(dashboard, '对齐任务');
+  await dashboard.getByRole('button', { name: '对齐任务' }).click();
+
+  const editor = dashboard.locator('#task-editor');
+  for (const group of ['tags', 'resources', 'subtasks']) {
+    await openEditorGroup(dashboard, group);
+  }
+
+  const measured = await editor.evaluate((node) => {
+    const box = (selector) => {
+      const rect = node.querySelector(selector).getBoundingClientRect();
+      return { left: Math.round(rect.left), width: Math.round(rect.width) };
+    };
+    const emptyBeforeAction = (group, action) => {
+      const empty = node.querySelector(`[data-editor-group="${group}"] .empty`);
+      const target = node.querySelector(action);
+      return (empty.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    };
+    return {
+      contentLeft: box('input[name="title"]').left,
+      contentWidth: box('.editor-groups').width,
+      tagEmpty: box('[data-editor-group="tags"] .empty'),
+      tagInput: box('#new-tag'),
+      resourceEmpty: box('[data-editor-group="resources"] .empty'),
+      resourceButton: box('[data-resource-add]'),
+      subtaskEmpty: box('[data-editor-group="subtasks"] .empty'),
+      subtaskInput: box('#subtask-title'),
+      order: [
+        emptyBeforeAction('tags', '#new-tag'),
+        emptyBeforeAction('resources', '[data-resource-add]'),
+        emptyBeforeAction('subtasks', '#subtask-title'),
+      ],
+    };
+  });
+
+  // 三处主操作与抽屉里其他控件同一个左边界：不再有"新标签"把输入框右移一格。
+  expect(measured.tagInput.left).toBe(measured.contentLeft);
+  expect(measured.resourceButton.left).toBe(measured.contentLeft);
+  expect(measured.subtaskInput.left).toBe(measured.contentLeft);
+
+  // 顺序一致：说明在前、动作在后。
+  expect(measured.order).toEqual([true, true, true]);
+
+  // 空提示通栏：三条分隔线一样长，标签区不再短一截。
+  expect(measured.tagEmpty.width).toBe(measured.contentWidth);
+  expect(measured.resourceEmpty.width).toBe(measured.contentWidth);
+  expect(measured.subtaskEmpty.width).toBe(measured.contentWidth);
+});
+
 test('390px 下抽屉首屏与展开后的入口行都不横向溢出', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.setViewportSize({ width: 390, height: 844 });
