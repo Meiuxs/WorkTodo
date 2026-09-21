@@ -653,3 +653,114 @@ test('不接受未知导入模式', async () => {
     restoreChrome();
   }
 });
+
+/* 资料仓库的替身：只需 BackupService 用到的那两个方法。 */
+class FakeResourceRepository {
+  constructor(resources = [], taskResources = []) {
+    this.resources = resources;
+    this.taskResources = taskResources;
+  }
+
+  async exportAll() {
+    return structuredClone({ resources: this.resources, taskResources: this.taskResources });
+  }
+
+  async replaceAll(snapshot) {
+    this.resources = snapshot.resources;
+    this.taskResources = snapshot.taskResources;
+  }
+}
+
+function createBackupServiceWithResources({ storage, resources, taskResources }) {
+  const restoreChrome = installStorage(storage);
+  const repo = new InMemoryTaskRepository([BASE_TASK], [CATEGORY], [EVENT]);
+  const resourceRepository = new FakeResourceRepository(resources, taskResources);
+  const backup = new BackupService(repo, {
+    now: () => NOW,
+    appVersion: '0.1.0',
+    resourceRepository,
+  });
+  return { backup, repo, resourceRepository, restoreChrome };
+}
+
+test('清除所有数据清空业务数据但保留设置并清空 metadata', async () => {
+  const storage = new InMemoryStorageArea();
+  await storage.set({ settings: { theme: 'dark' }, metadata: { lastExportedAt: NOW } });
+  const { backup, repo, restoreChrome } = createBackupService({
+    tasks: [BASE_TASK],
+    categories: [CATEGORY],
+    events: [EVENT],
+    tags: [TAG],
+    recurringTemplates: [TEMPLATE],
+    storage,
+  });
+  try {
+    await backup.clearAllData();
+
+    const snapshot = await repo.exportAll();
+    assert.deepEqual(snapshot.tasks, []);
+    assert.deepEqual(snapshot.categories, []);
+    assert.deepEqual(snapshot.events, []);
+    assert.deepEqual(snapshot.tags, []);
+    assert.deepEqual(snapshot.recurringTemplates, []);
+
+    const persisted = storage.snapshot();
+    // 偏好是“在这台机器上我怎么看”，不属于业务数据。
+    assert.deepEqual(persisted.settings, { theme: 'dark' });
+    assert.deepEqual(persisted.metadata, {});
+  } finally {
+    restoreChrome();
+  }
+});
+
+test('清除所有数据同时清空资料集合', async () => {
+  const resource = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', title: '资料' };
+  const link = { taskId: SAME_ID, resourceId: resource.id };
+  const { backup, resourceRepository, restoreChrome } = createBackupServiceWithResources({
+    storage: new InMemoryStorageArea(),
+    resources: [resource],
+    taskResources: [link],
+  });
+  try {
+    await backup.clearAllData();
+    assert.deepEqual(resourceRepository.resources, []);
+    assert.deepEqual(resourceRepository.taskResources, []);
+  } finally {
+    restoreChrome();
+  }
+});
+
+test('清除所有数据失败时回滚任务数据且不写 metadata', async () => {
+  class FailingReplaceRepository extends InMemoryTaskRepository {
+    async replaceAll(snapshot) {
+      // 只让“清空”这一步失败；回滚用的恢复点写入必须仍然可用。
+      if ((snapshot.tasks ?? []).length === 0) throw new Error('事务失败');
+      return super.replaceAll(snapshot);
+    }
+  }
+
+  const storage = new InMemoryStorageArea();
+  await storage.set({ settings: { theme: 'dark' }, metadata: { lastExportedAt: NOW } });
+  const restoreChrome = installStorage(storage);
+  const repo = new FailingReplaceRepository([BASE_TASK], [CATEGORY], [EVENT]);
+  const backup = new BackupService(repo, { now: () => NOW, appVersion: '0.1.0' });
+  try {
+    await assert.rejects(() => backup.clearAllData(), /事务失败/);
+    const snapshot = await repo.exportAll();
+    assert.deepEqual(snapshot.tasks.map((task) => task.id), [SAME_ID]);
+    assert.deepEqual(snapshot.categories.map((category) => category.id), [CATEGORY_ID]);
+    assert.deepEqual(storage.snapshot().metadata, { lastExportedAt: NOW });
+  } finally {
+    restoreChrome();
+  }
+});
+
+test('清除所有数据在未注入资源仓库时同样可用', async () => {
+  const { backup, repo, restoreChrome } = createBackupService();
+  try {
+    await backup.clearAllData();
+    assert.deepEqual((await repo.exportAll()).tasks, []);
+  } finally {
+    restoreChrome();
+  }
+});

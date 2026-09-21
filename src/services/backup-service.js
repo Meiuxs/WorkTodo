@@ -392,6 +392,38 @@ export class BackupService {
     return this.#replaceImport(backup);
   }
 
+  /* 清空全部业务数据，保留 chrome.storage.local 里的 settings。
+     与 #replaceImport 同一套恢复点策略：任一步失败都回滚，
+     避免留下"任务已清、资料还在"的半清状态。
+     资源仓库是可选的（单测里常不注入），因此沿用 createBackup 的 ?. 写法。 */
+  async clearAllData() {
+    const recovery = await this.#repository.exportAll();
+    const resourceRecovery = this.#resourceRepository?.exportAll
+      ? await this.#resourceRepository.exportAll()
+      : null;
+    const emptySnapshot = {
+      tasks: [],
+      categories: [],
+      events: [],
+      tags: [],
+      recurringTemplates: [],
+    };
+    try {
+      await this.#repository.replaceAll(emptySnapshot);
+      if (this.#resourceRepository?.replaceAll) {
+        await this.#resourceRepository.replaceAll({ resources: [], taskResources: [] });
+      }
+      // 元数据整体置空：导入与导出的时间戳属于本次清除范围。
+      await this.#settingsRepository.saveMetadata({});
+    } catch (error) {
+      await this.#repository.replaceAll(recovery);
+      if (resourceRecovery !== null && this.#resourceRepository?.replaceAll) {
+        await this.#resourceRepository.replaceAll(resourceRecovery);
+      }
+      throw error;
+    }
+  }
+
   async #mergeImport(backup) {
     const current = await this.#repository.exportAll();
     const currentResources = this.#resourceRepository?.exportAll
