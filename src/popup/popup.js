@@ -1,6 +1,7 @@
 import { toLocalDate } from '../domain/dates.js';
 import { TaskRepository } from '../data/task-repository.js';
 import { TaskService } from '../services/task-service.js';
+import { SubtaskService } from '../services/subtask-service.js';
 import { TaskQueryService } from '../services/task-query-service.js';
 import { StatisticsService } from '../services/statistics-service.js';
 import { escapeHtml } from '../shared/ui.js';
@@ -50,10 +51,10 @@ function showPopupSuccess(feedback, onUndo) {
   showPopupSuccess.timeoutId = window.setTimeout(() => { toast.hidden = true; }, 5000);
 }
 
-function showCompleteToast(onUndo) {
+function showCompleteToast(undoLabel, onUndo) {
   toast.replaceChildren();
   const text = document.createElement('span');
-  text.textContent = '已完成任务';
+  text.textContent = undoLabel;
   const undo = document.createElement('button');
   undo.type = 'button';
   undo.className = 'toast__action';
@@ -81,12 +82,14 @@ function taskMarkup(task, today) {
   const checked = task.lifecycle === 'completed';
   // 完成是 Popup 里的“立刻推进”动作：用真正的按钮与 role="checkbox"，
   // 与工作台任务行的圆圈完全一致的语义，而不是看起来能点却不可点的静态符号。
-  return `<li class="task-row"><button class="task-row__check" type="button" role="checkbox" aria-checked="${checked}" aria-label="完成任务" data-action="complete" data-task-id="${escapeHtml(task.id)}" data-revision="${task.revision}">${checked ? '✓' : ''}</button><span class="task-row__title">${escapeHtml(task.title)}</span><span class="task-row__detail${overdue ? ' task-row__detail--overdue' : ''}">${detail}</span></li>`;
+  return `<li class="task-row"><button class="task-row__check" type="button" role="checkbox" aria-checked="${checked}" aria-label="完成任务" data-action="complete" data-task-id="${escapeHtml(task.id)}" data-revision="${task.revision}">${checked ? '✓' : ''}</button><span class="task-row__title" title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</span><span class="task-row__detail${overdue ? ' task-row__detail--overdue' : ''}">${detail}</span></li>`;
 }
 
 const repository = new TaskRepository();
+const popupTaskService = new TaskService(repository);
 const controller = new PopupController({
-  taskService: new TaskService(repository),
+  taskService: popupTaskService,
+  subtaskService: new SubtaskService(popupTaskService, repository),
   queryService: new TaskQueryService(repository),
   statisticsService: new StatisticsService(repository),
   today: () => toLocalDate(new Date()),
@@ -105,17 +108,16 @@ function setSelectedDate(value) {
 }
 
 function renderTasks(state) {
-  const overdueTasks = state.focusTasks.filter((task) => task.scheduledDate !== null && task.scheduledDate < state.date);
-  const otherTasks = state.focusTasks.filter((task) => !overdueTasks.includes(task));
+  // 逾期与今日两节分别取自 load 的各自配额，逾期不再挤空今日列表。
   const overdueSection = document.querySelector('#overdue-section');
   overdueSection.hidden = state.overdueCount === 0;
-  const hiddenOverdueCount = Math.max(state.overdueCount - overdueTasks.length, 0);
+  const hiddenOverdueCount = Math.max(state.overdueCount - state.overdueTasks.length, 0);
   document.querySelector('#overdue-heading').textContent = hiddenOverdueCount > 0
     ? `逾期 ${state.overdueCount}（还有 ${hiddenOverdueCount} 项，打开工作台查看）`
     : `逾期 ${state.overdueCount}`;
-  document.querySelector('#overdue-list').innerHTML = overdueTasks.map((task) => taskMarkup(task, state.date)).join('');
-  document.querySelector('#focus-list').innerHTML = otherTasks.map((task) => taskMarkup(task, state.date)).join('');
-  document.querySelector('#empty-state').hidden = state.focusTasks.length !== 0;
+  document.querySelector('#overdue-list').innerHTML = state.overdueTasks.map((task) => taskMarkup(task, state.date)).join('');
+  document.querySelector('#focus-list').innerHTML = state.focusTasks.map((task) => taskMarkup(task, state.date)).join('');
+  document.querySelector('#empty-state').hidden = state.overdueTasks.length + state.focusTasks.length !== 0;
 }
 
 async function refresh() {
@@ -157,12 +159,17 @@ async function handleComplete(button) {
   const revision = Number(button.dataset.revision);
   button.disabled = true;
   try {
-    const completed = await controller.completeTask(taskId, revision);
+    const { task: completed, completedChildren } = await controller.completeTask(taskId, revision);
     await refresh();
-    showCompleteToast(async () => {
-      await controller.restoreTask(taskId, completed.revision);
-      await refresh();
-    });
+    // 级联结果写进反馈：与工作台同一口径，用户才能预判撤销覆盖的范围。
+    showCompleteToast(
+      completedChildren.length > 0 ? `已完成父任务和 ${completedChildren.length} 个子任务` : '已完成任务',
+      async () => {
+        await controller.restoreTask(taskId, completed.revision);
+        await controller.restoreTasks(completedChildren);
+        await refresh();
+      },
+    );
   } catch {
     if (button.isConnected) button.disabled = false;
     message.textContent = '操作没有完成，请重新打开扩展重试。';

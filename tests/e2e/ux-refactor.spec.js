@@ -159,6 +159,8 @@ test('Popup 点击圆环完成任务并可撤销', async ({ extension }) => {
 
   const row = popup.locator('#focus-list .task-row').filter({ hasText: '弹窗完成任务' });
   await expect(row).toBeVisible();
+  // 标题在窄弹窗里会被单行截断，全文必须能通过 title 取回（规范 §3.2）。
+  await expect(row.locator('.task-row__title')).toHaveAttribute('title', '弹窗完成任务');
   await row.getByRole('checkbox', { name: '完成任务' }).click();
   await expect(popup.locator('#toast')).toContainText('已完成任务');
   await expect(row).toHaveCount(0);
