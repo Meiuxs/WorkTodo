@@ -12,7 +12,7 @@
 
 ### Aesthetic Direction
 
-采用“清透网格”方向：薄荷灰与暖白为底色，深墨绿文字，青绿色作为完成与行动色，橙珊瑚色只用于逾期和需要注意的事项。使用结构化网格、细边界和轻微层级差建立秩序，不使用霓虹渐变、玻璃拟态、发光装饰或堆叠卡片。Popup 强调快速记录，Dashboard 强调今日主线。
+采用"清透网格"方向：薄荷灰与暖白为底色，深墨绿文字，青绿色作为完成与行动色，橙珊瑚色只用于逾期和需要注意的事项。使用结构化网格、细边界和轻微层级差建立秩序，不使用霓虹渐变、玻璃拟态、发光装饰或堆叠卡片。Popup 强调快速记录，Dashboard 强调今日主线。
 
 ### Design Principles
 
@@ -44,8 +44,15 @@
 - 使用 `npm run package` 生成可导入 Chromium 的扩展压缩包。
 - 打包脚本读取 `manifest.json` 的版本号，输出到 `dist/WorkTodo-v<version>.zip`。
 - 发布包只包含 `manifest.json` 和 `src/`，不包含测试、文档、`node_modules` 或开发工具。
-- 生成的压缩包解压后，在 Chromium 的扩展管理页开启“开发者模式”，选择“加载已解压的扩展程序”，指向解压目录即可安装。
+- 生成的压缩包解压后，在 Chromium 的扩展管理页开启"开发者模式"，选择"加载已解压的扩展程序"，指向解压目录即可安装。
 - 修改运行时代码或 `manifest.json` 后，先运行 `npm test`，再运行 `npm run package`。
+
+## 本地预览（Edge）
+
+- 每次验证（`npm test`）完成后，运行 `npm run preview:edge`（`scripts/preview-edge.mjs`）把最新代码以未打包扩展打开到 Edge；脚本会打印当前 `manifest.json` 的版本号，浏览器里是不是这一版一看便知。
+- 加载的是仓库根目录而不是 `dist/` 里的压缩包，所以预览看到的永远是工作区代码；无法运行 Playwright 时，也可以在扩展管理页开启“开发者模式”，选择“加载已解压的扩展程序”并指向仓库根目录。
+- 未打包扩展的代码在浏览器启动时读取：重新运行前先关闭上一次的预览窗口，或在 `edge://extensions` 点“重新加载”后刷新工作台页面，否则看到的仍是旧代码。
+- 预览使用系统临时目录下的独立配置目录，与日常浏览器数据分开；预览里新建的任务不会出现在日常浏览器中。
 
 ## 版本与 GitHub 发布
 
@@ -58,8 +65,8 @@
   1. 更新 `manifest.json` 版本号，并运行 `npm test` 与 `npm run package`。
   2. 确认只包含本次任务相关的改动，用中文提交信息提交代码。
   3. 将提交推送到 GitHub 默认分支。
-  4. 创建与版本号一致的带注释 tag，格式为 `v<version>`，例如 `v1.5.0`，并推送到 GitHub。
-  5. 在 GitHub Releases 页面创建同名 Release，上传 `dist/WorkTodo-v<version>.zip`，并填写本次变更说明。
+  4. 创建与版本号一致的带注释 tag，名称为 `v<version>`（例如 `v1.5.0`），注释主题为 `WorkTodo v<version>：<变更摘要>`（摘要一句话概括本次主题、不加句号，例如 `WorkTodo v1.6.1：统一 UX 术语、空状态与无障碍交互`），并推送到 GitHub。
+  5. 在 GitHub Releases 页面创建 Release，标题为 `WorkTodo v<version>`（与 tag 注释同一格式），上传 `dist/WorkTodo-v<version>.zip`，并填写本次变更说明。
   6. 发布后核对默认分支提交、tag、Release 和附件名称/版本号一致，并确认工作区干净。
 - 发布记录至少包含版本号、变更摘要、测试结果、包文件名、GitHub Release 链接和 tag 名称；后续发布不得复用已有版本号、tag 或 Release。
 
