@@ -308,6 +308,25 @@
 }
 
 .task__title:hover { background: transparent; color: var(--teal); text-decoration: underline; }
+
+/* 已删行只剩「永久删除」一个动作，因此不套菜单：它直接占行尾那一列。
+   尺寸沿用「更多」触发器，只把颜色换成破坏性色，
+   否则破坏性动作和普通操作外形完全一样。 */
+.task__danger {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-h-sm);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--coral);
+  padding: 0 var(--sp-3);
+  font-size: var(--fs-caption);
+  cursor: pointer;
+}
+
+.task__danger:hover { border-color: var(--line); background: var(--coral-soft); }
+
 .task__meta {
   display: block;
   overflow: hidden;
@@ -551,10 +570,8 @@
 .task__menu button:hover { background: var(--teal-soft); }
 .task__menu button[aria-pressed="true"] { background: var(--teal-soft); color: var(--teal); font-weight: 700; }
 /* 破坏性操作与普通操作必须能一眼区分，否则"删除"和"复制"外形完全一样。 */
-.task__menu button[data-action="trash"],
-.task__menu button[data-action="delete-permanently"] { color: var(--coral); }
-.task__menu button[data-action="trash"]:hover,
-.task__menu button[data-action="delete-permanently"]:hover { background: var(--coral-soft); }
+.task__menu button[data-action="trash"] { color: var(--coral); }
+.task__menu button[data-action="trash"]:hover { background: var(--coral-soft); }
 /* 菜单扁平化后不再套子菜单：改期快捷档用小分组平铺，
    自定义日期和优先级收进编辑抽屉，菜单整屏不滚动。 */
 .task__date-group {
@@ -564,9 +581,8 @@
   border-top: 1px solid var(--line);
   padding-top: var(--sp-1);
 }
-/* 回收站入口是菜单里唯一的破坏性动作，用分隔线把它和日常操作隔开。 */
-.task__menu button[data-action="trash"],
-.task__menu button[data-action="delete-permanently"] {
+/* 移入回收站是菜单里唯一的破坏性动作，用分隔线把它和日常操作隔开。 */
+.task__menu button[data-action="trash"] {
   margin-top: var(--sp-2);
   border-top: 1px solid var(--line);
   padding-top: var(--sp-3);

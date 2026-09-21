@@ -93,14 +93,13 @@ test('回收站可以恢复任务，永久删除任务需要二次确认', async
 
   await page.getByRole('button', { name: '回收站', exact: true }).click();
   await expect(page.getByRole('button', { name: '待删除任务' })).toBeVisible();
-  await row.getByText('更多', { exact: true }).click();
+  // 已删行只剩「永久删除」一个动作，因此不再套「更多」菜单，直接点行内按钮。
   await row.getByRole('button', { name: '永久删除' }).click();
   const confirmation = page.locator('#confirm-dialog');
   await expect(confirmation.getByRole('heading', { name: '永久删除任务？' })).toBeVisible();
   await confirmation.getByRole('button', { name: '取消' }).click();
   await expect(page.getByRole('button', { name: '待删除任务' })).toBeVisible();
-  // 取消确认后行菜单会随“点外收起”一起关闭，重试需重新展开。
-  await row.getByText('更多', { exact: true }).click();
+  // 取消后焦点回到触发按钮，不必重新展开任何菜单即可重试。
   await row.getByRole('button', { name: '永久删除' }).click();
   await confirmation.getByRole('button', { name: '永久删除' }).click();
   await expect(page.getByRole('button', { name: '待删除任务' })).toHaveCount(0);
@@ -333,4 +332,31 @@ test('主题保存失败时不改变页面主题并恢复选择框', async ({ ex
   await expect(page.locator('#toast')).toContainText('模拟主题保存失败');
   await expect(page.getByLabel('主题')).toHaveValue('dark');
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+});
+
+test('回收站行直接展示永久删除，不再套更多菜单', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await seedTrashedTasks(page, [trashedTask({
+    id: 'trashed-row',
+    title: '回收站行',
+    lifecycle: 'todo',
+    trashedAt: '2026-09-17T10:00:00.000Z',
+  })]);
+  await page.getByRole('button', { name: '回收站', exact: true }).click();
+
+  const row = page.locator('[data-task-id="trashed-row"]');
+  // 唯一动作不再藏在菜单里。
+  await expect(row.locator('summary[aria-label="更多任务操作"]')).toHaveCount(0);
+  await expect(row.getByRole('button', { name: '永久删除', exact: true })).toBeVisible();
+  // 恢复仍由行首圆环承担，不得出现第二个恢复入口。
+  await expect(row.locator('.task__check')).toHaveAttribute('data-action', 'untrash');
+  await expect(row.getByRole('button', { name: '恢复任务', exact: true })).toHaveCount(1);
+
+  // 破坏性色必须在行所在的表层上满足 AA，深浅两套主题都不例外。
+  // 断言比值而不是写死 rgb：写死会在令牌调整时假失败。
+  const colors = await row.evaluate((node) => ({
+    danger: getComputedStyle(node.querySelector('.task__danger')).color,
+    surface: getComputedStyle(document.querySelector('.content')).backgroundColor,
+  }));
+  expect(contrastRatio(colors.danger, colors.surface)).toBeGreaterThanOrEqual(4.5);
 });

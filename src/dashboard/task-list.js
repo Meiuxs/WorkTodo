@@ -80,8 +80,9 @@ function taskStatus(task, today) {
 function taskActions(task, today) {
   const actions = [];
   if (task.trashedAt !== null) {
-    // 恢复由行首圆环按钮承担，菜单里只留低频的破坏性动作，避免同一动作出现两次。
-    actions.push('<button type="button" data-action="delete-permanently">永久删除</button>');
+    // 恢复由行首圆环按钮承担，所以这里只剩一个低频的破坏性动作。
+    // 单个动作藏进「更多」要多一次展开，因此它不套菜单外壳，直接作为行内按钮。
+    actions.push('<button type="button" class="task__danger" data-action="delete-permanently">永久删除</button>');
     return actions.join('');
   }
   if (task.lifecycle === 'todo') actions.push('<button type="button" data-action="start">开始</button>');
@@ -157,18 +158,23 @@ function taskMarkup(task, today, tags, resourceCounts, children = []) {
   const checkAttributes = canRestore
     ? 'aria-label="恢复任务"'
     : `role="checkbox" aria-checked="${checked}" aria-label="完成任务"`;
+  // 已删行只有「永久删除」一个动作（见 taskActions），菜单外壳没有存在意义，
+  // 直接把它渲染成行尾按钮；其余行照旧收进「更多」。
+  const moreMarkup = trashed
+    ? taskActions(task, today)
+    : `<details class="task__more">
+      <summary aria-label="更多任务操作" aria-haspopup="true" aria-expanded="false">更多</summary>
+      <div class="task__menu">
+        ${taskActions(task, today)}
+      </div>
+    </details>`;
   return `<article class="task task--${escapeHtml(task.lifecycle)}${overdue ? ' task--overdue' : ''}" data-task-id="${escapeHtml(task.id)}" data-revision="${task.revision}" role="listitem">
     <button class="task__check" type="button" ${checkAttributes} data-action="${checkboxAction}">${checked ? '✓' : ''}</button>
     <div class="task__body">
       <button class="task__title" type="button" data-action="edit" title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</button>
       <span class="task__meta"><span class="task__status">${status}</span> · ${escapeHtml(taskMeta(task, today))}${priorityMarkup}${task.starred ? ' · 已星标' : ''}${tagMarkup}${subtaskLabel}${resourceLabel}</span>
     </div>
-    <details class="task__more">
-      <summary aria-label="更多任务操作" aria-haspopup="true" aria-expanded="false">更多</summary>
-      <div class="task__menu">
-        ${taskActions(task, today)}
-      </div>
-    </details>
+    ${moreMarkup}
     ${children.length === 0 ? '' : `<ul class="task__subtasks" role="group" aria-label="子任务">${children.map((child) => subtaskMarkup(child, today)).join('')}</ul>`}
   </article>`;
 }
