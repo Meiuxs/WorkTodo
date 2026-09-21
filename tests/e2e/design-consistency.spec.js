@@ -28,6 +28,21 @@ test('页面级空状态使用同一结构且不重复表达同一件事', async
   await expect(dashboard.locator('.week-empty')).toHaveCount(0);
 });
 
+test('设置页按数据优先级排列，初始不显示数据状态且列表空状态统一', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await dashboard.getByRole('button', { name: '设置', exact: true }).click();
+
+  await expect.poll(() => dashboard.locator('#view-root > .view-section > .section-heading h2').allTextContents())
+    .toEqual(['外观', '数据管理', '列表', '键盘快捷键']);
+  await expect(dashboard.locator('#data-state .data-state')).toHaveCount(0);
+  await expect(dashboard.locator('.category-list .empty-state__title')).toHaveText('还没有列表');
+  await expect(dashboard.locator('.category-list .empty-state__text')).toHaveText('创建后可在任务编辑器中分配。');
+
+  await dashboard.setViewportSize({ width: 1280, height: 1000 });
+  const categoryFormWidth = await dashboard.locator('#create-category').evaluate((node) => node.getBoundingClientRect().width);
+  expect(categoryFormWidth).toBeLessThanOrEqual(720);
+});
+
 test('任务菜单用动作名称表达破坏性操作并只保留一个编辑入口', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('术语检查任务');
