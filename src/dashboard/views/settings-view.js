@@ -89,6 +89,37 @@ export class DataManagementController {
     }
   }
 
+  /* 清除是不可逆动作，结果复用同一套 state，由 #data-state 统一播报。
+     kind 用 clearing 而不是 importing：清除不是导入，语义不同就不该互相借用。 */
+  async clearAll() {
+    this.#state = {
+      kind: 'clearing',
+      canConfirm: false,
+      message: '正在清除本地数据…',
+      preview: null,
+      text: null,
+    };
+    try {
+      await this.#backupService.clearAllData();
+      this.#state = {
+        kind: 'result',
+        canConfirm: false,
+        message: '已清除全部本地数据；主题等偏好设置已保留。',
+        preview: null,
+        text: null,
+      };
+    } catch (error) {
+      this.#state = {
+        kind: 'error',
+        canConfirm: false,
+        message: '清除没有完成，本机原有数据保持不变。',
+        preview: null,
+        text: null,
+      };
+    }
+    return this.#state;
+  }
+
   reset() {
     this.#state = clone(INITIAL_STATE);
   }
@@ -260,12 +291,24 @@ export function createSettingsView({
         <button type="button" id="export-csv" class="button-secondary">导出 CSV</button>
         <label class="button-secondary file-picker">选择导入文件<input id="import-file" type="file" accept="application/json,.json"></label>
       </div>
+      <div class="data-danger">
+        <p class="data-danger__hint">清除本机的全部工作数据，保留主题等偏好设置。</p>
+        <button type="button" id="clear-all-data" class="button-danger">清除所有数据</button>
+      </div>
       <div id="data-state"></div>
       <dialog class="modal" id="import-confirm">
         <form method="dialog">
           <h2 data-import-confirm-title>确认导入？</h2>
           <p data-import-confirm-message></p>
           <div class="dialog-actions"><button value="cancel">取消</button><button class="button-danger" value="confirm" data-import-confirm-submit>确认导入</button></div>
+        </form>
+      </dialog>
+      <dialog class="modal" id="clear-all-dialog">
+        <form method="dialog">
+          <h2>清除所有数据？</h2>
+          <p>会删除全部任务、列表、标签、资料、重复规则和工作记录，并清空回收站。主题等偏好设置会保留。</p>
+          <p>清除后无法恢复，也不能撤销。建议先导出 JSON 备份。</p>
+          <div class="dialog-actions"><button value="cancel">取消</button><button class="button-danger" value="confirm">清除所有数据</button></div>
         </form>
       </dialog>
     </section>
@@ -321,6 +364,32 @@ export function createSettingsView({
         if (signal?.aborted) return;
         renderDataState(signal);
         event.target.value = '';
+      }, { signal, onError });
+    });
+    const clearDialog = root.querySelector('#clear-all-dialog');
+    const clearTrigger = root.querySelector('#clear-all-data');
+    clearTrigger.addEventListener('click', () => {
+      clearDialog.showModal();
+      // 规范 §4.5：默认焦点落在安全动作上。
+      clearDialog.querySelector('[value="cancel"]')?.focus();
+    });
+    clearDialog.addEventListener('close', () => {
+      // 规范 §4.5：关框后焦点回到触发它的控件。
+      clearTrigger.focus();
+      if (clearDialog.returnValue !== 'confirm') return;
+      runViewAction(async () => {
+        await dataController.clearAll();
+        if (dataController.state.kind === 'result') {
+          // 成功会整页重渲染，新的 #data-state 会读到 result 状态；
+          // 但它也换掉了设置页 DOM，焦点会落回 body，所以要把焦点还给清空后的同名按钮。
+          // 注意这里刻意不复用 signal——重渲染已经把它中止了。
+          await onDataChanged();
+          root.querySelector('#clear-all-data')?.focus();
+          return;
+        }
+        // 失败不触发重渲染，必须在这里就地播报 error。
+        if (signal?.aborted) return;
+        renderDataState(signal);
       }, { signal, onError });
     });
     root.querySelector('#create-category').addEventListener('submit', (event) => {

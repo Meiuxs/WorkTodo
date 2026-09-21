@@ -952,6 +952,18 @@ input::placeholder { color: var(--muted); }
 .category-create,
 .category-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
 .data-actions { margin-top: var(--sp-5); }
+/* 清除所有数据是不可逆动作，与三个安全动作之间用分隔线断开，
+   避免它挨着"导出 JSON 备份"被误点。 */
+.data-danger {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-7);
+  border-top: 1px solid var(--line);
+  padding-top: var(--sp-5);
+}
+.data-danger__hint { margin: 0; color: var(--muted); font-size: var(--fs-caption); }
 .file-picker { position: relative; overflow: hidden; display: inline-flex; align-items: center; cursor: pointer; }
 .file-picker input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; }
 .file-picker:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }

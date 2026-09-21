@@ -360,3 +360,43 @@ test('回收站行直接展示永久删除，不再套更多菜单', async ({ ex
   }));
   expect(contrastRatio(colors.danger, colors.surface)).toBeGreaterThanOrEqual(4.5);
 });
+
+test('清除所有数据需要确认，清除后业务数据清空而主题保留', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.getByLabel('记录一个新事项').fill('清除前任务');
+  await page.locator('#quick-add-date').selectOption('today');
+  await page.getByRole('button', { name: '记录', exact: true }).click();
+
+  await page.getByRole('button', { name: '设置' }).click();
+  await page.getByLabel('主题').selectOption('dark');
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+
+  const trigger = page.locator('#clear-all-data');
+  const confirmation = page.locator('#clear-all-dialog');
+
+  await trigger.click();
+  await expect(confirmation.getByRole('heading', { name: '清除所有数据？' })).toBeVisible();
+  // 规范 §4.5：默认焦点落在安全动作上。
+  await expect(confirmation.getByRole('button', { name: '取消' })).toBeFocused();
+
+  // 取消分支：什么都不能被改动。
+  await confirmation.getByRole('button', { name: '取消' }).click();
+  await expect(trigger).toBeFocused();
+  await page.getByRole('button', { name: '今天' }).click();
+  await expect(page.getByRole('button', { name: '清除前任务' })).toBeVisible();
+
+  await page.getByRole('button', { name: '设置' }).click();
+  await trigger.click();
+  await confirmation.getByRole('button', { name: '清除所有数据' }).click();
+
+  // 重渲染之后焦点回到清空按钮，而不是掉到 body。
+  await expect(trigger).toBeFocused();
+  await expect(page.locator('#data-state')).toContainText('已清除全部本地数据');
+  await expect(page.getByLabel('主题')).toHaveValue('dark');
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+
+  await page.getByRole('button', { name: '今天' }).click();
+  await expect(page.getByRole('button', { name: '清除前任务' })).toHaveCount(0);
+  await page.getByRole('button', { name: '回收站', exact: true }).click();
+  await expect(page.locator('.empty-state__title')).toHaveText('回收站是空的');
+});
