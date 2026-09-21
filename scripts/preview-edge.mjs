@@ -15,12 +15,17 @@ await mkdir(profileDir, { recursive: true });
 const channel = process.env.PLAYWRIGHT_CHANNEL ?? (process.platform === 'win32' ? 'msedge' : undefined);
 const context = await chromium.launchPersistentContext(profileDir, {
   headless: false,
+  /* viewport: null 不能省：不指定时 Playwright 会把页面固定按 1280×720 渲染，
+     窗口一旦放大，右侧和下方就空出一大片，看起来像"扩展没显示全"。
+     置空后页面跟随真实窗口尺寸。 */
+  viewport: null,
   ...(channel === undefined ? {} : { channel }),
   args: [
     `--disable-extensions-except=${projectRoot}`,
     `--load-extension=${projectRoot}`,
     '--no-first-run',
     '--no-default-browser-check',
+    '--start-maximized',
   ],
 });
 
@@ -40,6 +45,8 @@ console.log(`扩展目录：${projectRoot}`);
 console.log(`浏览器：${channel ?? 'bundled-chromium'}`);
 console.log(`配置目录：${profileDir}`);
 console.log(`版本：${version}`);
+/* 打出真实视口尺寸：它是"页面有没有铺满窗口"最直接的判据。 */
+console.log(`视口：${await page.evaluate(() => `${window.innerWidth}×${window.innerHeight}`)}`);
 console.log(`工作台：${dashboardUrl}`);
 console.log(`弹窗：chrome-extension://${extensionId}/src/popup/popup.html`);
 console.log('关闭预览窗口即结束本次预览。');
