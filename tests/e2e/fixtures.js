@@ -36,7 +36,9 @@ export async function launchExtension({
   context.on('request', (request) => {
     if (/^https?:/i.test(request.url())) externalRequests.push(request.url());
   });
-  if (trace) await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+  // 仅抓 DOM 快照的轻量 tracing：失败时可回放结构，避免 screenshots+sources
+  // 在 2 核 CI runner 上给每个用例叠加重型开销。
+  if (trace) await context.tracing.start({ snapshots: true });
 
   let worker = context.serviceWorkers()[0];
   if (worker === undefined) worker = await context.waitForEvent('serviceworker', { timeout: 15_000 });
@@ -92,10 +94,11 @@ export const test = base.extend({
     await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => {});
   },
   extension: async ({ extensionPath, userDataDir }, use, testInfo) => {
+    // 视频与 trace 只在失败时留证：常驻录屏是 CI 上每用例 ~15s 的主要开销，
+    // 改为失败时抓 failure.png + trace.zip（见下方 teardown），通过用例不产出视频。
     const extension = await launchExtension({
       extensionPath,
       userDataDir,
-      videoDir: testInfo.outputPath('video'),
       trace: true,
     });
     const setupPage = await openDashboard(extension);
