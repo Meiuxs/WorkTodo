@@ -86,13 +86,19 @@ export async function assertNoExternalRequests(extension) {
   expect(extension.externalRequests, '扩展运行期间不应发起外部网络请求').toEqual([]);
 }
 
+async function removeDirectory(directory) {
+  await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => {});
+}
+
 export const test = base.extend({
   extensionPath: [projectRoot, { option: true }],
   userDataDir: async ({}, use) => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'worktodo-e2e-'));
     await use(directory);
-    await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => {});
+    await removeDirectory(directory);
   },
+  // 每个用例一个全新浏览器：service worker 内存态、告警与 IndexedDB 都随之干净，
+  // 套件不依赖用例之间的隔离。性能靠多 worker 并行拿，不靠复用浏览器。
   extension: async ({ extensionPath, userDataDir }, use, testInfo) => {
     // 视频与 trace 只在失败时留证：常驻录屏是 CI 上每用例 ~15s 的主要开销，
     // 改为失败时抓 failure.png + trace.zip（见下方 teardown），通过用例不产出视频。
