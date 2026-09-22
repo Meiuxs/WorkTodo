@@ -1,5 +1,5 @@
 import { createTaskEvent } from '../domain/task-event.js';
-import { DomainError, ValidationError } from '../domain/errors.js';
+import { ConflictError, DomainError, ValidationError } from '../domain/errors.js';
 import { validateTask } from '../domain/task.js';
 import { materializeTaskRelationships, openWorkTodoDatabase } from './database.js';
 import {
@@ -9,13 +9,7 @@ import {
   querySearchGrams,
 } from './search-index.js';
 
-export class ConflictError extends DomainError {
-  constructor(taskId) {
-    super(`任务 ${taskId} 已被其他编辑更新`);
-    this.name = 'ConflictError';
-    this.taskId = taskId;
-  }
-}
+export { ConflictError };
 
 function clone(value) {
   return structuredClone(value);

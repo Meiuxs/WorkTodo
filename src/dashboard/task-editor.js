@@ -264,6 +264,15 @@ export function createTaskEditor({
     return draft;
   }
 
+  async function handleExternalChange(taskId) {
+    if (currentTask === null || currentTask.id !== taskId) return;
+    try {
+      await autosave.flushOnExternalChange();
+    } catch (error) {
+      if (error?.name !== 'ConflictError') throw error;
+    }
+  }
+
   const autosave = createEditorAutosave({
     initial: {},
     save: saveTaskDraft,
@@ -571,5 +580,5 @@ export function createTaskEditor({
     await renderResources();
   });
 
-  return { openNew, openTask, close };
+  return { openNew, openTask, close, handleExternalChange };
 }

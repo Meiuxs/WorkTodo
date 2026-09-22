@@ -87,6 +87,11 @@ export function createEditorAutosave({
 
     flush,
 
+    flushOnExternalChange() {
+      if (state !== 'dirty' && state !== 'saving') return Promise.resolve(clone(baseline));
+      return flush();
+    },
+
     cancel() {
       if (timer !== null) clearTimeoutFn(timer);
       timer = null;

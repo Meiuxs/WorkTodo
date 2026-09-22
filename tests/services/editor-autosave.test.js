@@ -109,6 +109,28 @@ test('flush 会立即提交待防抖的 draft', async () => {
   assert.equal(autosave.getState(), 'saved');
 });
 
+test('外部变更到达时立即提交待防抖的 draft', async () => {
+  const timers = createManualTimers();
+  const saved = [];
+  const autosave = createEditorAutosave({
+    initial: { title: 'A' },
+    delay: 500,
+    setTimeoutFn: timers.set,
+    clearTimeoutFn: timers.clear,
+    save: async (draft) => {
+      saved.push(draft);
+      return draft;
+    },
+  });
+
+  autosave.update({ title: 'B' });
+  await autosave.flushOnExternalChange();
+
+  assert.deepEqual(saved, [{ title: 'B' }]);
+  assert.equal(timers.size, 0);
+  assert.equal(autosave.getState(), 'saved');
+});
+
 test('保存失败保留 error 状态和 draft，冲突单独标记为 conflict', async () => {
   const conflict = Object.assign(new Error('revision 过期'), { name: 'ConflictError' });
   const states = [];

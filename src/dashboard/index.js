@@ -203,6 +203,29 @@ async function onAction(action, taskId, revision, value) {
     if (!confirmed) return null;
   }
 
+  // 菜单里的「恢复待办」不带 revision（行内勾选与撤销路径带），子任务行也没有菜单：
+  // 两者都不进级联确认。级联完成的逆操作默认把已完成的子任务一并恢复，
+  // 与完成方向的确认口径保持对称。
+  if (action === 'restore' && typeof value !== 'number') {
+    const restored = await taskService.getTask(taskId);
+    if (restored.parentId === null || restored.parentId === undefined) {
+      const siblings = await subtaskService.list(taskId);
+      const completedChildren = siblings.filter((child) =>
+        child.trashedAt === null && child.lifecycle === 'completed');
+      if (completedChildren.length > 0) {
+        const confirmed = await confirmAction({
+          title: '恢复父任务及其子任务？',
+          message: `还有 ${completedChildren.length} 个已完成的子任务。恢复父任务会同时把这些子任务标记为待办。`,
+          confirmLabel: '恢复全部',
+        });
+        if (!confirmed) return null;
+        const cascade = await controller.handleTaskAction('restore', taskId, revision, { force: true });
+        showToast(`已恢复父任务和 ${cascade.restoredChildren.length} 个子任务`);
+        return cascade;
+      }
+    }
+  }
+
   const result = await controller.handleTaskAction(action, taskId, revision, value);
   if (action === 'cancel') {
     showToast('已取消任务', {
