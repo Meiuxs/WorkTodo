@@ -451,6 +451,12 @@ document.querySelector('#quick-add').addEventListener('submit', async (event) =>
   const custom = document.querySelector('#quick-add-custom');
   const message = document.querySelector('#quick-add-message');
   message.textContent = '';
+  // 空标题不走浏览器原生校验气泡（表单已 novalidate），改用行内提示并聚焦输入框。
+  if (input.value.trim().length === 0) {
+    message.textContent = '先写下一件要做的事，再记录。';
+    input.focus();
+    return;
+  }
   const now = new Date();
   let scheduledDate = null;
   if (select.value === 'today') scheduledDate = toLocalDate(now);

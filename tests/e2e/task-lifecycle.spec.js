@@ -1,5 +1,18 @@
 import { test, expect, openDashboard } from './fixtures.js';
 
+test('空标题点“记录”不弹浏览器原生气泡，改为行内提示不创建任务', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  // 表单带 novalidate，阻断浏览器原生的“请填写此字段。”气泡，提交交给 JS 处理。
+  await expect(dashboard.locator('#quick-add')).toHaveAttribute('novalidate');
+  await dashboard.getByLabel('记录一个新事项').click();
+  await dashboard.getByRole('button', { name: '记录', exact: true }).click();
+
+  await expect(dashboard.locator('#quick-add-message')).toHaveText('先写下一件要做的事，再记录。');
+  await expect(dashboard.getByLabel('记录一个新事项')).toBeFocused();
+  // 未创建任何任务：今日列表仍为空。
+  await expect(dashboard.getByText('今天还没有待办')).toBeVisible();
+});
+
 test('安排今天并完成后进入实际完成的工作记录', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('完成项目报价');

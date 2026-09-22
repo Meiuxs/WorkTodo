@@ -146,6 +146,12 @@ dateButtons.forEach((button) => button.addEventListener('click', () => setSelect
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   message.textContent = '';
+  // 空标题不走浏览器原生校验气泡（表单已 novalidate），改用行内提示并聚焦输入框。
+  if (input.value.trim().length === 0) {
+    message.textContent = '先写下一件要做的事，再记录。';
+    input.focus();
+    return;
+  }
   const today = toLocalDate(new Date());
   const scheduledDate = selectedDate === 'today' ? today : selectedDate === 'tomorrow' ? dateOffset(new Date(), 1) : null;
   try {
