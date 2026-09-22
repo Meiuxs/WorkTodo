@@ -492,6 +492,7 @@ document.addEventListener('keydown', createShortcutHandler({
 }));
 
 chrome.runtime.onMessage.addListener((message) => {
+  void taskEditor.handleExternalChange(message?.taskId).catch(onError);
   controller.onMessage(message).catch(onError);
 });
 
