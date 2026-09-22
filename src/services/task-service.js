@@ -128,11 +128,12 @@ export class TaskService {
     return { task: await this.#repository.deleteCreated(id, expectedRevision) };
   }
 
-  async copy(id) {
+  async copy(id, changes = {}) {
     const source = await this.#task(id);
     const now = this.#now();
     const task = {
       ...source,
+      ...changes,
       id: this.#generateId(),
       lifecycle: 'todo',
       revision: 0,
@@ -143,6 +144,7 @@ export class TaskService {
       trashedAt: null,
       parentId: null,
       tagIds: source.tagIds ?? [],
+      firstScheduledDate: Object.hasOwn(changes, 'scheduledDate') ? changes.scheduledDate : source.scheduledDate,
       seriesId: null,
       occurrenceKey: null,
     };

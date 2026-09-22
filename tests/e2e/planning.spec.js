@@ -17,7 +17,7 @@ test('页面快捷键可以导航并聚焦快速新增', async ({ extension }) =
 
 test('任务编辑器可以创建重复任务模板和首个实例', async ({ extension }) => {
   const page = await openDashboard(extension);
-  await page.getByRole('button', { name: '更多字段', exact: true }).click();
+  await page.getByRole('button', { name: '补充详情', exact: true }).click();
   await page.getByLabel('任务名称').fill('每周复盘');
   const scheduledDate = await page.evaluate(() => {
     const date = new Date();
@@ -193,6 +193,69 @@ test('月历展示当前月份任务并支持切换月份', async ({ extension }
   await expect(page.locator('[data-month-label]')).not.toHaveText(currentMonth);
 });
 
+test('月历月份标题两侧紧邻翻页按钮', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.getByRole('button', { name: '月历', exact: true }).click();
+  const nav = page.locator('.month-nav');
+  await expect(nav.locator('[data-month-label]')).toBeVisible();
+
+  const structure = await nav.evaluate((node) => ({
+    // h2 没有 data-month-nav，这里补空串，让顺序断言读起来是一串结构标记。
+    children: [...node.children].map((child) => `${child.tagName.toLowerCase()}${child.dataset.monthNav ?? ''}`),
+    prevLabel: node.querySelector('[data-month-nav="-1"]')?.getAttribute('aria-label'),
+    nextLabel: node.querySelector('[data-month-nav="1"]')?.getAttribute('aria-label'),
+  }));
+  // 顺序固定为「上个月 → 月份标题 → 下个月」：翻页控件与被翻页的标题必须相邻。
+  expect(structure.children).toEqual(['button-1', 'h2', 'button1']);
+  expect(structure.prevLabel).toBe('上个月');
+  expect(structure.nextLabel).toBe('下个月');
+});
+
+test('月历格最多显示三条任务并提供“更多”当日弹窗', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  const today = await page.evaluate(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  });
+  await page.evaluate(async (date) => {
+    const { TaskRepository } = await import('../data/task-repository.js');
+    const { TaskService } = await import('../services/task-service.js');
+    const service = new TaskService(new TaskRepository());
+    for (const title of ['月历超长标题任务需要单行截断显示', '月历任务二', '月历任务三', '月历任务四', '月历任务五']) {
+      await service.create({ title, scheduledDate: date });
+    }
+  }, today);
+
+  await page.getByRole('button', { name: '月历', exact: true }).click();
+  const cell = page.locator(`[data-date="${today}"]`);
+  await expect(cell.locator('.task')).toHaveCount(3);
+  // 日期格右上角仍是当日任务总数，而不是可见条数。
+  await expect(cell.locator('.month-day__count')).toHaveText('5');
+
+  const titleStyle = await cell.locator('.task__title').first().evaluate((node) => ({
+    whiteSpace: getComputedStyle(node).whiteSpace,
+    textOverflow: getComputedStyle(node).textOverflow,
+    fullTitle: node.getAttribute('title'),
+  }));
+  expect(titleStyle.whiteSpace).toBe('nowrap');
+  expect(titleStyle.textOverflow).toBe('ellipsis');
+  expect(titleStyle.fullTitle).toBe('月历超长标题任务需要单行截断显示');
+
+  // 完成控件必须是方形复选框，不能再用圆形（圆形会被读成单选）。
+  expect(await cell.locator('.task__check').first().evaluate((node) => getComputedStyle(node).borderRadius)).not.toContain('%');
+
+  const more = cell.getByRole('button', { name: /的全部 5 项任务$/ });
+  await expect(more).toHaveText('+2 更多');
+  await more.click();
+
+  const dialog = page.locator('#month-day-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.task')).toHaveCount(5);
+  await expect(dialog.getByRole('button', { name: '月历任务五', exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(dialog).toBeHidden();
+});
+
 test('月历在 390px 下可键盘打开任务且没有横向溢出', async ({ extension }) => {
   const page = await openDashboard(extension);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -308,7 +371,7 @@ test('工作记录可以生成并复制规则模板总结', async ({ extension }
   await page.getByLabel('记录一个新事项').fill('总结用任务');
   await page.locator('#quick-add-date').selectOption('today');
   await page.getByRole('button', { name: '记录', exact: true }).click();
-  await page.getByRole('checkbox', { name: '完成任务', exact: true }).first().click();
+  await page.getByRole('checkbox', { name: /^完成任务：/ }).first().click();
   await page.getByRole('button', { name: '工作记录', exact: true }).click();
 
   await expect(page.locator('.history-report-top')).toBeVisible();

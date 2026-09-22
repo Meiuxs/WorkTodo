@@ -132,19 +132,56 @@ function categoryOptions(categories, selectedId = '') {
     .join('');
 }
 
-function categoryRows(categories) {
-  if (categories.length === 0) {
-    return `<div class="empty-state">
+/* 行操作图标：24×24 画布、2px 线宽、描边取 currentColor，深色主题自动跟随文字色。
+   图标一律 aria-hidden，动作名称全部由按钮的 aria-label / title 承担（规范 §4.13）。 */
+const ROW_ICON_PATHS = {
+  rename: '<path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>',
+  delete: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+  save: '<path d="M20 6L9 17l-5-5"/>',
+  cancel: '<path d="M18 6L6 18"/><path d="M6 6l12 12"/>',
+};
+
+function rowIcon(name) {
+  return `<svg class="row-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ROW_ICON_PATHS[name]}</svg>`;
+}
+
+function categoryEmptyState() {
+  return `<div class="empty-state">
       <p class="empty-state__title">还没有列表</p>
       <p class="empty-state__text">创建后可在任务编辑器中分配。</p>
     </div>`;
-  }
-  return categories.map((item) => `<div class="category-row" data-category-id="${escapeHtml(item.id)}">
-    <label class="sr-only" for="category-${escapeHtml(item.id)}">列表名称</label>
-    <input id="category-${escapeHtml(item.id)}" value="${escapeHtml(item.name)}" maxlength="100">
-    <button type="button" data-category-action="rename">保存名称</button>
-    <button type="button" data-category-action="delete">删除列表</button>
-  </div>`).join('');
+}
+
+/* 只读行：名称靠左，重命名与删除两个图标靠右；删除是高危动作，固定排在行尾。 */
+function categoryRow(item) {
+  const id = escapeHtml(item.id);
+  const name = escapeHtml(item.name);
+  return `<div class="category-row" data-category-id="${id}">
+    <span class="category-row__name">${name}</span>
+    <span class="category-row__actions">
+      <button type="button" class="icon-button icon-button--row" data-category-action="rename" aria-label="重命名列表：${name}" title="重命名列表">${rowIcon('rename')}</button>
+      <button type="button" class="icon-button icon-button--row icon-button--row-danger" data-category-action="delete" aria-label="删除列表：${name}" title="删除列表">${rowIcon('delete')}</button>
+    </span>
+  </div>`;
+}
+
+/* 编辑行：名称原地换成输入框，Enter 保存、Esc 或 ✕ 取消，两个图标位置不变。 */
+function categoryEditRow(item) {
+  const id = escapeHtml(item.id);
+  const name = escapeHtml(item.name);
+  return `<form class="category-row category-row--editing" data-category-id="${id}">
+    <label class="sr-only" for="rename-${id}">列表名称</label>
+    <input id="rename-${id}" name="name" value="${name}" maxlength="100" required>
+    <span class="category-row__actions">
+      <button type="submit" class="icon-button icon-button--row" aria-label="保存列表名称" title="保存名称">${rowIcon('save')}</button>
+      <button type="button" class="icon-button icon-button--row" data-category-action="cancel" aria-label="取消重命名" title="取消">${rowIcon('cancel')}</button>
+    </span>
+  </form>`;
+}
+
+function categoryRows(categories) {
+  if (categories.length === 0) return categoryEmptyState();
+  return categories.map((item) => categoryRow(item)).join('');
 }
 
 export function createSettingsView({
@@ -292,9 +329,9 @@ export function createSettingsView({
         <div><h2 id="category-heading">列表</h2><p>删除列表时必须把任务迁移到未归入列表或其他列表，任务本身不会删除。</p></div>
       </div>
       <form id="create-category" class="category-create">
-        <label for="new-category">新列表名称</label>
-        <input id="new-category" name="name" maxlength="100" required>
-        <button type="submit">创建列表</button>
+        <label class="sr-only" for="new-category">新列表名称</label>
+        <input id="new-category" name="name" maxlength="100" placeholder="输入新列表名称……" required>
+        <button type="submit" class="button-primary">创建列表</button>
       </form>
       <p class="form-message" id="category-message" role="alert"></p>
       <div class="category-list">${categoryRows(categories)}</div>
@@ -418,14 +455,51 @@ export function createSettingsView({
     });
 
     const deleteDialog = root.querySelector('#delete-category-dialog');
+    const list = root.querySelector('.category-list');
+    const categoryMessage = root.querySelector('#category-message');
+
+    /* 增删改后 .category-list 会整段重建，旧节点已经不在文档里；
+       焦点目标只能按列表 id 现取，取不到就退回创建输入框，不丢到 body。 */
+    function focusRowAction(categoryId, action) {
+      if (signal?.aborted) return;
+      const row = root.querySelector(`.category-list [data-category-id="${CSS.escape(categoryId)}"]`);
+      const target = row?.querySelector(`[data-category-action="${action}"]`);
+      (target ?? row ?? root.querySelector('#new-category'))?.focus();
+    }
+
+    function startRename(row) {
+      const name = row.querySelector('.category-row__name').textContent;
+      row.outerHTML = categoryEditRow({ id: row.dataset.categoryId, name });
+      const input = root.querySelector('.category-row--editing input');
+      input?.focus();
+      input?.select();
+    }
+
+    function openDeleteDialog(categoryId) {
+      deleteDialog.dataset.categoryId = categoryId;
+      deleteDialog.querySelector('select').innerHTML = categoryOptions(categories, categoryId);
+      deleteDialog.querySelector('[data-delete-message]').textContent = '';
+      deleteDialog.showModal();
+      // 规范 §4.5：默认焦点落在安全动作上。
+      deleteDialog.querySelector('[value="cancel"]')?.focus();
+    }
+
     deleteDialog.addEventListener('close', () => {
-      if (deleteDialog.returnValue !== 'confirm') return;
       const categoryId = deleteDialog.dataset.categoryId;
+      if (deleteDialog.returnValue !== 'confirm') {
+        focusRowAction(categoryId, 'delete');
+        return;
+      }
       runViewAction(async () => {
         try {
           const destination = deleteDialog.querySelector('select').value || null;
           await taskService.deleteCategory(categoryId, destination);
           await renderCategoryList(signal);
+          if (signal?.aborted) return;
+          // 删掉的可能就是最后一条：没有列表时焦点回到创建输入框。
+          const nextRow = root.querySelector('.category-list [data-category-id]');
+          if (nextRow === null) root.querySelector('#new-category')?.focus();
+          else focusRowAction(nextRow.dataset.categoryId, 'rename');
         } catch (error) {
           if (signal?.aborted) return;
           deleteDialog.querySelector('[data-delete-message]').textContent = error.message;
@@ -434,28 +508,57 @@ export function createSettingsView({
       }, { signal, onError });
     });
 
-    root.querySelector('.category-list').addEventListener('click', (event) => {
+    list.addEventListener('click', (event) => {
       const button = event.target.closest('[data-category-action]');
       if (button === null) return;
       const row = button.closest('[data-category-id]');
       const categoryId = row.dataset.categoryId;
-      if (button.dataset.categoryAction === 'rename') {
+      const action = button.dataset.categoryAction;
+      if (action === 'rename') {
+        categoryMessage.textContent = '';
+        startRename(row);
+        return;
+      }
+      // 取消：重取数据重画这一行就是"回到只读"，不需要另存临时值。
+      if (action === 'cancel') {
         runViewAction(async () => {
-          try {
-            await taskService.renameCategory(categoryId, row.querySelector('input').value);
-            await renderCategoryList(signal);
-          } catch (error) {
-            if (signal?.aborted) return;
-            root.querySelector('#category-message').textContent = error.message;
-            row.querySelector('input').focus();
-          }
+          await renderCategoryList(signal);
+          focusRowAction(categoryId, 'rename');
         }, { signal, onError });
         return;
       }
-      deleteDialog.dataset.categoryId = categoryId;
-      deleteDialog.querySelector('select').innerHTML = categoryOptions(categories, categoryId);
-      deleteDialog.querySelector('[data-delete-message]').textContent = '';
-      deleteDialog.showModal();
+      categoryMessage.textContent = '';
+      openDeleteDialog(categoryId);
+    });
+
+    list.addEventListener('submit', (event) => {
+      const form = event.target.closest('.category-row--editing');
+      if (form === null) return;
+      event.preventDefault();
+      const input = form.elements.namedItem('name');
+      const categoryId = form.dataset.categoryId;
+      runViewAction(async () => {
+        try {
+          await taskService.renameCategory(categoryId, input.value);
+          await renderCategoryList(signal);
+          focusRowAction(categoryId, 'rename');
+        } catch (error) {
+          if (signal?.aborted) return;
+          categoryMessage.textContent = error.message;
+          input.focus();
+        }
+      }, { signal, onError });
+    });
+
+    list.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      const form = event.target.closest?.('.category-row--editing');
+      if (form == null) return;
+      const categoryId = form.dataset.categoryId;
+      runViewAction(async () => {
+        await renderCategoryList(signal);
+        focusRowAction(categoryId, 'rename');
+      }, { signal, onError });
     });
   }
 

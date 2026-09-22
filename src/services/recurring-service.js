@@ -56,13 +56,13 @@ export class RecurringService {
     return this.#templateRepository.get(id);
   }
 
-  async generateNext(templateId, currentDate) {
+  async generateNext(templateId, currentDate, { returnMeta = false } = {}) {
     const template = await this.#templateRepository.get(templateId);
-    if (template === undefined || !template.active) return null;
+    if (template === undefined || !template.active) return returnMeta ? { task: null, created: false } : null;
     const nextDate = nextOccurrenceDate(template, currentDate);
     const occurrenceKey = createOccurrenceKey(template.id, nextDate);
     const existing = await this.#taskRepository.findByOccurrenceKey(occurrenceKey);
-    if (existing !== undefined) return existing;
+    if (existing !== undefined) return returnMeta ? { task: existing, created: false } : existing;
 
     const now = this.#now();
     const nextTask = createTask({
@@ -85,7 +85,7 @@ export class RecurringService {
       detail: { recurringTemplateId: template.id, previousOccurrence: currentDate },
     });
     const result = await this.#taskRepository.createIfOccurrenceAbsent(nextTask, event);
-    return result.task;
+    return returnMeta ? { task: result.task, created: result.created === true } : result.task;
   }
 
   async #completeTask(taskId, revision, options) {
@@ -97,9 +97,19 @@ export class RecurringService {
   async complete(taskId, revision, options = {}) {
     const current = await this.#taskService.getTask(taskId);
     const result = await this.#completeTask(taskId, revision, options);
-    const nextTask = current.seriesId === null
-      ? null
-      : await this.generateNext(current.seriesId, current.scheduledDate);
-    return { ...result, nextTask };
+    let next;
+    try {
+      next = current.seriesId === null
+        ? { task: null, created: false }
+        : await this.generateNext(current.seriesId, current.scheduledDate, { returnMeta: true });
+    } catch (error) {
+      // 下一实例写入失败时撤回本次完成，避免重复任务已经完成但用户看不到后续实例。
+      try { await this.#taskService.restore(result.task.id, result.task.revision); } catch { /* best effort rollback */ }
+      for (const child of [...(result.completedChildren ?? [])].reverse()) {
+        try { await this.#taskService.restore(child.id, child.revision); } catch { /* best effort rollback */ }
+      }
+      throw error;
+    }
+    return { ...result, nextTask: next.task, nextTaskCreated: next.created };
   }
 }

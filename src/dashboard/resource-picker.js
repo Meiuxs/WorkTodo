@@ -97,6 +97,14 @@ export function createResourcePicker({ dialog, resourceService, onChanged, onErr
       close();
     } catch (error) {
       message.textContent = error?.message ?? '资料没有保存，请重试。';
+      const focusTarget = error?.message?.includes('网页链接') || error?.message?.includes('url')
+        ? url
+        : error?.message?.includes('片段') || error?.message?.includes('content')
+          ? content
+          : error?.message?.includes('文件') || error?.message?.includes('file')
+            ? file
+            : title;
+      focusTarget?.focus();
     } finally {
       submit.disabled = false;
     }

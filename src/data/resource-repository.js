@@ -116,7 +116,13 @@ export class ResourceRepository {
   async attachTask(taskId, resourceId) {
     if (typeof taskId !== 'string' || taskId.length === 0) throw new ValidationError('taskId 不能为空');
     const database = await this.#getDatabase();
-    const transaction = database.transaction(['resources', 'taskResources', 'resourceBlobs'], 'readwrite');
+    const transaction = database.transaction(['tasks', 'resources', 'taskResources', 'resourceBlobs'], 'readwrite');
+    const task = await requestResult(transaction.objectStore('tasks').get(taskId));
+    if (task === undefined) {
+      transaction.abort();
+      try { await transactionResult(transaction); } catch { /* expected abort */ }
+      throw new ValidationError(`任务 ${taskId} 不存在`);
+    }
     const resource = await requestResult(transaction.objectStore('resources').get(resourceId));
     if (resource === undefined) {
       transaction.abort();
@@ -161,7 +167,7 @@ export class ResourceRepository {
 
   async delete(id) {
     const database = await this.#getDatabase();
-    const transaction = database.transaction(['resources', 'taskResources'], 'readwrite');
+    const transaction = database.transaction(['resources', 'taskResources', 'resourceBlobs'], 'readwrite');
     const resources = transaction.objectStore('resources');
     const resource = await requestResult(resources.get(id));
     if (resource === undefined) {
@@ -177,15 +183,24 @@ export class ResourceRepository {
     await transactionResult(transaction);
   }
 
-  async exportAll() {
+  async exportAll({ includeBlobs = false } = {}) {
     const database = await this.#getDatabase();
-    const transaction = database.transaction(['resources', 'taskResources'], 'readonly');
-    const [resources, taskResources] = await Promise.all([
+    const stores = includeBlobs
+      ? ['resources', 'taskResources', 'resourceBlobs']
+      : ['resources', 'taskResources'];
+    const transaction = database.transaction(stores, 'readonly');
+    const [resources, taskResources, blobs = []] = await Promise.all([
       requestResult(transaction.objectStore('resources').getAll()),
       requestResult(transaction.objectStore('taskResources').getAll()),
+      includeBlobs ? requestResult(transaction.objectStore('resourceBlobs').getAll()) : Promise.resolve([]),
     ]);
     await transactionResult(transaction);
-    return clone({ resources, taskResources });
+    if (!includeBlobs) return clone({ resources, taskResources });
+    const blobsById = new Map(blobs.map((entry) => [entry.id, entry.blob]));
+    return clone({
+      resources: resources.map((resource) => ({ ...resource, blob: blobsById.get(resource.id) ?? null })),
+      taskResources,
+    });
   }
 
   async replaceAll(snapshot) {

@@ -1,6 +1,10 @@
-import { formatLocalDay, toLocalDate } from '../../domain/dates.js';
+import { formatLocalDay, formatLocalDayWithWeekday, toLocalDate, weekdayLabel } from '../../domain/dates.js';
 import { runViewAction } from '../../shared/ui.js';
 import { renderTaskList } from '../task-list.js';
+
+// 桌面与窄屏共用同一套密度：每格最多显示 3 条，超出的收进“+N 更多”弹窗，
+// 免得单个格子被长列表撑高、整月网格高度参差。
+const MAX_VISIBLE_TASKS = 3;
 
 function shiftMonth(date, offset) {
   const [year, month] = date.split('-').map(Number);
@@ -12,12 +16,6 @@ function formatMonth(startDate) {
     .format(new Date(`${startDate}T00:00:00`));
 }
 
-const WEEKDAY_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-
-function weekdayLabel(date) {
-  return WEEKDAY_LABELS[new Date(`${date}T00:00:00`).getDay()];
-}
-
 export function createMonthView({
   root,
   query,
@@ -26,9 +24,48 @@ export function createMonthView({
   onAction,
   onEdit,
   onError,
+  dayDialog = null,
 }) {
   let anchor = today();
   let renderVersion = 0;
+  // 记录由“+N 更多”打开的日期；列表重渲染后据此把弹窗刷新到最新数据。
+  let openDayDate = null;
+
+  if (dayDialog !== null) {
+    // Esc、遮罩与关闭按钮都会触发 close：统一在这里清空打开状态，避免下次渲染误刷新已关闭的弹窗。
+    dayDialog.addEventListener('close', () => { openDayDate = null; });
+  }
+
+  function renderDayTasks(date, tasks, tags) {
+    dayDialog.querySelector('[data-day-dialog-title]').textContent = formatLocalDayWithWeekday(date);
+    dayDialog.querySelector('[data-day-dialog-summary]').textContent = `${tasks.length} 项任务`;
+    renderTaskList(dayDialog.querySelector('[data-day-dialog-list]'), tasks, {
+      today: anchor,
+      tags,
+      onAction,
+      onEdit,
+      onError,
+      emptyMessage: '这一天没有任务。',
+    });
+  }
+
+  function openDayTasks(date, tasks, tags) {
+    if (dayDialog === null) return;
+    openDayDate = date;
+    renderDayTasks(date, tasks, tags);
+    if (!dayDialog.open) dayDialog.showModal();
+  }
+
+  // 弹窗打开期间月历会因任务动作整页重渲染：这里按最新数据刷新弹窗，当天清空则自动关闭。
+  function syncDayDialog(calendar, tags) {
+    if (dayDialog === null || !dayDialog.open || openDayDate === null) return;
+    const tasks = calendar.byDate[openDayDate] ?? [];
+    if (tasks.length === 0) {
+      dayDialog.close();
+      return;
+    }
+    renderDayTasks(openDayDate, tasks, tags);
+  }
 
   return {
     async render(signal) {
@@ -49,14 +86,14 @@ export function createMonthView({
       // 表头直接由第一周的真实日期推出星期，这样无论周起始是哪天，列标题都不会错位。
       const weekdays = (calendar.weeks[0] ?? []).map(weekdayLabel);
       root.innerHTML = `<section class="view-section" aria-labelledby="month-heading">
-        <div class="section-heading">
+        <div class="section-heading month-heading">
           <div>
-            <h2 id="month-heading" data-month-label>${label}</h2>
-            <p>按月查看任务分布，点击标题可编辑，点左侧圆圈直接完成。</p>
-          </div>
-          <div class="month-nav" role="group" aria-label="月份切换">
-            <button type="button" data-month-nav="-1">上个月</button>
-            <button type="button" data-month-nav="1">下个月</button>
+            <div class="month-nav" role="group" aria-label="月份切换">
+              <button type="button" data-month-nav="-1" aria-label="上个月" title="上个月">‹</button>
+              <h2 id="month-heading" data-month-label>${label}</h2>
+              <button type="button" data-month-nav="1" aria-label="下个月" title="下个月">›</button>
+            </div>
+            <p>按月查看任务分布。</p>
           </div>
         </div>
         <div class="month-grid" aria-label="${label}">
@@ -80,7 +117,10 @@ export function createMonthView({
       </section>`;
 
       for (const cell of root.querySelectorAll('[data-date]')) {
-        renderTaskList(cell.querySelector('.month-day__tasks'), calendar.byDate[cell.dataset.date] ?? [], {
+        const date = cell.dataset.date;
+        const dayTasks = calendar.byDate[date] ?? [];
+        const visibleTasks = dayTasks.slice(0, MAX_VISIBLE_TASKS);
+        renderTaskList(cell.querySelector('.month-day__tasks'), visibleTasks, {
           today: requestedAnchor,
           tags,
           onAction,
@@ -88,6 +128,16 @@ export function createMonthView({
           onError,
           emptyMessage: '',
         });
+        const hiddenCount = dayTasks.length - visibleTasks.length;
+        if (hiddenCount > 0) {
+          const more = document.createElement('button');
+          more.type = 'button';
+          more.className = 'month-day__more';
+          more.dataset.dayMore = date;
+          more.setAttribute('aria-label', `查看 ${formatLocalDay(date)} 的全部 ${dayTasks.length} 项任务`);
+          more.textContent = `+${hiddenCount} 更多`;
+          cell.append(more);
+        }
       }
 
       // 日期格子之间的方向键增强（非复合角色要求）：左右移动一天，上下移动一周，Home/End 到本周首尾。
@@ -121,12 +171,24 @@ export function createMonthView({
         focusCell(index + offset);
       });
 
+      // “+N 更多”打开当日任务弹窗；用委托绑定，格子重建后无需重挂。
+      root.querySelector('.month-grid')?.addEventListener('click', (event) => {
+        const more = event.target.closest('[data-day-more]');
+        if (more === null) return;
+        const date = more.dataset.dayMore;
+        openDayTasks(date, calendar.byDate[date] ?? [], tags);
+      });
+
       root.querySelectorAll('[data-month-nav]').forEach((button) => {
         button.addEventListener('click', () => {
+          // 翻月后旧日期可能不在新网格里：先收起弹窗，避免停在一个当前不可见的日期上。
+          if (dayDialog?.open) dayDialog.close();
           anchor = shiftMonth(anchor, Number(button.dataset.monthNav));
           runViewAction(() => this.render(signal), { signal, onError });
         });
       });
+
+      syncDayDialog(calendar, tags);
     },
 
     /* 月历是格子矩阵，行级原地替换保不住网格焦点分配（roving tabindex），

@@ -2,7 +2,7 @@ import { test, expect, openDashboard, openPopup, openEditorGroup } from './fixtu
 
 test('Popup 完成重复任务后会继续生成下一实例', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
-  await dashboard.getByRole('button', { name: '更多字段', exact: true }).click();
+  await dashboard.getByRole('button', { name: '补充详情', exact: true }).click();
   await dashboard.getByLabel('任务名称').fill('Popup 每日复盘');
   const today = await dashboard.evaluate(() => new Date().toISOString().slice(0, 10));
   await dashboard.locator('#task-editor input[name="scheduledDate"]').fill(today);

@@ -41,7 +41,8 @@
 
 ## Packaging
 
-- 使用 `npm run package` 生成可导入 Chromium 的扩展压缩包。
+- 使用 `npm run package` 生成可导入 Chromium 的扩展压缩包；入口使用 Node.js 内置能力，可在 Windows、UOS/Linux 和 CI 运行，不依赖 PowerShell。
+- 使用 `npm run verify:package` 校验 Manifest V3、权限/CSP、ZIP allowlist 以及包名与版本一致性。
 - 打包脚本读取 `manifest.json` 的版本号，输出到 `dist/WorkTodo-v<version>.zip`。
 - 发布包只包含 `manifest.json` 和 `src/`，不包含测试、文档、`node_modules` 或开发工具。
 - 生成的压缩包解压后，在 Chromium 的扩展管理页开启"开发者模式"，选择"加载已解压的扩展程序"，指向解压目录即可安装。

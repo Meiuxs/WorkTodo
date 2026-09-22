@@ -87,7 +87,7 @@ test('回收站可以恢复任务，永久删除任务需要二次确认', async
   await page.locator('#quick-add-date').selectOption('today');
   await page.getByRole('button', { name: '记录', exact: true }).click();
   const row = page.locator('[data-task-id]').filter({ has: page.getByRole('button', { name: '待删除任务' }) });
-  await row.getByText('更多', { exact: true }).click();
+  await row.locator('summary[aria-label^="更多任务操作"]').click();
   // 可撤销的移入回收站不再叠加确认：一次点击直接执行。
   await row.getByRole('button', { name: '移入回收站', exact: true }).click();
 
@@ -145,7 +145,7 @@ test('回收站主复选框恢复四种状态并只清空 trashedAt', async ({ e
     const row = page.locator(`[data-task-id="${task.id}"]`);
     const checkbox = row.locator('.task__check');
     await expect(checkbox).toHaveAttribute('data-action', 'untrash');
-    await expect(checkbox).toHaveAccessibleName('恢复任务');
+    await expect(checkbox).toHaveAccessibleName(`恢复任务：${task.title}`);
   }
 
   for (const task of tasks) {
@@ -351,7 +351,7 @@ test('回收站行直接展示永久删除，不再套更多菜单', async ({ ex
   await expect(row.getByRole('button', { name: '永久删除 回收站行', exact: true })).toBeVisible();
   // 恢复仍由行首圆环承担，不得出现第二个恢复入口。
   await expect(row.locator('.task__check')).toHaveAttribute('data-action', 'untrash');
-  await expect(row.getByRole('button', { name: '恢复任务', exact: true })).toHaveCount(1);
+  await expect(row.getByRole('button', { name: '恢复任务：回收站行', exact: true })).toHaveCount(1);
 
   // 破坏性色必须在行所在的表层上满足 AA，深浅两套主题都不例外。
   // 断言比值而不是写死 rgb：写死会在令牌调整时假失败。

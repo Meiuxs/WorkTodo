@@ -85,7 +85,7 @@ function taskMarkup(task, today) {
   const checked = task.lifecycle === 'completed';
   // 完成是 Popup 里的“立刻推进”动作：用真正的按钮与 role="checkbox"，
   // 与工作台任务行的圆圈完全一致的语义，而不是看起来能点却不可点的静态符号。
-  return `<li class="task-row"><button class="task-row__check" type="button" role="checkbox" aria-checked="${checked}" aria-label="完成任务" data-action="complete" data-task-id="${escapeHtml(task.id)}" data-revision="${task.revision}">${checked ? '✓' : ''}</button><span class="task-row__title" title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</span><span class="task-row__detail${overdue ? ' task-row__detail--overdue' : ''}">${detail}</span></li>`;
+  return `<li class="task-row"><button class="task-row__check" type="button" role="checkbox" aria-checked="${checked}" aria-label="完成任务：${escapeHtml(task.title)}" data-action="complete" data-task-id="${escapeHtml(task.id)}" data-revision="${task.revision}">${checked ? '✓' : ''}</button><span class="task-row__title" title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</span><span class="task-row__detail${overdue ? ' task-row__detail--overdue' : ''}">${detail}</span></li>`;
 }
 
 const repository = new TaskRepository();
@@ -171,12 +171,13 @@ async function handleComplete(button) {
   const revision = Number(button.dataset.revision);
   button.disabled = true;
   try {
-    const { task: completed, completedChildren } = await controller.completeTask(taskId, revision);
+    const { task: completed, completedChildren, nextTask, nextTaskCreated } = await controller.completeTask(taskId, revision);
     await refresh();
     // 级联结果写进反馈：与工作台同一口径，用户才能预判撤销覆盖的范围。
     showCompleteToast(
       completedChildren.length > 0 ? `已完成父任务和 ${completedChildren.length} 个子任务` : '已完成任务',
       async () => {
+        if (nextTaskCreated && nextTask !== null) await controller.undoCreate(nextTask);
         await controller.restoreTask(taskId, completed.revision);
         await controller.restoreTasks(completedChildren);
         await refresh();

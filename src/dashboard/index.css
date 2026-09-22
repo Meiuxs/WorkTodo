@@ -145,11 +145,14 @@
 
 /* ============ 页头 ============ */
 .workspace-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--sp-5); }
+/* 系统日期退到页头右上角并降为弱化说明文字：
+   它回答"今天是几号"，不承担"我在哪个页面"，所以不与 h1 抢第一眼。 */
 .workspace-date {
-  margin: 0 0 var(--sp-2);
-  color: var(--teal);
-  font-size: var(--fs-ui);
-  font-weight: 700;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+  text-align: right;
 }
 .workspace-header h1 {
   margin: 0;
@@ -266,7 +269,7 @@
 .task {
   position: relative;
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   gap: var(--sp-4);
   align-items: center;
   min-height: 64px;
@@ -277,31 +280,43 @@
 .task:hover { background: var(--hover-tint); }
 
 .task__check {
+  position: relative;
   display: grid;
-  width: 26px;
-  height: 26px;
+  width: 44px;
+  height: 44px;
   place-items: center;
-  border: 1.5px solid var(--teal);
-  border-radius: var(--r-pill);
+  border: 0;
+  border-radius: var(--r-sm);
   background: transparent;
-  color: var(--surface-raised);
+  color: transparent;
   padding: 0;
   font-size: var(--fs-caption);
   line-height: 1;
 }
 
+.task__check::before {
+  content: '';
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid var(--teal);
+  border-radius: var(--r-sm);
+  background: transparent;
+}
 .task__check[aria-checked="true"],
-.task__check:hover { background: var(--teal); }
+.task__check:hover { background: transparent; color: var(--surface-raised); }
+.task__check[aria-checked="true"]::before,
+.task__check:hover::before { background: var(--teal); }
 .task__check--restore {
-  background: var(--teal-soft);
+  background: transparent;
   color: var(--teal);
 }
 .task__check--restore:hover {
-  background: var(--teal);
+  background: transparent;
   color: var(--surface-raised);
 }
 .task--completed .task__check--restore {
-  background: var(--teal);
+  background: transparent;
   color: var(--surface-raised);
 }
 .task__body { min-width: 0; padding: var(--sp-4) 0; }
@@ -403,26 +418,38 @@
 }
 .task__subtask {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--sp-3);
   min-height: 30px;
 }
 .task__subtask-check {
+  position: relative;
   display: grid;
-  width: 18px;
-  height: 18px;
+  width: 44px;
+  height: 44px;
   place-items: center;
-  border: 1.5px solid var(--teal);
-  border-radius: var(--r-pill);
+  border: 0;
+  border-radius: var(--r-sm);
   background: transparent;
-  color: var(--surface-raised);
+  color: transparent;
   padding: 0;
   font-size: var(--fs-micro);
   line-height: 1;
 }
+.task__subtask-check::before {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--teal);
+  border-radius: var(--r-sm);
+  background: transparent;
+}
 .task__subtask-check[aria-checked="true"],
-.task__subtask-check:hover { background: var(--teal); }
+.task__subtask-check:hover { background: transparent; color: var(--surface-raised); }
+.task__subtask-check[aria-checked="true"]::before,
+.task__subtask-check:hover::before { background: var(--teal); }
 .task__subtask-title {
   overflow: hidden;
   border: 0;
@@ -482,17 +509,25 @@
 .week-empty span { color: var(--muted); font-size: var(--fs-ui); }
 
 /* ============ 月历 ============ */
-.month-nav { display: flex; gap: var(--sp-2); }
+/* 月份标题被上/下月按钮夹在中间：翻页控件必须紧贴翻页对象，
+   否则宽屏下鼠标要在标题和远端按钮之间来回长距离移动。 */
+.month-nav { display: flex; align-items: center; gap: var(--sp-3); }
 .month-nav button {
-  min-height: var(--control-h-sm);
+  display: inline-grid;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  place-items: center;
   border: 1px solid var(--line-strong);
   border-radius: var(--r-sm);
   background: var(--surface-raised);
   color: var(--ink);
-  padding: var(--sp-2) var(--sp-4);
-  font-size: var(--fs-ui);
+  padding: 0;
+  font-size: var(--fs-lead);
+  line-height: 1;
 }
 .month-nav button:hover { border-color: var(--teal); color: var(--teal); }
+/* 月份标题保持稳定宽度：切换月份时字数不同也不会把两侧箭头推来推去。 */
+.month-nav h2 { min-width: 6.5em; margin: 0; text-align: center; }
 .month-grid {
   min-width: 0;
   border-top: 1px solid var(--line);
@@ -528,9 +563,20 @@
 .month-day--today { background: var(--teal-soft); box-shadow: inset 0 0 0 2px var(--teal); }
 .month-day--today h3 { color: var(--teal); font-weight: 700; }
 .month-day .task-list { border-top: 0; }
-.month-day .task { position: relative; grid-template-columns: 18px minmax(0, 1fr); gap: var(--sp-1); min-height: 34px; }
-.month-day .task__check { width: 18px; height: 18px; border-width: 1px; font-size: var(--fs-micro); }
-.month-day .task__body { padding: var(--sp-1) 0; }
+/* 格子里三行黏在一起，是因为行高完全由 44px 命中区撑起、行与行零间距。
+   命中区收敛到 40px（仍高于 32px 触控下限），行与行之间给 --sp-2（4px），
+   任务条读起来就是彼此独立的条目。 */
+.month-day .task { position: relative; grid-template-columns: 40px minmax(0, 1fr); gap: var(--sp-2); min-height: 40px; }
+.month-day .task + .task { margin-top: var(--sp-2); }
+/* 复选框视觉尺寸缩到 16px，与 12px 标题匹配；外框仍占满 40px 命中区，点击范围不变。
+   对齐靠外框居中完成，::before 只表达方块本身。 */
+.month-day .task__check { width: 40px; height: 40px; font-size: var(--fs-micro); }
+.month-day .task__check::before { width: 16px; height: 16px; border-width: 1.5px; }
+.month-day .task__body { padding: 0; min-height: 40px; display: flex; align-items: center; }
+/* 已完成的任务在日历里退居二线：整行压淡一档，标题用灰字加删除线，
+   让未完成任务保持正常墨色，视觉重心留在"还需要做的事"上。 */
+.month-day .task--completed { opacity: .6; }
+.month-day .task--completed .task__title { color: var(--muted); }
 /* 格子只有 140px 左右，"更多"若占一列，标题就只剩两个字的位置。
    把它移出文档流、悬停或键盘聚焦时浮出，标题拿回整行宽度。 */
 .month-day .task__more {
@@ -543,17 +589,34 @@
 .month-day .task:hover .task__more,
 .month-day .task__more:focus-within,
 .month-day .task__more[open] { opacity: 1; }
-/* 长标题在窄格里最多两行，不然一行任务会把整格撑高、周行高度全乱。 */
+/* 长标题单行截断，完整标题由按钮自带的 title 提供；不再换行，格子高度才不会被撑破。 */
 .month-day .task__title {
-  display: -webkit-box;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-size: var(--fs-caption);
   line-height: var(--lh-caption);
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
 }
+/* 星标与复选框、标题之间留出间距，三个元素不挤成一团。 */
+.month-day .task__title-line { gap: var(--sp-2); }
+.month-day .task__star { padding-inline: var(--sp-1); }
 .month-day .task__meta { display: none; }
+/* 每格最多 3 条，超出的任务收进“+N 更多”弹窗。
+   顶部一条极淡分割线把它与展示出的任务分开；居中、用动作色，读起来是入口而不是第四行任务。 */
+.month-day__more {
+  display: block;
+  width: 100%;
+  margin-top: var(--sp-2);
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--teal);
+  padding: var(--sp-1) var(--sp-2);
+  font-size: var(--fs-micro);
+  text-align: center;
+}
+.month-day__more:hover { background: var(--teal-soft); text-decoration: underline; }
 .month-day .task__more > summary { background: var(--surface-raised); padding: var(--sp-1) var(--sp-2); }
 .month-day .empty {
   min-height: 0;
@@ -567,17 +630,30 @@
 .task__more > summary {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: var(--control-h-sm);
+  min-width: 32px;
   border: 1px solid transparent;
   border-radius: var(--r-sm);
   color: var(--muted);
   cursor: pointer;
   list-style: none;
-  padding: 0 var(--sp-3);
-  font-size: var(--fs-caption);
+  padding: 0;
+  font-size: var(--fs-body);
+  line-height: 1;
 }
 
 .task__more > summary::-webkit-details-marker { display: none; }
+
+/* 只有精确指针设备才隐藏省略号：触屏没有悬停，图标必须常驻，
+   否则完成、延期和删除在移动端就消失了（规范 §4.8）。
+   键盘聚焦、菜单展开同样让图标显形，键盘路径不依赖鼠标。 */
+@media (hover: hover) and (pointer: fine) {
+  .task__more > summary { opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); }
+  .task:hover .task__more > summary,
+  .task__more:focus-within > summary,
+  .task__more[open] > summary { opacity: 1; }
+}
 .task__more[open] > summary,
 .task__more > summary:hover { border-color: var(--line); background: var(--surface-raised); color: var(--ink); }
 .task__menu {
@@ -667,7 +743,7 @@
 .completed-fold .task-list { border-top: 0; }
 
 /* ============ 快速记录 ============ */
-/* 内联表单：标签、输入行与日期选项在同一水平带内流式排列，不吸底、不浮层。 */
+/* 内联表单：标签与输入带在同一水平带内流式排列，不吸底、不浮层。 */
 .quick-add {
   position: static;
   display: flex;
@@ -684,13 +760,31 @@
 }
 .quick-add__lead { display: flex; flex: 0 0 auto; flex-direction: column; gap: var(--sp-1); min-width: 132px; }
 .quick-add__lead span { color: var(--muted); font-size: var(--fs-caption); }
-.quick-add__row { display: flex; flex: 1 1 340px; min-width: min(100%, 280px); gap: var(--sp-3); }
-.quick-add__row input { flex: 1 1 auto; min-width: 0; background: var(--surface); }
-.quick-add__row .button-primary { flex: 0 0 auto; min-width: 72px; }
-.quick-add__options { display: flex; align-items: center; flex: 0 0 auto; gap: var(--sp-2); }
-.quick-add__options select { width: auto; min-width: 120px; background: var(--surface); }
-.quick-add__options .quick-add__custom { width: 148px; }
-.quick-add__options .button-secondary { white-space: nowrap; }
+/* 操作顺序与用户心智一致：写标题 → 选计划日期 → 补充详情 → 记录（主按钮在行尾）。
+   主按钮不再插在输入框与日期选择之间。 */
+.quick-add__fields { display: flex; flex: 1 1 420px; align-items: center; gap: var(--sp-3); min-width: min(100%, 280px); }
+.quick-add__fields #quick-add-title { flex: 1 1 auto; min-width: 0; background: var(--surface); }
+.quick-add__fields select { flex: 0 0 auto; width: auto; min-width: 120px; background: var(--surface); }
+.quick-add__fields .quick-add__custom { flex: 0 0 auto; width: 148px; }
+.quick-add__fields .button-primary { flex: 0 0 auto; min-width: 72px; }
+/* 补充详情是次级图标按钮：方形、与输入同高，不使用主行动色，不与记录争夺视觉焦点。 */
+.quick-add .quick-add__more {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: var(--control-h);
+  height: var(--control-h);
+  min-height: var(--control-h);
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0;
+  font-size: var(--fs-lead);
+  font-weight: 400;
+  line-height: 1;
+}
+.quick-add .quick-add__more:hover { border-color: var(--teal); color: var(--teal); }
 
 textarea { resize: vertical; }
 input::placeholder { color: var(--muted); }
@@ -698,8 +792,7 @@ input::placeholder { color: var(--muted); }
 /* ============ 按钮 ============ */
 .button-primary,
 .button-secondary,
-.button-danger,
-.quick-add button {
+.button-danger {
   min-height: var(--control-h);
   border: 1px solid transparent;
   border-radius: var(--r-sm);
@@ -708,10 +801,8 @@ input::placeholder { color: var(--muted); }
   font-weight: 700;
 }
 
-.button-primary,
-.quick-add button { background: var(--teal); color: var(--surface-raised); }
-.button-primary:hover,
-.quick-add button:hover { background: var(--focus); }
+.button-primary { background: var(--teal); color: var(--surface-raised); }
+.button-primary:hover { background: var(--focus); }
 .button-secondary { border-color: var(--line-strong); background: var(--surface); color: var(--ink); }
 .button-secondary:hover { border-color: var(--teal); color: var(--teal); }
 .button-danger { background: var(--coral); color: var(--surface-raised); }
@@ -722,8 +813,7 @@ input::placeholder { color: var(--muted); }
    不用半透明是因为半透明会把底色和文字一起压低，深色主题下糊成一团。 */
 .button-primary:disabled,
 .button-secondary:disabled,
-.button-danger:disabled,
-.quick-add button:disabled {
+.button-danger:disabled {
   border-color: var(--line);
   background: var(--surface);
   color: var(--muted);
@@ -797,18 +887,69 @@ input::placeholder { color: var(--muted); }
 
 /* ============ 筛选与工具栏 ============ */
 .filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
+  display: grid;
   gap: var(--sp-3);
   margin: var(--sp-5) 0 var(--sp-6);
 }
 
+/* 常驻行只留搜索和状态；两组共用同一套字段排布，展开高级条件不会换一种排版。 */
+.filters__primary,
+.filters__advanced {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--sp-3);
+}
+.filters__primary > label,
+.filters__advanced > label { flex: 1 1 150px; }
+.filters .filter-search { flex: 2 1 260px; }
+/* 两个动作推到行尾：它们是操作，不是第 3、4 个输入条件。 */
+.filters__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-left: auto;
+}
+/* 细分隔线说明这些字段仍属于筛选区，而不是另一个突然出现的表单。 */
+.filters__advanced {
+  border-top: 1px solid var(--line);
+  padding-top: var(--sp-4);
+}
+
 .filters label { display: grid; gap: var(--sp-2); color: var(--muted); font-size: var(--fs-caption); }
-.filters > label { flex: 1 1 150px; }
 .filters label input,
 .filters label select { font-size: var(--fs-ui); }
-.filters .filter-search { flex: 2 1 260px; }
+
+/* 纯文字动作按钮：只靠颜色和下划线区分于输入框，
+   不与下拉框共用"浅底 + 边框"的外形（那样会被读成又一个条件）。 */
+.button-text {
+  min-height: var(--control-h-sm);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--teal);
+  padding: 0 var(--sp-1);
+  font-size: var(--fs-ui);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.button-text:hover { background: transparent; color: var(--focus); }
+
+/* 角标把"已启用几个高级条件"写在入口上：面板收起时条件仍在生效，不能无声无息。 */
+.filters__badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: var(--sp-2);
+  border-radius: var(--r-pill);
+  background: var(--teal);
+  color: var(--surface-raised);
+  padding: 0 5px;
+  font-size: var(--fs-micro);
+  line-height: 1;
+}
 .filter-count {
   color: var(--muted);
   font-size: var(--fs-ui);
@@ -1048,8 +1189,7 @@ input::placeholder { color: var(--muted); }
 .shortcuts-table td { text-align: left; font-size: var(--fs-ui); font-weight: 400; }
 .shortcuts-table th { display: block; padding: 0; }
 .data-actions,
-.category-create,
-.category-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.category-create { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
 /* 三个安全动作紧跟在分区标题之下，标题自带的 margin-bottom 已经够了。 */
 .data-actions { margin-top: 0; }
 /* 危险区域：清除所有数据不可逆，单独放到页面最下方并用珊瑚色边界圈起来。
@@ -1098,22 +1238,48 @@ input::placeholder { color: var(--muted); }
 .import-mode { display: flex; flex-direction: column; gap: var(--sp-2); margin: var(--sp-5) 0; border: 0; padding: 0; }
 .import-mode legend { color: var(--ink); font-size: var(--fs-ui); font-weight: 700; }
 .import-mode label { color: var(--ink); font-size: var(--fs-body); }
+/* 创建表单：名称标签折进 placeholder，"输入 + 创建"同排且只跨一屏宽度的一半，
+   标签不再隔着一大段空白与输入框相认；创建是这一行唯一的主行动，用实心 teal 承担，
+   线框样式会让它在不了了之的表单行里失去指向性。 */
 .category-create {
   display: grid;
-  grid-template-columns: minmax(88px, auto) minmax(0, 520px) auto;
-  max-width: 720px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  max-width: 560px;
   /* 上方间距由分区标题的 margin-bottom 提供，这里只留与列表之间的间隔。 */
   margin: 0 0 var(--sp-5);
 }
 .category-create input { min-width: 0; }
+/* 容器只画一条上边线把"创建区"和"展示区"分开；区域内最后一位不再画下边线——
+   卡片自己的底边框已经收尾，再补一条就叠成双重边框。 */
 .category-list { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.category-list > :last-child { border-bottom: 0; }
 .category-row {
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-4);
   border-bottom: 1px solid var(--line);
+  /* 行高：32px 图标按钮上下各留一档，密集差别不明显时不把行压成细线。 */
+  min-height: 52px;
   padding: var(--sp-3) 0;
 }
-.category-row > span { font-size: var(--fs-body); }
+.category-row__name { overflow-wrap: anywhere; font-size: var(--fs-body); }
+.category-row__actions { display: flex; align-items: center; gap: var(--sp-2); }
+/* 行操作图标：无框、静默色，悬停才抬起；删除排在行尾并额外用珊瑚表达高危。
+   铅笔与垃圾桶的形状本身承担非颜色识别，不引入第五种颜色以外的差别。 */
+.icon-button--row {
+  width: 32px;
+  height: 32px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  padding: 0;
+}
+.icon-button--row:hover { border-color: var(--line); background: var(--hover-tint); color: var(--ink); }
+.icon-button--row-danger:hover { border-color: transparent; background: var(--coral-soft); color: var(--coral); }
+.row-icon { display: block; width: 16px; height: 16px; }
 
 /* ============ 任务抽屉 ============ */
 .task-editor {
@@ -1265,6 +1431,12 @@ input::placeholder { color: var(--muted); }
 .modal label.check-field input { flex: 0 0 auto; }
 .modal .dialog-actions { margin-top: var(--sp-6); border-top: 1px solid var(--line); padding-top: var(--sp-4); }
 
+/* 月历“+N 更多”的当日任务弹窗：列出当天全部任务，行内操作与主列表完全一致。 */
+.day-dialog__list { margin-top: var(--sp-3); }
+.day-dialog__list .task-list { border-top: 1px solid var(--line); }
+.day-dialog__list .task:last-child { border-bottom: 0; }
+.day-dialog__list .task__title { font-size: var(--fs-ui); }
+
 /* ============ 反馈条 ============ */
 /* 反馈条固定在正文列底部居中：正文列位于侧栏右侧、宽屏时自动居中，
    其水平中心 = (视口宽 + 侧栏宽) / 2。底部只留一档间距，不遮挡顶部快速记录与日期选择。 */
@@ -1320,10 +1492,10 @@ input::placeholder { color: var(--muted); }
   .week-day__header, .week-day__tasks { padding-inline: var(--sp-4); }
   .month-grid { min-width: 0; }
   .month-day { min-height: 76px; padding: var(--sp-2); }
-  .month-day .task { grid-template-columns: 18px minmax(0, 1fr); gap: var(--sp-1); min-height: 30px; }
-  .month-day .task__check { width: 16px; height: 16px; }
+  .month-day .task { grid-template-columns: 44px minmax(0, 1fr); gap: var(--sp-1); min-height: 44px; }
+  .month-day .task__check { width: 44px; height: 44px; }
   /* 窄屏同样要能完成、延期和删除：把"更多"放回文档流，不再依赖悬停。 */
-  .month-day .task { grid-template-columns: 18px minmax(0, 1fr) auto; }
+  .month-day .task { grid-template-columns: 44px minmax(0, 1fr) auto; }
   .month-day .task__more { position: static; opacity: 1; }
   /* 移动端月历是密度概览，但状态须保留非颜色化表达（AGENTS 要求），故恢复元信息显示。 */
   .month-day .task__title { font-size: var(--fs-micro); }
@@ -1339,14 +1511,14 @@ input::placeholder { color: var(--muted); }
   .task__menu { position: fixed; top: auto; right: 12px; bottom: 12px; left: 12px; max-width: none; }
   .metrics { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
   .history-breakdown__heading { display: grid; gap: var(--sp-1); }
+  /* 窄屏：输入框独占一行、创建按钮落到下一行左对齐；仍不用满宽，
+     否则按钮会被拉成和输入框一样长的横条。 */
   .category-create {
     grid-template-columns: minmax(0, 1fr) auto;
     max-width: none;
   }
-  .category-create label,
   .category-create input { grid-column: 1 / -1; }
-  .category-create button { grid-column: 1; }
-  .category-row { grid-template-columns: 1fr; }
+  .category-create button { grid-column: 1; justify-self: start; }
   /* 窄屏两列会把每条快捷键的描述压成三五行，回落单列反而更好扫读。 */
   .shortcuts-table tbody { grid-template-columns: minmax(0, 1fr); }
   /* 面板在窄屏收一档内边距，否则正文可用宽度只剩两三百像素。 */
@@ -1413,9 +1585,12 @@ input::placeholder { color: var(--muted); }
   .nav__footer { flex: 1 1 100%; margin-top: var(--sp-2); }
   .content { padding: var(--sp-7) var(--sp-5) var(--sp-7); }
   .quick-add { align-items: stretch; padding: var(--sp-4); }
-  .quick-add__lead, .quick-add__row, .quick-add__options { flex-basis: 100%; }
-  .quick-add__options { flex-wrap: wrap; }
-  .quick-add__options select, .quick-add__options .quick-add__custom, .quick-add__options .button-secondary { flex: 1 1 140px; width: auto; }
+  .quick-add__lead, .quick-add__fields { flex-basis: 100%; }
+  /* 窄屏：输入框独占一行，日期、补充详情与记录排到下一行，主按钮仍在行尾。 */
+  .quick-add__fields { flex-wrap: wrap; }
+  .quick-add__fields #quick-add-title { flex: 1 1 100%; }
+  .quick-add__fields select, .quick-add__fields .quick-add__custom { flex: 1 1 140px; width: auto; }
+  .quick-add__fields .button-primary { flex: 1 1 auto; }
   .today-focus { gap: var(--sp-5); }
   .today-summary { flex-basis: 100%; gap: var(--sp-6); }
   .today-summary__next { flex-basis: 100%; min-width: 0; border-top: 1px solid var(--line); border-left: 0; padding-top: var(--sp-5); padding-left: 0; }

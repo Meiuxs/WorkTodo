@@ -145,7 +145,7 @@ function subtaskMarkup(child, today) {
   const action = canRestore ? 'restore' : 'complete';
   const status = taskStatus(child, today);
   return `<li class="task__subtask task__subtask--${escapeHtml(child.lifecycle)}" data-subtask-id="${escapeHtml(child.id)}" data-subtask-revision="${child.revision}">
-    <button class="task__subtask-check" type="button" role="checkbox" aria-checked="${checked}" aria-label="完成子任务" data-subtask-action="${action}">${checked ? '✓' : ''}</button>
+    <button class="task__subtask-check" type="button" role="checkbox" aria-checked="${checked}" aria-label="${action === 'restore' ? '恢复' : '完成'}子任务：${escapeHtml(child.title)}" data-subtask-action="${action}">${checked ? '✓' : ''}</button>
     <button class="task__subtask-title" type="button" data-subtask-action="edit" title="${escapeHtml(child.title)}">${escapeHtml(child.title)}</button>
     <span class="task__subtask-status">${escapeHtml(status)}</span>
   </li>`;
@@ -182,14 +182,14 @@ function taskMarkup(task, today, tags, resourceCounts, children = []) {
     : '';
   // 恢复不是勾选行为：可恢复的行用普通按钮，避免读屏把动作读成复选框的状态切换。
   const checkAttributes = canRestore
-    ? 'aria-label="恢复任务"'
-    : `role="checkbox" aria-checked="${checked}" aria-label="完成任务"`;
+    ? `aria-label="恢复任务：${escapeHtml(task.title)}"`
+    : `role="checkbox" aria-checked="${checked}" aria-label="完成任务：${escapeHtml(task.title)}"`;
   // 已删行只有「永久删除」一个动作（见 taskActions），菜单外壳没有存在意义，
   // 直接把它渲染成行尾按钮；其余行照旧收进「更多」。
   const moreMarkup = trashed
     ? taskActions(task, today)
     : `<details class="task__more">
-      <summary aria-label="更多任务操作：${escapeHtml(task.title)}" aria-haspopup="true" aria-expanded="false">更多</summary>
+      <summary aria-label="更多任务操作：${escapeHtml(task.title)}" aria-haspopup="true" aria-expanded="false" title="更多操作"><span aria-hidden="true">⋯</span></summary>
       <div class="task__menu">
         ${taskActions(task, today)}
       </div>
@@ -225,10 +225,21 @@ export function renderTaskRow(task, { today, tags = [], resourceCounts = new Map
 /* 事件委托必须在列表为空时也绑定：动作后 list-patch 可能把第一行直接插入
    原本只有空状态的容器，如果此时才绑定，菜单能展开但里面的动作没有入口。 */
 function bindTaskListInteractions(container, { onAction, onEdit, onError, onLoadMore = null }) {
+  const reportError = (error) => {
+    try {
+      return Promise.resolve(onError?.(error)).catch(() => {});
+    } catch {
+      return Promise.resolve();
+    }
+  };
   container.onclick = async (event) => {
     const loadMore = event.target.closest('[data-load-more]');
     if (loadMore !== null) {
-      await onLoadMore?.();
+      try {
+        await onLoadMore?.();
+      } catch (error) {
+        reportError(error);
+      }
       return;
     }
     const button = event.target.closest('button[data-action]');
@@ -242,14 +253,18 @@ function bindTaskListInteractions(container, { onAction, onEdit, onError, onLoad
         const subAction = subButton.dataset.subtaskAction;
         const subId = subRow.dataset.subtaskId;
         if (subAction === 'edit') {
-          await onEdit?.(subId);
+          try {
+            await onEdit?.(subId);
+          } catch (error) {
+            reportError(error);
+          }
           return;
         }
         subButton.disabled = true;
         try {
           await onAction?.(subAction, subId, Number(subRow.dataset.subtaskRevision));
         } catch (error) {
-          onError(error);
+          reportError(error);
         } finally {
           // 子任务状态变化会重渲染整个父行，按 id 重新拿到勾选按钮并恢复焦点。
           const restored = container.querySelector(`[data-subtask-id="${cssEscape(subId)}"] .task__subtask-check`);
@@ -262,7 +277,11 @@ function bindTaskListInteractions(container, { onAction, onEdit, onError, onLoad
     if (row === null) return;
     const action = button.dataset.action;
     if (action === 'edit') {
-      await onEdit?.(row.dataset.taskId);
+      try {
+        await onEdit?.(row.dataset.taskId);
+      } catch (error) {
+        reportError(error);
+      }
       return;
     }
 
@@ -275,7 +294,7 @@ function bindTaskListInteractions(container, { onAction, onEdit, onError, onLoad
     try {
       await onAction?.(action, row.dataset.taskId, Number(row.dataset.revision), value);
     } catch (error) {
-      onError(error);
+      reportError(error);
     } finally {
       if (button.isConnected) button.disabled = false;
     }
@@ -284,6 +303,7 @@ function bindTaskListInteractions(container, { onAction, onEdit, onError, onLoad
     if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
     if (!['d', 'p'].includes(event.key.toLowerCase())) return;
     if (event.target.closest('input, select, textarea')) return;
+    if (event.target.closest('[data-subtask-id]') !== null) return;
     const row = event.target.closest('[data-task-id]');
     if (row === null) return;
     if (event.key.toLowerCase() === 'p') {
@@ -296,7 +316,7 @@ function bindTaskListInteractions(container, { onAction, onEdit, onError, onLoad
       try {
         await onAction?.('cycle-priority', row.dataset.taskId, Number(row.dataset.revision), current);
       } catch (error) {
-        onError(error);
+        reportError(error);
       } finally {
         if (button.isConnected) button.disabled = false;
       }

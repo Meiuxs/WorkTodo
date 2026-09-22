@@ -105,7 +105,7 @@ export function createTodayView({ root, query, statistics, tagService, today, on
       root.innerHTML = `<section class="today-focus" aria-label="今日推进摘要">
         <div class="today-summary">
           <div class="today-summary__metric"><span class="eyebrow">今日进度</span><strong>${summary.completedCount} / ${summary.plannedCount}</strong><span>项计划已完成</span></div>
-          <div class="progress-block"><span class="eyebrow">完成率 ${summary.completionRate === null ? '暂无计划' : `${progress}%`}</span><progress value="${progress}" max="100">${progress}%</progress></div>
+          <div class="progress-block"><span class="eyebrow" id="today-progress-label">完成率 ${summary.completionRate === null ? '暂无计划' : `${progress}%`}</span><progress aria-labelledby="today-progress-label" value="${progress}" max="100">${progress}%</progress></div>
         </div>
         <div class="today-summary__next" data-next-action>
           <span class="eyebrow">下一步</span>

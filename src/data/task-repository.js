@@ -190,9 +190,10 @@ export class TaskRepository {
   async permanentlyDelete(id, expectedRevision) {
     assertRevision(expectedRevision);
     const database = await this.#getDatabase();
-    const transaction = database.transaction(['tasks', 'events', 'searchIndex'], 'readwrite');
+    const transaction = database.transaction(['tasks', 'events', 'searchIndex', 'taskResources'], 'readwrite');
     const tasks = transaction.objectStore('tasks');
     const searchIndex = transaction.objectStore('searchIndex');
+    const taskResources = transaction.objectStore('taskResources');
     const current = await requestResult(tasks.get(id));
     if (current === undefined || current.revision !== expectedRevision) {
       transaction.abort();
@@ -212,10 +213,18 @@ export class TaskRepository {
       }
       throw new ValidationError('只能永久删除回收站中的任务');
     }
+    const children = await requestResult(tasks.index('parentId').getAll(id));
+    if (children.length > 0) {
+      transaction.abort();
+      try { await transactionResult(transaction); } catch { /* expected abort */ }
+      throw new ValidationError('请先删除子任务后再永久删除父任务');
+    }
     const events = await requestResult(
       transaction.objectStore('events').index('taskId').getAll(id),
     );
     for (const event of events) transaction.objectStore('events').delete(event.id);
+    const relations = await requestResult(taskResources.index('taskId').getAll(id));
+    for (const relation of relations) taskResources.delete([relation.taskId, relation.resourceId]);
     searchIndex.delete(id);
     tasks.delete(id);
     await transactionResult(transaction);

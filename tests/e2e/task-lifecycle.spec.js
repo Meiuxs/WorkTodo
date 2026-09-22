@@ -5,14 +5,14 @@ test('安排今天并完成后进入实际完成的工作记录', async ({ exten
   await dashboard.getByLabel('记录一个新事项').fill('完成项目报价');
   await dashboard.locator('#quick-add-date').selectOption('today');
   await dashboard.getByRole('button', { name: '记录', exact: true }).click();
-  await expect(dashboard.getByRole('button', { name: '完成项目报价' })).toBeVisible();
+  await expect(dashboard.getByRole('button', { name: '完成项目报价', exact: true })).toBeVisible();
 
   await dashboard.getByRole('checkbox', { name: '完成任务' }).first().click();
   await expect(dashboard.getByText('已完成任务')).toBeVisible();
 
   await dashboard.getByRole('button', { name: '工作记录' }).click();
   await expect(dashboard.locator('#page-title')).toHaveText('工作记录');
-  await expect(dashboard.getByRole('button', { name: '完成项目报价' })).toBeVisible();
+  await expect(dashboard.getByRole('button', { name: '完成项目报价', exact: true })).toBeVisible();
   await expect(dashboard.getByText('实际完成', { exact: true })).toBeVisible();
 });
 
@@ -73,7 +73,7 @@ test('已完成任务恢复后显示为待办状态', async ({ extension }) => {
   await dashboard.getByRole('button', { name: '今天', exact: true }).click();
   const restoredRow = dashboard.locator('[data-task-id]').filter({ hasText: '恢复状态任务' });
   await expect(restoredRow).toContainText('待办');
-  await expect(restoredRow.locator('.task__check')).toHaveAttribute('aria-label', '完成任务');
+  await expect(restoredRow.locator('.task__check')).toHaveAttribute('aria-label', '完成任务：恢复状态任务');
 });
 
 test('今日已完成折叠区恢复待办后任务状态正确', async ({ extension }) => {
@@ -91,7 +91,7 @@ test('今日已完成折叠区恢复待办后任务状态正确', async ({ exten
 
   const restoredRow = dashboard.locator('#today-list [data-task-id]').filter({ hasText: '折叠区恢复任务' });
   await expect(restoredRow).toContainText('待办');
-  await expect(restoredRow.locator('.task__check')).toHaveAttribute('aria-label', '完成任务');
+  await expect(restoredRow.locator('.task__check')).toHaveAttribute('aria-label', '完成任务：折叠区恢复任务');
   await expect(restoredRow.locator('.task__more[open]')).toHaveCount(0);
 });
 
@@ -145,7 +145,7 @@ test('移入回收站不再叠加确认框，撤销窗口可把任务取回', as
   const taskRow = dashboard.locator('[data-task-id]').filter({
     has: dashboard.getByRole('button', { name: '可撤销删除任务' }),
   });
-  await taskRow.getByText('更多', { exact: true }).click();
+  await taskRow.locator('summary[aria-label^="更多任务操作"]').click();
   await taskRow.getByRole('button', { name: '移入回收站', exact: true }).click();
 
   // 可撤销的动作不用确认框拦一道：行直接离开列表，反馈只有一条带秒数的 Toast。
@@ -156,7 +156,7 @@ test('移入回收站不再叠加确认框，撤销窗口可把任务取回', as
 
   // 撤销是唯一的二次机会：回收站行首圆环承担恢复，它是动作按钮而不是勾选。
   await dashboard.locator('[data-task-id]').filter({ hasText: '可撤销删除任务' })
-    .getByRole('button', { name: '恢复任务', exact: true }).click();
+    .getByRole('button', { name: '恢复任务：可撤销删除任务', exact: true }).click();
   await dashboard.getByRole('button', { name: '今天', exact: true }).click();
   await expect(dashboard.locator('[data-task-id]').filter({ hasText: '可撤销删除任务' })).toBeVisible();
 });

@@ -45,11 +45,18 @@ export class SubtaskService {
       throw new ValidationError('父任务仍有未完成子任务');
     }
     const completedChildren = [];
-    for (const child of active) {
-      const result = await this.#taskService.complete(child.id, child.revision);
-      completedChildren.push(result.task);
+    try {
+      for (const child of active) {
+        const result = await this.#taskService.complete(child.id, child.revision);
+        completedChildren.push(result.task);
+      }
+      const result = await this.#taskService.complete(parentId, revision);
+      return { ...result, completedChildren };
+    } catch (error) {
+      for (const child of completedChildren.reverse()) {
+        try { await this.#taskService.restore(child.id, child.revision); } catch { /* best effort rollback */ }
+      }
+      throw error;
     }
-    const result = await this.#taskService.complete(parentId, revision);
-    return { ...result, completedChildren };
   }
 }

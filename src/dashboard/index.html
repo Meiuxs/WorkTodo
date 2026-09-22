@@ -49,10 +49,12 @@
       <main class="content">
         <header class="workspace-header">
           <div>
-            <p class="workspace-date" id="workspace-date"></p>
             <h1 id="page-title">今日工作</h1>
             <p class="content__subtitle" id="page-subtitle">现在最需要推进的事项</p>
           </div>
+          <!-- 系统日期是全局上下文，不是某个页面的标题前缀：
+               放在页头右上角并弱化，避免与"全部任务"这类非日期页面抢读。 -->
+          <p class="workspace-date" id="workspace-date"></p>
         </header>
 
         <form class="quick-add" id="quick-add">
@@ -60,12 +62,9 @@
             <p class="eyebrow">快速记录</p>
             <span>只写标题，稍后再整理</span>
           </div>
-          <div class="quick-add__row">
+          <div class="quick-add__fields">
             <label class="sr-only" for="quick-add-title">记录一个新事项</label>
             <input id="quick-add-title" maxlength="200" autocomplete="off" aria-keyshortcuts="n" placeholder="写下下一件要推进的事……" required>
-            <button type="submit" class="button-primary">记录</button>
-          </div>
-          <div class="quick-add__options">
             <label class="sr-only" for="quick-add-date">计划日期</label>
             <select id="quick-add-date">
               <option value="inbox">先放收集箱</option>
@@ -74,7 +73,8 @@
               <option value="custom">指定日期</option>
             </select>
             <input class="quick-add__custom" id="quick-add-custom" type="date" hidden aria-label="指定计划日期">
-            <button type="button" class="button-secondary" id="quick-add-more" aria-label="更多字段">补充详情</button>
+            <button type="button" class="quick-add__more" id="quick-add-more" aria-label="补充详情" title="补充详情"><span aria-hidden="true">⋯</span></button>
+            <button type="submit" class="button-primary">记录</button>
           </div>
         </form>
         <p class="form-message" id="quick-add-message" role="alert"></p>
@@ -178,18 +178,27 @@
     <dialog class="modal resource-dialog" id="resource-dialog">
       <form method="dialog" data-resource-form>
         <h2>添加资料</h2>
-        <label class="field">资料类型<select data-resource-type aria-label="资料类型"><option value="url">网页链接</option><option value="snippet">文本片段</option><option value="file">本地文件</option></select></label>
+        <label class="field">资料类型<select data-resource-type aria-label="资料类型" aria-describedby="resource-picker-message"><option value="url">网页链接</option><option value="snippet">文本片段</option><option value="file">本地文件</option></select></label>
         <label class="field">资料名称<input data-resource-title aria-label="资料名称" maxlength="200" required></label>
         <label class="field" data-resource-url-field>网页链接<input data-resource-url aria-label="网页链接" type="url" placeholder="https://" required></label>
         <label class="field" data-resource-snippet-field hidden>文本片段<textarea data-resource-content aria-label="文本片段" maxlength="20000"></textarea></label>
         <label class="field" data-resource-file-field hidden>本地文件<input data-resource-file type="file" aria-label="本地文件"></label>
         <label class="check-field" data-resource-copy-field hidden><input data-resource-save-copy type="checkbox"> 保存一份副本到本地（单个文件不超过 20 MB）</label>
         <label class="field">备注<textarea data-resource-note aria-label="资料备注" maxlength="2000" rows="2"></textarea></label>
-        <p class="form-message" data-resource-message role="alert"></p>
+        <p class="form-message" id="resource-picker-message" data-resource-message role="alert"></p>
         <div class="dialog-actions"><button type="button" data-resource-cancel>取消</button><button type="submit" class="button-primary">保存资料</button></div>
         <section class="resource-existing" data-resource-existing hidden>
           <h3>关联已有资料</h3><div data-resource-existing-list></div>
         </section>
+      </form>
+    </dialog>
+
+    <dialog class="modal day-dialog" id="month-day-dialog">
+      <form method="dialog">
+        <h2 data-day-dialog-title>当天任务</h2>
+        <p data-day-dialog-summary></p>
+        <div class="day-dialog__list" data-day-dialog-list></div>
+        <div class="dialog-actions"><button type="button" class="button-secondary" data-day-dialog-close>关闭</button></div>
       </form>
     </dialog>
 

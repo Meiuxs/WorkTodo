@@ -134,6 +134,7 @@ test('未完成子任务时重复任务默认拒绝完成，force 才能放行',
   const completed = await service.complete(created.task.id, created.task.revision, { force: true });
   assert.equal(completed.task.lifecycle, 'completed');
   assert.equal(completed.nextTask.scheduledDate, '2026-09-18');
+  assert.equal(completed.nextTaskCreated, true);
 });
 
 test('重复完成已完成实例不会生成第二个下一实例', async () => {

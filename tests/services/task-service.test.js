@@ -215,6 +215,22 @@ test('复制创建新的 todo 任务并清理结束与回收时间', async () =>
   assert.ok(await repo.get('t1'));
 });
 
+test('复制使用编辑抽屉当前内容并重置首次计划日期', async () => {
+  const { service } = createService({
+    tasks: [{ ...BASE_TASK, scheduledDate: '2026-09-17', firstScheduledDate: '2026-09-10' }],
+  });
+  const copied = await service.copy('t1', {
+    title: '改过的副本',
+    scheduledDate: '2026-09-22',
+    description: '保留当前编辑内容',
+  });
+
+  assert.equal(copied.task.title, '改过的副本');
+  assert.equal(copied.task.scheduledDate, '2026-09-22');
+  assert.equal(copied.task.firstScheduledDate, '2026-09-22');
+  assert.equal(copied.task.description, '保留当前编辑内容');
+});
+
 test('分类可创建和改名，删除时可明确迁移至未分类', async () => {
   const { repo, service } = createService();
   const created = await service.createCategory('  待跟进  ');

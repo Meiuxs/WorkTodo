@@ -166,6 +166,9 @@ export class InMemoryTaskRepository {
     if (current.trashedAt === null) {
       throw new ValidationError('只能永久删除回收站中的任务');
     }
+    if ([...this.#tasks.values()].some((task) => task.parentId === id)) {
+      throw new ValidationError('请先删除子任务后再永久删除父任务');
+    }
 
     const snapshot = {
       tasks: new Map([...this.#tasks].map(([taskId, task]) => [taskId, clone(task)])),

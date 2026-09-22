@@ -73,7 +73,7 @@ function keysFor(record, keyPath, multiEntry) {
 class IndexedDbFake {
   #stores;
 
-  constructor({ tasks = [], events = [], tags = [] } = {}) {
+  constructor({ tasks = [], events = [], tags = [], taskResources = [] } = {}) {
     this.indexReads = [];
     this.transactionLog = [];
     this.#stores = new Map([
@@ -82,6 +82,7 @@ class IndexedDbFake {
       ['events', new Map(events.map((event) => [event.id, structuredClone(event)]))],
       ['tags', new Map(tags.map((tag) => [tag.id, structuredClone(tag)]))],
       ['recurringTemplates', new Map()],
+      ['taskResources', new Map(taskResources.map((relation) => [`${relation.taskId}:${relation.resourceId}`, structuredClone(relation)]))],
       [
         'searchIndex',
         new Map(tasks.map((task) => {
@@ -107,7 +108,7 @@ class IndexedDbFake {
   #store(name) {
     const database = this;
     const records = this.#stores.get(name);
-    const keyPath = name === 'searchIndex' ? 'taskId' : 'id';
+    const keyPath = name === 'searchIndex' || name === 'taskResources' ? 'taskId' : 'id';
     const indexes = name === 'searchIndex'
       ? { grams: { keyPath: 'grams', multiEntry: true } }
       : {
@@ -119,6 +120,7 @@ class IndexedDbFake {
           trashedAt: { keyPath: 'trashedAt' },
           tagIds: { keyPath: 'tagIds', multiEntry: true },
           occurrenceKey: { keyPath: 'occurrenceKey' },
+          parentId: { keyPath: 'parentId' },
           taskId: { keyPath: 'taskId' },
           occurredAt: { keyPath: 'occurredAt' },
         };
@@ -129,7 +131,7 @@ class IndexedDbFake {
 
     return {
       get(key) {
-        const record = records.get(key);
+        const record = records.get(Array.isArray(key) ? key.join(':') : key);
         return asyncRequest(record);
       },
       getAll(range) {
@@ -143,17 +145,19 @@ class IndexedDbFake {
         return asyncRequest(values);
       },
       add(record) {
-        if (records.has(record[keyPath])) throw new Error('主键已存在');
-        records.set(record[keyPath], structuredClone(record));
+        const primaryKey = name === 'taskResources' ? `${record.taskId}:${record.resourceId}` : record[keyPath];
+        if (records.has(primaryKey)) throw new Error('主键已存在');
+        records.set(primaryKey, structuredClone(record));
       },
       put(record) {
-        records.set(record[keyPath], structuredClone(record));
+        const primaryKey = name === 'taskResources' ? `${record.taskId}:${record.resourceId}` : record[keyPath];
+        records.set(primaryKey, structuredClone(record));
       },
       clear() {
         records.clear();
       },
       delete(key) {
-        records.delete(key);
+        records.delete(Array.isArray(key) ? key.join(':') : key);
       },
       index(indexName) {
         const definition = indexes[indexName];
@@ -556,7 +560,7 @@ test('真实仓库永久删除事务覆盖 searchIndex', async () => {
   assert.equal(database.snapshot().searchIndex.length, 0);
   assert.deepEqual(
     database.transactionLog.at(-1).storeNames,
-    ['tasks', 'events', 'searchIndex'],
+    ['tasks', 'events', 'searchIndex', 'taskResources'],
   );
 });
 

@@ -52,6 +52,12 @@ function assertNullableIdentifier(value, fieldName) {
   if (value !== null) assertIdentifier(value, fieldName);
 }
 
+function assertNullableIsoTimestamp(value, fieldName) {
+  if (value !== null && (typeof value !== 'string' || Number.isNaN(Date.parse(value)))) {
+    throw new ValidationError(`${fieldName} 必须是有效的 ISO 时间字符串或 null`);
+  }
+}
+
 function normalizeTagIds(tagIds) {
   if (tagIds === undefined) return [];
   if (!Array.isArray(tagIds)) throw new ValidationError('tagIds 必须是数组');
@@ -134,12 +140,9 @@ export function validateTask(task) {
   if (task.lifecycle !== 'completed' && task.completedAt !== null) {
     throw new ValidationError('未完成任务不能有 completedAt');
   }
-  if (task.cancelledAt !== undefined && task.cancelledAt !== null && typeof task.cancelledAt !== 'string') {
-    throw new ValidationError('cancelledAt 必须是字符串或 null');
-  }
-  if (task.trashedAt !== null && typeof task.trashedAt !== 'string') {
-    throw new ValidationError('trashedAt 必须是字符串或 null');
-  }
+  assertNullableIsoTimestamp(task.completedAt, 'completedAt');
+  assertNullableIsoTimestamp(task.cancelledAt ?? null, 'cancelledAt');
+  assertNullableIsoTimestamp(task.trashedAt, 'trashedAt');
   return true;
 }
 

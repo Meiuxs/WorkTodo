@@ -1,5 +1,12 @@
 import { test, expect, openDashboard, openEditorGroup } from './fixtures.js';
 
+// 高级筛选默认收起：要用到标签、日期这类低频条件，先展开面板。
+async function openAdvancedFilters(page) {
+  const panel = page.locator('#advanced-filters');
+  if (await panel.isHidden()) await page.getByRole('button', { name: /^高级筛选/ }).click();
+  await expect(panel).toBeVisible();
+}
+
 test('任务编辑器可以创建、选择并保留标签', async ({ extension }) => {
   const page = await openDashboard(extension);
   await page.getByLabel('记录一个新事项').fill('整理报价');
@@ -37,6 +44,7 @@ test('全部任务可以按标签筛选并显示标签文字', async ({ extensio
   await page.getByRole('button', { name: '记录', exact: true }).click();
 
   await page.getByRole('button', { name: '全部任务' }).click();
+  await openAdvancedFilters(page);
   await page.getByLabel('标签', { exact: true }).selectOption({ label: '客户' });
   await expect(page.getByRole('button', { name: '客户甲报价' })).toBeVisible();
   await expect(page.getByText('#客户', { exact: true })).toBeVisible();
@@ -46,7 +54,7 @@ test('全部任务可以按标签筛选并显示标签文字', async ({ extensio
 test('通过更多字段新增任务并保存标签后可筛选', async ({ extension }) => {
   const page = await openDashboard(extension);
   await page.getByLabel('记录一个新事项').fill('编辑器标签任务');
-  await page.getByRole('button', { name: '更多字段' }).click();
+  await page.getByRole('button', { name: '补充详情' }).click();
 
   const editor = page.locator('#task-editor');
   await expect(editor).toBeVisible();
@@ -60,11 +68,47 @@ test('通过更多字段新增任务并保存标签后可筛选', async ({ exten
   await page.getByLabel('记录一个新事项').fill('无标签对照');
   await page.getByRole('button', { name: '记录', exact: true }).click();
   await page.getByRole('button', { name: '全部任务' }).click();
+  await openAdvancedFilters(page);
   await page.getByLabel('标签', { exact: true }).selectOption({ label: '编辑器标签' });
 
   await expect(page.getByRole('button', { name: '编辑器标签任务' })).toBeVisible();
   await expect(page.getByText('#编辑器标签', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '无标签对照' })).not.toBeVisible();
+});
+
+test('全部任务的筛选区默认只有搜索与状态，高级条件按需展开', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.getByLabel('记录一个新事项').fill('渐进披露任务');
+  await page.locator('#quick-add-date').selectOption('today');
+  await page.getByRole('button', { name: '记录', exact: true }).click();
+
+  await page.getByRole('button', { name: '全部任务' }).click();
+  await expect(page.getByLabel('搜索')).toBeVisible();
+  await expect(page.getByLabel('状态')).toBeVisible();
+  await expect(page.locator('#advanced-filters')).toBeHidden();
+  // 没有条件时「清空筛选」不占位：它不是又一个没填的输入框。
+  await expect(page.getByRole('button', { name: '清空筛选' })).toBeHidden();
+
+  await page.getByRole('button', { name: /^高级筛选/ }).click();
+  await expect(page.locator('#advanced-filters')).toBeVisible();
+
+  await page.getByLabel('状态').selectOption('todo');
+  await expect(page.getByRole('button', { name: '清空筛选' })).toBeVisible();
+  // 编辑器里也有一个优先级下拉：限定在筛选面板内取值。
+  const advanced = page.locator('#advanced-filters');
+  await advanced.getByLabel('优先级').selectOption('high');
+  await expect(page.locator('#advanced-count')).toContainText('1');
+
+  // 条件留在 hash 里：刷新后面板自动展开，不会"收着却仍在生效"。
+  await page.reload();
+  await expect(page.locator('#advanced-filters')).toBeVisible();
+  await expect(advanced.getByLabel('优先级')).toHaveValue('high');
+
+  await page.getByRole('button', { name: '清空筛选' }).click();
+  await expect(page.locator('#advanced-filters')).toBeHidden();
+  await expect(page.getByRole('button', { name: '清空筛选' })).toBeHidden();
+  await expect(page.getByLabel('状态')).toHaveValue('');
+  await expect(page.getByRole('button', { name: '渐进披露任务' })).toBeVisible();
 });
 
 test('父任务编辑器可以新增并持久化子任务', async ({ extension }) => {
@@ -150,10 +194,12 @@ test('完成父任务会先确认并级联完成子任务', async ({ extension }
   await confirmation.getByRole('button', { name: '完成全部' }).click();
   await page.getByRole('button', { name: '已完成' }).click();
   const doneParent = page.locator('[data-task-id]').filter({ has: page.getByRole('button', { name: '发布版本' }) });
-  await expect(doneParent.getByRole('button', { name: '发布版本' })).toBeVisible();
+  // 已完成行的恢复按钮可访问名是「恢复任务：发布版本」，非精确匹配会连同标题按钮一起命中。
+  await expect(doneParent.getByRole('button', { name: '发布版本', exact: true })).toBeVisible();
   // 级联完成后子任务也进入已完成，并嵌在父行下、勾选态保持。
   await expect(doneParent.locator('[data-subtask-id]')).toHaveCount(1);
-  await expect(doneParent.getByRole('checkbox', { name: '完成子任务' })).toBeChecked();
+  // 级联完成后子任务可恢复，勾选控件的可访问名随状态改写为「恢复子任务：{标题}」。
+  await expect(doneParent.getByRole('checkbox', { name: /子任务/ })).toBeChecked();
 });
 
 test('标签和子任务在键盘与 390px 视口下不溢出并恢复焦点', async ({ extension }) => {
@@ -227,6 +273,7 @@ test('标签和子任务在键盘与 390px 视口下不溢出并恢复焦点', a
   await page.getByRole('button', { name: '记录', exact: true }).click();
 
   await page.getByRole('button', { name: '全部任务' }).click();
+  await openAdvancedFilters(page);
   await page.getByLabel('标签', { exact: true }).selectOption({ label: longTag });
   await expect(page.getByRole('button', { name: '窄屏组织任务' })).toBeVisible();
   await expect(page.getByRole('button', { name: '无标签窄屏任务' })).not.toBeVisible();

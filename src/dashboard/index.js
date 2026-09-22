@@ -65,7 +65,11 @@ const statistics = new StatisticsService(repository);
 const summaryService = new SummaryService({ statistics, query });
 const resourceRepository = new ResourceRepository();
 const resourceService = new ResourceService(resourceRepository);
-const backupService = new BackupService(repository, { settingsRepository, resourceRepository });
+const backupService = new BackupService(repository, {
+  settingsRepository,
+  resourceRepository,
+  appVersion: chrome.runtime.getManifest().version,
+});
 const csvService = new CsvExportService();
 const tagRepository = new TagRepository();
 const tagService = new TagService(tagRepository);
@@ -73,6 +77,8 @@ const root = document.querySelector('#view-root');
 const toast = document.querySelector('#toast');
 const confirmDialog = document.querySelector('#confirm-dialog');
 const app = document.querySelector('.app');
+// 月历“+N 更多”的当日任务弹窗：放在视图之外，月份切换或列表重渲染都不会丢掉它。
+const dayDialog = document.querySelector('#month-day-dialog');
 let controller;
 let toastTimer;
 const undoController = new UndoController();
@@ -89,8 +95,11 @@ function dateOffset(date, days) {
 }
 
 function formatWorkspaceDate(date) {
-  return new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
+  // 头部日期只表达“今天是哪天”，与视图内表达“当前查看月份/周”的标题区分开，
+  // 避免同屏出现两个都像“当前时间”的日期而互相打架。
+  const formatted = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' })
     .format(new Date(`${date}T00:00:00`));
+  return `今天 · ${formatted}`;
 }
 
 function showToast(message, { actionLabel = null, onAction = null, duration = 5000 } = {}) {
@@ -169,6 +178,9 @@ async function onAction(action, taskId, revision, value) {
       actionLabel: '撤销',
       onAction: async () => {
         try {
+          if (result.nextTaskCreated && result.nextTask !== null) {
+            await controller.handleTaskAction('undo-create', result.nextTask.id, result.nextTask.revision);
+          }
           await controller.handleTaskAction('restore', taskId, result.task.revision);
           for (const child of children) {
             await controller.handleTaskAction('restore', child.id, child.revision);
@@ -271,7 +283,7 @@ const views = {
   today: createTodayView(viewOptions),
   tomorrow: createWeekView({ ...viewOptions, singleDate: true }),
   week: createWeekView(viewOptions),
-  month: createMonthView(viewOptions),
+  month: createMonthView({ ...viewOptions, dayDialog }),
   inbox: createInboxView(viewOptions),
   resources: createResourcesView({ ...viewOptions, resourceService }),
   all: createAllTasksView(viewOptions),
@@ -324,10 +336,11 @@ const taskEditor = createTaskEditor({
     await controller.refresh();
     return result;
   }),
-  onCopy: (taskId) => controller.handleTaskAction('copy', taskId),
+  onCopy: (taskId, changes) => controller.handleTaskAction('copy', taskId, undefined, changes),
   onReload: (taskId) => taskService.getTask(taskId),
   resourceService,
   openResourcePicker: (taskId, source) => resourcePicker.openForTask(taskId, source),
+  onError,
   confirmDiscard: () => confirmAction({
     title: '放弃未保存的修改？',
     message: '关闭后这次修改不会保存，任务仍保持打开前的状态。',
@@ -375,30 +388,36 @@ window.addEventListener('hashchange', () => {
 });
 
 document.querySelectorAll('[data-route]').forEach((button) => {
-  button.addEventListener('click', async () => {
-    await navigate(button.dataset.route);
+  button.addEventListener('click', () => {
+    void navigate(button.dataset.route).catch(onError);
   });
+});
+
+dayDialog.querySelectorAll('[data-day-dialog-close]').forEach((button) => {
+  button.addEventListener('click', () => dayDialog.close());
 });
 
 document.querySelector('#quick-add-date').addEventListener('change', (event) => {
   document.querySelector('#quick-add-custom').hidden = event.target.value !== 'custom';
 });
 
-document.querySelector('#quick-add-more').addEventListener('click', async () => {
-  const select = document.querySelector('#quick-add-date');
-  const custom = document.querySelector('#quick-add-custom');
-  const now = new Date();
-  const scheduledDate = select.value === 'today'
-    ? toLocalDate(now)
-    : select.value === 'tomorrow'
-      ? dateOffset(now, 1)
-      : select.value === 'custom'
-        ? custom.value || null
-        : null;
-  await taskEditor.openNew({
-    title: document.querySelector('#quick-add-title').value,
-    scheduledDate,
-  });
+document.querySelector('#quick-add-more').addEventListener('click', () => {
+  void (async () => {
+    const select = document.querySelector('#quick-add-date');
+    const custom = document.querySelector('#quick-add-custom');
+    const now = new Date();
+    const scheduledDate = select.value === 'today'
+      ? toLocalDate(now)
+      : select.value === 'tomorrow'
+        ? dateOffset(now, 1)
+        : select.value === 'custom'
+          ? custom.value || null
+          : null;
+    await taskEditor.openNew({
+      title: document.querySelector('#quick-add-title').value,
+      scheduledDate,
+    });
+  })().catch(onError);
 });
 
 document.querySelector('#quick-add').addEventListener('submit', async (event) => {

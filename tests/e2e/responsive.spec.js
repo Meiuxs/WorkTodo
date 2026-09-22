@@ -27,7 +27,7 @@ test('窄屏下回收站行内删除与设置页危险动作都不产生横向�
   const row = dashboard.locator('[data-task-id]').filter({
     has: dashboard.getByRole('button', { name: '窄屏删除任务' }),
   });
-  await row.getByText('更多', { exact: true }).click();
+  await row.locator('summary[aria-label^="更多任务操作"]').click();
   // 移入回收站已取消确认框：一次点击直接执行。
   await row.getByRole('button', { name: '移入回收站', exact: true }).click();
 

@@ -1,6 +1,8 @@
 import { ValidationError } from '../domain/errors.js';
 import { validateTask } from '../domain/task.js';
 import { createTaskEvent } from '../domain/task-event.js';
+import { validateRecurringTemplate } from '../domain/recurring-template.js';
+import { validateResource } from '../domain/resource.js';
 import { SettingsRepository } from '../data/settings-repository.js';
 
 const SCHEMA_VERSION = 2;
@@ -148,6 +150,13 @@ function validateTags(tags) {
 
 function validateRecurringTemplates(recurringTemplates) {
   assertUniqueUuid(recurringTemplates, 'recurringTemplate');
+  // 早期 v2 数据只保存 id/title/active/updatedAt；完整模板才进入领域级校验，
+  // 既拦截损坏的新格式，也保留旧数据的平滑导入能力。
+  for (const template of recurringTemplates) {
+    if (Object.hasOwn(template, 'scheduledDate') || Object.hasOwn(template, 'recurrence')) {
+      validateRecurringTemplate(template);
+    }
+  }
 }
 
 function validateTasks(tasks, categoryIds, tagIds) {
@@ -205,6 +214,7 @@ function validateResources(resources, taskResources, taskIds) {
   assertUniqueUuid(resources, 'resource');
   const resourceIds = new Set(resources.map((resource) => resource.id));
   for (const resource of resources) {
+    validateResource(resource);
     if (!['url', 'file', 'snippet'].includes(resource.type)) throw new ValidationError('resource.type 无效');
     if (typeof resource.title !== 'string' || resource.title.trim().length === 0) throw new ValidationError('resource.title 不能为空');
     assertIsoString(resource.createdAt, 'resource.createdAt');
@@ -283,6 +293,19 @@ function mergeRelations(localItems, incomingItems) {
   const relations = new Map(localItems.map((item) => [`${item.taskId}:${item.resourceId}`, item]));
   for (const item of incomingItems) relations.set(`${item.taskId}:${item.resourceId}`, item);
   return [...relations.values()];
+}
+
+function mergeResources(localItems, incomingItems) {
+  const localById = new Map(localItems.map((item) => [item.id, item]));
+  return mergeById(localItems, incomingItems, 'updatedAt').map((resource) => {
+    const local = localById.get(resource.id);
+    // JSON 备份不会携带本地文件 Blob；合并元数据时保留本机已有副本，
+    // 否则一次普通的合并导入会把用户本地保存的文件变成不可下载的引用。
+    if (resource.blob === null && local?.blob instanceof Blob && resource.storageMode === 'copy') {
+      return { ...resource, blob: local.blob };
+    }
+    return resource;
+  });
 }
 
 function importResult(snapshot, conflicts) {
@@ -427,8 +450,9 @@ export class BackupService {
   async #mergeImport(backup) {
     const current = await this.#repository.exportAll();
     const currentResources = this.#resourceRepository?.exportAll
-      ? await this.#resourceRepository.exportAll()
+      ? await this.#resourceRepository.exportAll({ includeBlobs: true })
       : { resources: [], taskResources: [] };
+    const previousMetadata = await this.#settingsRepository.getMetadata();
     const conflicts = allConflicts(current, backup);
     const snapshot = {
       tasks: mergeById(current.tasks, backup.tasks, 'updatedAt'),
@@ -442,19 +466,26 @@ export class BackupService {
       ),
     };
     const resourceSnapshot = {
-      resources: mergeById(currentResources.resources, backup.resources, 'updatedAt'),
+      resources: mergeResources(currentResources.resources, backup.resources),
       taskResources: mergeRelations(currentResources.taskResources, backup.taskResources),
     };
-    await this.#repository.replaceAll(snapshot);
-    if (this.#resourceRepository?.replaceAll) await this.#resourceRepository.replaceAll(resourceSnapshot);
-    await this.#saveMetadata({ lastImportedAt: this.#now() });
+    try {
+      await this.#repository.replaceAll(snapshot);
+      if (this.#resourceRepository?.replaceAll) await this.#resourceRepository.replaceAll(resourceSnapshot);
+      await this.#saveMetadata({ lastImportedAt: this.#now() });
+    } catch (error) {
+      await this.#repository.replaceAll(current);
+      if (this.#resourceRepository?.replaceAll) await this.#resourceRepository.replaceAll(currentResources);
+      await this.#settingsRepository.saveMetadata(previousMetadata);
+      throw error;
+    }
     return importResult(snapshot, conflicts);
   }
 
   async #replaceImport(backup) {
     const recovery = await this.#repository.exportAll();
     const resourceRecovery = this.#resourceRepository?.exportAll
-      ? await this.#resourceRepository.exportAll()
+      ? await this.#resourceRepository.exportAll({ includeBlobs: true })
       : null;
     const previousSettings = await this.#settingsRepository.getSettings();
     const previousMetadata = await this.#settingsRepository.getMetadata();

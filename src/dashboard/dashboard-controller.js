@@ -140,6 +140,8 @@ export class DashboardController {
     } else if (action === 'complete' && this.#subtaskService !== null) {
       const force = value?.force === true;
       result = await this.#subtaskService.completeParent(taskId, revision, { force });
+    } else if (action === 'copy') {
+      result = await this.#taskService.copy(taskId, value ?? {});
     } else if (action === 'postpone' || action === 'reschedule') {
       result = await this.#taskService[action](taskId, value, revision);
     } else if (action === 'set-priority') {

@@ -36,6 +36,7 @@ export function createTaskEditor({
   resourceService,
   openResourcePicker,
   onClose = () => {},
+  onError = () => {},
   confirmDiscard = null,
 }) {
   const form = dialog.querySelector('form');
@@ -352,7 +353,15 @@ export function createTaskEditor({
         dialog.querySelector('[data-editor-reload]').focus();
         return null;
       }
-      field(form, 'title').focus();
+      const messageText = errorMessage(error);
+      const focusField = messageText.includes('计划日期')
+        ? field(form, 'scheduledDate')
+        : messageText.includes('时间')
+          ? field(form, 'startTime')
+          : messageText.includes('优先级')
+            ? field(form, 'priority')
+            : field(form, 'title');
+      focusField?.focus();
       return null;
     } finally {
       submit.disabled = false;
@@ -423,15 +432,25 @@ export function createTaskEditor({
       control.scrollIntoView({ block: 'center' });
     }
   });
-  dialog.querySelector('[data-editor-copy]').addEventListener('click', async () => {
-    if (currentTask === null) return;
-    await onCopy(currentTask.id);
-    await close({ force: true });
+  dialog.querySelector('[data-editor-copy]').addEventListener('click', () => {
+    void (async () => {
+      if (currentTask === null) return;
+      await onCopy(currentTask.id, readChanges());
+      await close({ force: true });
+    })().catch((error) => {
+      showMessage(errorMessage(error));
+      void Promise.resolve(onError(error)).catch(() => {});
+    });
   });
-  dialog.querySelector('[data-editor-reload]').addEventListener('click', async () => {
-    if (currentTask === null) return;
-    const latest = await onReload(currentTask.id);
-    await openTask(latest, trigger);
+  dialog.querySelector('[data-editor-reload]').addEventListener('click', () => {
+    void (async () => {
+      if (currentTask === null) return;
+      const latest = await onReload(currentTask.id);
+      await openTask(latest, trigger);
+    })().catch((error) => {
+      showMessage(errorMessage(error));
+      void Promise.resolve(onError(error)).catch(() => {});
+    });
   });
   dialog.querySelector('[data-create-tag]').addEventListener('click', createTag);
   newTag.addEventListener('keydown', (event) => {

@@ -3,8 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package.ps1",
+    "package": "node scripts/package.mjs",
+    "verify:package": "node scripts/verify-package.mjs",
     "test:unit": "node --test",
     "test:e2e": "playwright test",
     "test": "npm run test:unit && npm run test:e2e",

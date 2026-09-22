@@ -1,8 +1,12 @@
 .superpowers/
 .workbuddy/
 .worktrees/
+.codegraph/
 audit/
 dist/
 node_modules/
 playwright-report/
 test-results/
+test-results-run*/
+pw-run*.log
+.qoder/

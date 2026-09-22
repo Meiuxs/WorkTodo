@@ -20,7 +20,7 @@ async function createList(dashboard, name) {
 test('新建任务时首屏只有三行字段，次级区全部收起', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('首屏任务');
-  await dashboard.getByRole('button', { name: '更多字段' }).click();
+  await dashboard.getByRole('button', { name: '补充详情' }).click();
 
   const editor = dashboard.locator('#task-editor');
   await expect(editor.getByLabel('任务名称')).toHaveValue('首屏任务');
