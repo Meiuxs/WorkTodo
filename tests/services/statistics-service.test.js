@@ -485,6 +485,71 @@ test('完成统计使用系统本地日期而不是 UTC 日期字符串', async 
   assert.equal((await statistics.daily(localDate)).completedCount, 1);
 });
 
+test('父任务级联完成的子任务不计入今日进度，避免完成率超过 100%', async () => {
+  // 复现缺陷：今日只计划了 1 项父任务，完成父任务级联带出 3 个无日期的子任务，
+  // 子任务计入分子会计出"4 / 1、完成率 400%"；分子分母应同为顶层任务口径。
+  const statistics = createStatistics([
+    task({
+      id: 'parent',
+      lifecycle: 'completed',
+      scheduledDate: '2026-09-17',
+      firstScheduledDate: '2026-09-17',
+      completedAt: localNoon('2026-09-17'),
+    }),
+    task({
+      id: 'child-1',
+      parentId: 'parent',
+      scheduledDate: null,
+      firstScheduledDate: null,
+      lifecycle: 'completed',
+      completedAt: localNoon('2026-09-17'),
+    }),
+    task({
+      id: 'child-2',
+      parentId: 'parent',
+      scheduledDate: null,
+      firstScheduledDate: null,
+      lifecycle: 'completed',
+      completedAt: localNoon('2026-09-17'),
+    }),
+    task({
+      id: 'child-3',
+      parentId: 'parent',
+      scheduledDate: null,
+      firstScheduledDate: null,
+      lifecycle: 'completed',
+      completedAt: localNoon('2026-09-17'),
+    }),
+  ]);
+
+  const daily = await statistics.daily('2026-09-17');
+
+  assert.equal(daily.completedCount, 1);
+  assert.equal(daily.plannedCount, 1);
+  assert.equal(daily.completionRate, 1);
+  assert.equal(daily.plannedCompletedCount, 1);
+});
+
+test('直接完成无计划日期的子任务不抬高实际完成数', async () => {
+  const statistics = createStatistics([
+    task({ id: 'parent', lifecycle: 'todo', scheduledDate: null, firstScheduledDate: null }),
+    task({
+      id: 'child',
+      parentId: 'parent',
+      scheduledDate: null,
+      firstScheduledDate: null,
+      lifecycle: 'completed',
+      completedAt: localNoon('2026-09-17'),
+    }),
+  ]);
+
+  const daily = await statistics.daily('2026-09-17');
+
+  assert.equal(daily.completedCount, 0);
+  assert.equal(daily.plannedCount, 0);
+  assert.equal(daily.completionRate, null);
+});
+
 test('统计通过索引范围与批量读取获取数据且不调用 exportAll 或 list', async () => {
   const { statistics, calls } = createRecordingStatistics([
     task({

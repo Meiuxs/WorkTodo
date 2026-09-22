@@ -1,3 +1,4 @@
+import { isSubtask } from '../domain/task.js';
 import {
   addLocalDays,
   assertLocalDate,
@@ -90,13 +91,16 @@ export class StatisticsService {
     });
 
     const createdCount = createdTasks.filter((task) => task.trashedAt === null).length;
-    const completedCount = completedTasks.filter((task) => task.trashedAt === null).length;
+    // 完成计数与计划总数保持同一口径：子任务没有独立计划日期（不计入 plannedCount），
+    // 父任务级联完成的子任务也不计入实际完成，避免"4 / 1、完成率 400%"这种分子分母错位。
+    const visibleCompletedTasks = completedTasks.filter((task) =>
+      task.trashedAt === null && !isSubtask(task));
+    const completedCount = visibleCompletedTasks.length;
     const plannedCount = [...plannedDatesByTask.values()]
       .reduce((total, dates) => total + dates.size, 0);
     const cancelledCount = [...plannedDatesByTask]
       .filter(([taskId]) => visibleTasksById.get(taskId).lifecycle === 'cancelled')
       .reduce((total, [, dates]) => total + dates.size, 0);
-    const visibleCompletedTasks = completedTasks.filter((task) => task.trashedAt === null);
     const plannedCompletedCount = visibleCompletedTasks.filter((task) => {
       const firstDateInRange = typeof task.firstScheduledDate === 'string'
         && inRange(task.firstScheduledDate, startDate, endDate);
