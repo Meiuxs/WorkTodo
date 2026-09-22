@@ -5,7 +5,7 @@ import os from 'node:os';
 // 按核数/4 限流避免 CPU 超订导致重列渲染键盘交互抢不到时间片而偶发失败。
 // CI runner 核心少，交给 Playwright 默认（约核数一半）。
 const defaultWorkers = process.platform === 'win32'
-  ? Math.max(1, Math.floor(os.cpus().length / 4))
+  ? Math.min(2, Math.max(1, Math.floor(os.cpus().length / 4)))
   : undefined;
 
 export default defineConfig({
