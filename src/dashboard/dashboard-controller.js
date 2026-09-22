@@ -140,6 +140,10 @@ export class DashboardController {
     } else if (action === 'complete' && this.#subtaskService !== null) {
       const force = value?.force === true;
       result = await this.#subtaskService.completeParent(taskId, revision, { force });
+    } else if (action === 'restore' && this.#subtaskService !== null) {
+      // 恢复与级联完成同口径：经 SubtaskService 把已完成的子任务一并恢复。
+      const force = value?.force === true;
+      result = await this.#subtaskService.restoreParent(taskId, revision, { force });
     } else if (action === 'copy') {
       result = await this.#taskService.copy(taskId, value ?? {});
     } else if (action === 'postpone' || action === 'reschedule') {

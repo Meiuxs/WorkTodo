@@ -147,3 +147,70 @@ test('没有未完成子任务时父任务可直接完成', async () => {
 
   assert.equal(completed.task.lifecycle, 'completed');
 });
+
+test('恢复父任务默认阻止，确认后级联恢复已完成子任务', async () => {
+  const { repository, service } = makeSubtaskService({
+    tasks: [
+      taskFixture({ lifecycle: 'completed', completedAt: NOW }),
+      taskFixture({ id: 'child-1', parentId: 'parent-1', lifecycle: 'completed', completedAt: NOW }),
+      taskFixture({ id: 'child-2', parentId: 'parent-1', lifecycle: 'completed', completedAt: NOW }),
+    ],
+  });
+
+  await assert.rejects(service.restoreParent('parent-1', 0), /有已完成子任务/);
+  assert.equal((await repository.get('parent-1')).lifecycle, 'completed');
+  assert.equal((await repository.get('child-1')).lifecycle, 'completed');
+
+  const restored = await service.restoreParent('parent-1', 0, { force: true });
+  assert.equal(restored.task.lifecycle, 'todo');
+  assert.equal(restored.event.type, 'RESTORE');
+  // 级联镜像：被完成方向级联带出的子任务一并回到待办。
+  assert.deepEqual(restored.restoredChildren.map((task) => task.id), ['child-1', 'child-2']);
+  assert.equal((await repository.get('child-1')).lifecycle, 'todo');
+  assert.equal((await repository.get('child-2')).lifecycle, 'todo');
+});
+
+test('父任务 revision 过期时级联恢复在改子任务前失败', async () => {
+  const { repository, service } = makeSubtaskService({
+    tasks: [
+      taskFixture({ lifecycle: 'completed', completedAt: NOW, revision: 1 }),
+      taskFixture({ id: 'child-1', parentId: 'parent-1', lifecycle: 'completed', completedAt: NOW }),
+    ],
+  });
+
+  await assert.rejects(service.restoreParent('parent-1', 0, { force: true }), { name: 'ConflictError' });
+  assert.equal((await repository.get('child-1')).lifecycle, 'completed');
+  assert.equal((await repository.get('child-1')).revision, 0);
+});
+
+test('没有已完成子任务时恢复父任务不要求确认', async () => {
+  const { repository, service } = makeSubtaskService({
+    tasks: [
+      taskFixture({ lifecycle: 'completed', completedAt: NOW }),
+      taskFixture({ id: 'open-child', parentId: 'parent-1' }),
+    ],
+  });
+
+  const restored = await service.restoreParent('parent-1', 0);
+
+  assert.equal(restored.task.lifecycle, 'todo');
+  assert.deepEqual(restored.restoredChildren, []);
+  assert.equal((await repository.get('open-child')).lifecycle, 'todo');
+});
+
+test('恢复子任务自身不级联也不要求确认', async () => {
+  const { repository, service } = makeSubtaskService({
+    tasks: [
+      taskFixture({ lifecycle: 'completed', completedAt: NOW }),
+      taskFixture({ id: 'child-1', parentId: 'parent-1', lifecycle: 'completed', completedAt: NOW }),
+      taskFixture({ id: 'child-2', parentId: 'parent-1', lifecycle: 'completed', completedAt: NOW }),
+    ],
+  });
+
+  const restored = await service.restoreParent('child-1', 0);
+
+  assert.equal(restored.task.lifecycle, 'todo');
+  assert.deepEqual(restored.restoredChildren, []);
+  assert.equal((await repository.get('child-2')).lifecycle, 'completed');
+  assert.equal((await repository.get('parent-1')).lifecycle, 'completed');
+});

@@ -294,6 +294,28 @@ test('完成父任务时通过 SubtaskService 并传递确认结果', async () =
   assert.deepEqual(calls, [['parent-1', 4, { force: true }]]);
 });
 
+test('恢复父任务时通过 SubtaskService 并传递确认结果', async () => {
+  const calls = [];
+  const controller = new DashboardController({
+    views: { today: { async render() {} } },
+    taskService: {},
+    subtaskService: {
+      async restoreParent(id, revision, options) {
+        calls.push([id, revision, options]);
+        return {
+          task: { id, revision: revision + 1 },
+          restoredChildren: [{ id: 'child-1', revision: 2 }],
+        };
+      },
+    },
+  });
+
+  const result = await controller.handleTaskAction('restore', 'parent-1', 4, { force: true });
+
+  assert.deepEqual(calls, [['parent-1', 4, { force: true }]]);
+  assert.deepEqual(result.restoredChildren, [{ id: 'child-1', revision: 2 }]);
+});
+
 test('导入验证失败停在 error 且不能确认', async () => {
   const controller = new DataManagementController({
     backupService: {

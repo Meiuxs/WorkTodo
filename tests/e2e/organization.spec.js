@@ -7,6 +7,11 @@ async function openAdvancedFilters(page) {
   await expect(panel).toBeVisible();
 }
 
+// 展开今日页的已完成折叠区。
+async function dashboardOpenFold(page) {
+  await page.locator('#completed-today-count').click();
+}
+
 test('任务编辑器可以创建、选择并保留标签', async ({ extension }) => {
   const page = await openDashboard(extension);
   await page.getByLabel('记录一个新事项').fill('整理报价');
@@ -194,6 +199,9 @@ test('完成父任务会先确认并级联完成子任务', async ({ extension }
 
   await parent.getByRole('checkbox', { name: '完成任务' }).click();
   await confirmation.getByRole('button', { name: '完成全部' }).click();
+  // 级联完成的子任务不计入今日进度：分子分母同为顶层任务口径，不能出现 2 / 1。
+  await expect(page.locator('.today-summary__metric strong')).toHaveText('1 / 1');
+  await expect(page.locator('.progress-block .eyebrow')).toHaveText('完成率 100%');
   await page.getByRole('button', { name: '已完成' }).click();
   const doneParent = page.locator('[data-task-id]').filter({ has: page.getByRole('button', { name: '发布版本' }) });
   // 已完成行的恢复按钮可访问名是「恢复任务：发布版本」，非精确匹配会连同标题按钮一起命中。
@@ -202,6 +210,43 @@ test('完成父任务会先确认并级联完成子任务', async ({ extension }
   await expect(doneParent.locator('[data-subtask-id]')).toHaveCount(1);
   // 级联完成后子任务可恢复，勾选控件的可访问名随状态改写为「恢复子任务：{标题}」。
   await expect(doneParent.getByRole('checkbox', { name: /子任务/ })).toBeChecked();
+});
+
+test('从菜单恢复父任务会确认后级联恢复子任务', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  await page.getByLabel('记录一个新事项').fill('恢复级联父任务');
+  await page.locator('#quick-add-date').selectOption('today');
+  await page.getByRole('button', { name: '记录', exact: true }).click();
+  await page.getByRole('button', { name: '恢复级联父任务' }).click();
+  const editor = page.locator('#task-editor');
+  await openEditorGroup(page, 'subtasks');
+  await editor.getByLabel('添加子任务').fill('恢复级联子任务');
+  await editor.getByRole('button', { name: '添加子任务', exact: true }).click();
+  await page.keyboard.press('Escape');
+
+  // 级联完成：父任务带着子任务进入今日已完成折叠区。
+  const parent = page.locator('[data-task-id]').filter({ has: page.getByRole('button', { name: '恢复级联父任务' }) });
+  await parent.getByRole('checkbox', { name: '完成任务' }).click();
+  const confirmation = page.locator('#confirm-dialog');
+  await confirmation.getByRole('button', { name: '完成全部' }).click();
+  await dashboardOpenFold(page);
+
+  // 取消确认：只关掉对话框，父任务和子任务都保持已完成。
+  const foldedParent = page.locator('#completed-today-list [data-task-id]').filter({ has: page.getByRole('button', { name: '恢复级联父任务' }) });
+  await foldedParent.locator('summary[aria-label^="更多任务操作"]').click();
+  await foldedParent.getByRole('button', { name: '恢复待办', exact: true }).click();
+  await expect(confirmation.getByRole('heading', { name: '恢复父任务及其子任务？' })).toBeVisible();
+  await confirmation.getByRole('button', { name: '取消' }).click();
+  await expect(foldedParent).toBeVisible();
+
+  // 确认后级联恢复：父任务回到今天待办，子任务同步回到未勾选。
+  await foldedParent.locator('summary[aria-label^="更多任务操作"]').click();
+  await foldedParent.getByRole('button', { name: '恢复待办', exact: true }).click();
+  await confirmation.getByRole('button', { name: '恢复全部' }).click();
+  const restoredParent = page.locator('#today-list [data-task-id]').filter({ has: page.getByRole('button', { name: '恢复级联父任务' }) });
+  await expect(restoredParent).toContainText('待办');
+  await expect(restoredParent.getByText('子任务 0/1')).toBeVisible();
+  await expect(restoredParent.getByRole('checkbox', { name: '完成子任务：恢复级联子任务' })).toBeVisible();
 });
 
 test('标签和子任务在键盘与 390px 视口下不溢出并恢复焦点', async ({ extension }) => {
