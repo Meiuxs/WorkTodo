@@ -3,6 +3,10 @@ import test from 'node:test';
 
 import { getScheduleOptions, taskMeta, taskPriorityLabel, taskTagLabel, taskTagSummary } from '../../src/dashboard/task-list.js';
 
+// taskMeta 把 UTC 时间戳按系统本地时区渲染（08:30Z → 16:30 依赖东八区）；
+// 固定为 Asia/Shanghai，使断言不随运行器默认时区（本地 UTC+8 / CI UTC）漂移。
+process.env.TZ = 'Asia/Shanghai';
+
 function task(overrides = {}) {
   return {
     lifecycle: 'todo',

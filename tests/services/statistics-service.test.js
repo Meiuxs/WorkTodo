@@ -5,6 +5,10 @@ import { toLocalDate } from '../../src/domain/dates.js';
 import { StatisticsService } from '../../src/services/statistics-service.js';
 import { InMemoryTaskRepository } from '../helpers/fakes.js';
 
+// 完成统计按系统本地日期归属（2026-09-16T16:30Z 在 UTC+8 下计入 09-17）；
+// 固定为 Asia/Shanghai，使断言不随运行器默认时区（本地 UTC+8 / CI UTC）漂移。
+process.env.TZ = 'Asia/Shanghai';
+
 const NOW = '2026-09-17T08:30:00.000Z';
 
 function task(overrides = {}) {
