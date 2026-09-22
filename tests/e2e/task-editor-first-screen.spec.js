@@ -107,7 +107,7 @@ test('关闭抽屉后重新打开，次级区仍全部收起', async ({ extensio
   const group = await openEditorGroup(dashboard, 'tags');
   await expect(group).toHaveAttribute('open', '');
 
-  await editor.getByRole('button', { name: '取消' }).click();
+  await editor.getByRole('button', { name: '关闭', exact: true }).click();
   await expect(editor).toBeHidden();
 
   await dashboard.getByRole('button', { name: '收起状态任务' }).click();
@@ -190,7 +190,8 @@ test('星标开关切换字形与可访问名，并能被键盘操作', async ({
   await expect(editor.getByRole('checkbox', { name: '已标记为星标，点击取消', exact: true })).toBeVisible();
   await expect(toggle.locator('[data-star-glyph]')).toHaveText('★');
 
-  await editor.getByRole('button', { name: '保存任务' }).click();
+  await expect(editor.locator('[data-editor-save-state]')).toHaveText('已保存', { timeout: 3000 });
+  await dashboard.keyboard.press('Escape');
   await dashboard.getByRole('button', { name: '星标任务' }).click();
   await expect(editor.locator('input[name="starred"]')).toBeChecked();
   await expect(editor.locator('[data-star-glyph]')).toHaveText('★');
@@ -207,7 +208,6 @@ test('并发冲突时冲突面板可见且焦点落在载入最新版本', async
   const dialog = second.locator('#task-editor');
   await dialog.getByLabel('任务名称').fill('本地修改');
   await first.getByRole('checkbox', { name: '完成任务' }).first().click();
-  await dialog.getByRole('button', { name: '保存任务' }).click();
 
   const reload = dialog.getByRole('button', { name: '载入最新版本' });
   await expect(reload).toBeFocused();

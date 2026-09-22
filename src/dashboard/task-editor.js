@@ -1,5 +1,6 @@
 import { escapeHtml } from '../shared/ui.js';
 import { readRecurringForm } from './recurring-form.js';
+import { createEditorAutosave } from './editor-autosave.js';
 
 function field(form, name) {
   return form.elements.namedItem(name);
@@ -15,6 +16,15 @@ const SUBTASK_STATUS_LABELS = Object.freeze({
   in_progress: '进行中',
   completed: '已完成',
   cancelled: '已取消',
+});
+
+const SAVE_STATE_LABELS = Object.freeze({
+  idle: '',
+  dirty: '等待保存',
+  saving: '保存中…',
+  saved: '已保存',
+  error: '保存失败，请重试',
+  conflict: '发生冲突，请选择恢复方式',
 });
 
 function subtaskStatus(task) {
@@ -43,6 +53,9 @@ export function createTaskEditor({
   const title = dialog.querySelector('[data-editor-title]');
   const message = dialog.querySelector('[data-editor-message]');
   const conflict = dialog.querySelector('[data-editor-conflict]');
+  const saveState = dialog.querySelector('[data-editor-save-state]');
+  const submit = form.querySelector('[data-editor-submit]');
+  const closeLabel = dialog.querySelector('[data-editor-close-label]');
   const category = field(form, 'categoryId');
   const tagOptions = dialog.querySelector('[data-tag-options]');
   const newTag = dialog.querySelector('#new-tag');
@@ -56,7 +69,11 @@ export function createTaskEditor({
   let trigger = null;
   let anchorTaskId = null;
   let subtaskBusy = false;
-  // 有未保存修改时关闭抽屉要先确认，避免 Esc 或误点直接丢掉编辑内容。
+  // 子任务行的点击处理是异步的；如果用户在资料/标签加载完成前按 Esc，
+  // 旧请求不能在抽屉关闭后又把自己打开。每次打开或关闭都推进一个令牌，
+  // 让迟到的打开请求安全失效。
+  let openRequest = 0;
+  // 新建任务仍需要确认放弃；已有任务通过自动保存不再有“取消修改”状态。
   let dirty = false;
   function markDirty() {
     dirty = true;
@@ -176,7 +193,7 @@ export function createTaskEditor({
     const selected = new Set(selectedIds);
     tagOptions.innerHTML = items.length === 0
       ? '<p class="empty">还没有标签。新建标签后可在这里勾选。</p>'
-      : items.map((tag) => `<label class="tag-option"><input type="checkbox" name="tagIds" value="${escapeHtml(tag.id)}" ${selected.has(tag.id) ? 'checked' : ''}> ${escapeHtml(tag.name)}</label>`).join('');
+      : items.map((tag) => `<label class="tag-option"><input type="checkbox" name="tagIds" value="${escapeHtml(tag.id)}" ${selected.has(tag.id) ? 'checked' : ''}><span class="tag-option__name">${escapeHtml(tag.name)}</span></label>`).join('');
     renderGroupSummaries();
   }
 
@@ -223,6 +240,36 @@ export function createTaskEditor({
     };
   }
 
+  function renderSaveState({ state, error }) {
+    if (saveState === null) return;
+    saveState.textContent = SAVE_STATE_LABELS[state] ?? '';
+    saveState.dataset.state = state;
+    if (state === 'error' || state === 'conflict') {
+      showMessage(errorMessage(error));
+    } else if (state === 'saved' || state === 'idle') {
+      showMessage('');
+    }
+    if (state === 'conflict') {
+      conflict.hidden = false;
+      conflict.scrollIntoView({ block: 'nearest' });
+      requestAnimationFrame(() => dialog.querySelector('[data-editor-reload]')?.focus());
+    }
+  }
+
+  async function saveTaskDraft(draft) {
+    if (currentTask === null) return draft;
+    const result = await onUpdate(currentTask.id, draft, currentTask.revision);
+    currentTask = result.task;
+    title.textContent = currentTask.title;
+    return draft;
+  }
+
+  const autosave = createEditorAutosave({
+    initial: {},
+    save: saveTaskDraft,
+    onStateChange: renderSaveState,
+  });
+
   function updateRecurringVisibility() {
     recurringFields.hidden = !recurring.checked;
     dialog.querySelector('[data-recurrence-unit]').hidden = !recurring.checked
@@ -244,12 +291,16 @@ export function createTaskEditor({
   }
 
   async function openNew(defaults = {}) {
+    const requestId = ++openRequest;
     clearSectionMessages();
     collapseGroups();
+    autosave.cancel();
     currentTask = null;
     anchorTaskId = null;
     trigger = document.activeElement;
     title.textContent = '新增任务';
+    closeLabel.textContent = '取消';
+    submit.hidden = false;
     form.reset();
     dirty = false;
     recurring.checked = false;
@@ -257,34 +308,47 @@ export function createTaskEditor({
     setGroupVisible('resources', false);
     setGroupVisible('subtasks', false);
     updateRecurringVisibility();
-    populateCategories(await getCategories(), defaults.categoryId ?? null);
+    const categories = await getCategories();
+    if (requestId !== openRequest) return;
+    populateCategories(categories, defaults.categoryId ?? null);
     await loadTags(defaults.tagIds ?? []);
+    if (requestId !== openRequest) return;
     field(form, 'title').value = defaults.title ?? '';
     field(form, 'scheduledDate').value = defaults.scheduledDate ?? '';
     field(form, 'priority').value = defaults.priority ?? 'none';
     renderStar();
+    autosave.reset(readChanges());
     conflict.hidden = true;
     showMessage('');
     await renderSubtasks();
+    if (requestId !== openRequest) return;
     await renderResources();
+    if (requestId !== openRequest) return;
     if (!dialog.open) dialog.showModal();
     requestAnimationFrame(() => field(form, 'title').focus());
   }
 
   async function openTask(task, sourceElement = document.activeElement) {
+    const requestId = ++openRequest;
     clearSectionMessages();
     collapseGroups();
+    autosave.cancel();
     if (!dialog.open) anchorTaskId = task.id;
     currentTask = task;
     trigger = sourceElement;
     title.textContent = task.title;
+    closeLabel.textContent = '关闭';
+    submit.hidden = true;
     form.reset();
     dirty = false;
     recurring.checked = false;
     setGroupVisible('recurring', false);
     updateRecurringVisibility();
-    populateCategories(await getCategories(), task.categoryId);
+    const categories = await getCategories();
+    if (requestId !== openRequest) return;
+    populateCategories(categories, task.categoryId);
     await loadTags(task.tagIds ?? []);
+    if (requestId !== openRequest) return;
     field(form, 'title').value = task.title;
     field(form, 'scheduledDate').value = task.scheduledDate ?? '';
     field(form, 'priority').value = task.priority;
@@ -293,19 +357,31 @@ export function createTaskEditor({
     field(form, 'dueTime').value = task.dueTime ?? '';
     field(form, 'starred').checked = Boolean(task.starred);
     renderStar();
+    autosave.reset(readChanges());
     conflict.hidden = true;
     showMessage('');
     await renderSubtasks();
+    if (requestId !== openRequest) return;
     await renderResources();
+    if (requestId !== openRequest) return;
     if (!dialog.open) dialog.showModal();
     requestAnimationFrame(() => field(form, 'title').focus());
   }
 
   async function close({ force = false } = {}) {
+    openRequest += 1;
+    if (!force && currentTask !== null) {
+      try {
+        await autosave.flush();
+      } catch {
+        return false;
+      }
+    }
     if (!force && dirty && confirmDiscard !== null) {
       const discard = await confirmDiscard();
       if (!discard) return false;
     }
+    autosave.cancel();
     dirty = false;
     clearSectionMessages();
     if (dialog.open) dialog.close();
@@ -315,8 +391,10 @@ export function createTaskEditor({
     const taskId = anchorTaskId;
     trigger = null;
     anchorTaskId = null;
-    onClose();
-    requestAnimationFrame(() => {
+    await onClose();
+    // 关闭后主列表可能先完成一次异步 patch，再由浏览器提交焦点变更；
+    // 多等一帧再恢复，避免抽屉关闭瞬间把焦点留在已脱离 DOM 的旧行上。
+    requestAnimationFrame(() => requestAnimationFrame(() => {
       if (previous?.isConnected) {
         previous.focus();
         return;
@@ -325,14 +403,21 @@ export function createTaskEditor({
         ? document.querySelector('#quick-add-title')
         : document.querySelector(`[data-task-id="${CSS.escape(taskId)}"] [data-action="edit"]`);
       replacement?.focus();
-    });
+    }));
     return true;
   }
 
   async function save() {
+    if (currentTask !== null) {
+      try {
+        await autosave.flush();
+        return true;
+      } catch {
+        return null;
+      }
+    }
     showMessage('');
     conflict.hidden = true;
-    const submit = form.querySelector('[type="submit"]');
     submit.disabled = true;
     try {
       const result = currentTask === null
@@ -407,11 +492,13 @@ export function createTaskEditor({
     save();
   });
   form.addEventListener('input', () => {
-    markDirty();
+    if (currentTask === null) markDirty();
+    else autosave.update(readChanges());
     renderGroupSummaries();
   });
   form.addEventListener('change', () => {
-    markDirty();
+    if (currentTask === null) markDirty();
+    else autosave.update(readChanges());
     renderGroupSummaries();
     renderStar();
   });

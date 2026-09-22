@@ -107,6 +107,22 @@ function taskActions(task, today) {
   return actions.join('');
 }
 
+/* 桌面端把两个最高频的次级动作提到行尾：完成仍由行首圆环承担，
+   星标与改期不必再打开长菜单；低频动作继续留在“更多”里。 */
+function taskQuickActions(task, today, titleId) {
+  if (task.trashedAt !== null || !ACTIVE_LIFECYCLES.has(task.lifecycle)) return '';
+  const schedule = getScheduleOptions(today);
+  const dateOption = task.scheduledDate === today
+    ? schedule.find((option) => option.label === '明天')
+    : schedule.find((option) => option.label === '今天');
+  if (dateOption === undefined) return '';
+  const starLabel = task.starred ? '取消星标' : '加星标';
+  return `<div class="task__quick-actions" aria-label="快捷操作：${escapeHtml(task.title)}">
+    <button type="button" class="task__quick-action" data-action="set-starred" data-starred="${task.starred ? 'false' : 'true'}" aria-pressed="${task.starred}" aria-label="${starLabel}" aria-describedby="${titleId}" title="${starLabel}"><span aria-hidden="true">${task.starred ? '★' : '☆'}</span></button>
+    <button type="button" class="task__quick-action" data-action="reschedule" data-date="${dateOption.value}" aria-label="安排${dateOption.label}" aria-describedby="${titleId}" title="安排${dateOption.label}"><span aria-hidden="true">◷</span></button>
+  </div>`;
+}
+
 /* 任务行只展示前几个标签：标签数量不设上限，全部铺开会把元信息行挤成第二行标题。
    超出的部分折叠成 +N，完整清单交给 title，悬停和读屏都还能拿到全部归属。 */
 const VISIBLE_TAG_LIMIT = 2;
@@ -194,16 +210,18 @@ function taskMarkup(task, today, tags, resourceCounts, children = []) {
         ${taskActions(task, today)}
       </div>
     </details>`;
+  const titleId = `task-title-${escapeHtml(task.id)}`;
+  const quickMarkup = taskQuickActions(task, today, titleId);
   return `<article class="task task--${escapeHtml(task.lifecycle)}${overdue ? ' task--overdue' : ''}" data-task-id="${escapeHtml(task.id)}" data-revision="${task.revision}" role="listitem">
     <button class="${checkClass}" type="button" ${checkAttributes} data-action="${checkboxAction}">${checked ? '✓' : ''}</button>
     <div class="task__body">
       <div class="task__title-line">
         ${starMarkup}
-        <button class="task__title" type="button" data-action="edit" title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</button>
+        <button id="${titleId}" class="task__title" type="button" data-action="edit" title="${escapeHtml(task.title)}">${escapeHtml(task.title)}</button>
       </div>
       <span class="task__meta"><span class="task__meta-text"><span class="task__status">${status}</span> · ${escapeHtml(taskMeta(task, today))}${priorityMarkup}${subtaskLabel}${resourceLabel}</span>${tagMarkup}</span>
     </div>
-    ${moreMarkup}
+    <div class="task__actions">${quickMarkup}${moreMarkup}</div>
     ${children.length === 0 ? '' : `<ul class="task__subtasks" role="group" aria-label="子任务">${children.map((child) => subtaskMarkup(child, today)).join('')}</ul>`}
   </article>`;
 }

@@ -208,31 +208,31 @@
 }
 
 /* ============ 今日摘要 ============ */
-/* 今日推进区：进度假度与下一步都采用单列 Flex 流，窄屏时整块换行。 */
+/* 今日推进区：桌面端把摘要压成一行，首屏尽快进入任务列表；窄屏仍由断点回退为纵向流。 */
 .today-focus {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(180px, .55fr) minmax(240px, .85fr) minmax(260px, 1fr);
   align-items: stretch;
-  flex-wrap: wrap;
-  gap: var(--sp-7);
+  gap: var(--sp-6);
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  padding: var(--sp-6) 0;
+  padding: var(--sp-4) 0;
 }
-.today-summary { display: flex; flex: 1 1 420px; align-items: stretch; gap: clamp(var(--sp-6), 5vw, var(--sp-10)); border: 0; padding: 0; }
-.today-summary__metric { display: flex; flex: 0 0 auto; flex-direction: column; gap: var(--sp-1); }
+.today-summary { display: contents; }
+.today-summary__metric { display: flex; grid-column: 1; flex-direction: column; gap: var(--sp-1); }
 .today-summary__metric strong { margin-top: var(--sp-1); }
 
 .today-summary strong {
   display: block;
   color: var(--teal);
-  font-size: var(--fs-metric);
+  font-size: var(--fs-lead);
   font-weight: 700;
   line-height: var(--lh-display);
   letter-spacing: var(--tracking-tight);
   font-variant-numeric: tabular-nums;
 }
 .today-summary span { color: var(--muted); font-size: var(--fs-ui); }
-.today-summary__next { display: flex; flex: 1 1 260px; flex-direction: column; justify-content: center; gap: var(--sp-2); min-width: 240px; border-left: 1px solid var(--line); padding-left: var(--sp-7); }
+.today-summary__next { display: flex; grid-column: 3; flex-direction: column; justify-content: center; gap: var(--sp-1); min-width: 0; border-left: 1px solid var(--line); padding-left: var(--sp-6); }
 .today-summary__next strong { color: var(--ink); font-size: var(--fs-lead); }
 .today-summary__next > span:last-child { color: var(--muted); }
 .today-summary__next .eyebrow { color: var(--muted); font-size: var(--fs-caption); font-weight: 700; }
@@ -249,7 +249,7 @@
   white-space: nowrap;
 }
 .today-summary__task:hover { background: transparent; color: var(--teal); text-decoration: underline; }
-.progress-block { display: flex; flex: 1 1 220px; flex-direction: column; justify-content: center; gap: var(--sp-3); min-width: 180px; max-width: none; }
+.progress-block { display: flex; grid-column: 2; flex-direction: column; justify-content: center; gap: var(--sp-2); min-width: 0; max-width: none; }
 .progress-block progress {
   display: block;
   width: 100%;
@@ -319,6 +319,9 @@
   background: transparent;
   color: var(--surface-raised);
 }
+.task--completed .task__check--restore::before {
+  background: var(--teal);
+}
 .task__body { min-width: 0; padding: var(--sp-4) 0; }
 .task__title-line {
   display: flex;
@@ -347,6 +350,40 @@
   color: var(--teal);
   font-size: var(--fs-body);
   line-height: 1;
+}
+
+.task__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.task__quick-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+.task__quick-action {
+  display: inline-grid;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  padding: 0;
+  font-size: var(--fs-body);
+  line-height: 1;
+}
+.task__quick-action:hover,
+.task__quick-action:focus-visible { border-color: var(--line); background: var(--teal-soft); color: var(--teal); }
+/* 鼠标用户只在当前行获得上下文时看到快捷动作；键盘焦点仍会让它们显形。 */
+@media (hover: hover) and (pointer: fine) {
+  .task__quick-action { opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); }
+  .task:hover .task__quick-action,
+  .task:focus-within .task__quick-action { opacity: 1; }
 }
 
 /* 已删行只剩「永久删除」一个动作，因此不套菜单：它直接占行尾那一列。
@@ -864,7 +901,6 @@ input::placeholder { color: var(--muted); }
   font-size: var(--fs-ui);
 }
 .tag-option:has(input:checked) { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
-.tag-option:has(input:checked)::after { content: "✓"; }
 /* 抽屉里两处"输入 + 主操作"共用一套排布：字段名独占一行，输入与按钮在下一行。
    名标签留在输入框左侧会把输入框右移一格，抽屉里就多出第二个左边界；
    两处各写一套则同一屏出现两种对齐。 */
@@ -1313,6 +1349,16 @@ input::placeholder { color: var(--muted); }
    把整列入口行挤出首屏，头部本身也成了第二遍正文（标题全文就在名称输入框里）。
    截到两行既留住可辨识的上下文，也保证长标题下首屏仍然不用滚动。 */
 .drawer-header > div { flex: 1 1 auto; min-width: 0; }
+.editor-save-state {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+  text-align: right;
+}
+.editor-save-state[data-state="saved"] { color: var(--teal); }
+.editor-save-state[data-state="error"],
+.editor-save-state[data-state="conflict"] { color: var(--coral); }
 .drawer-header h2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1438,14 +1484,13 @@ input::placeholder { color: var(--muted); }
 .day-dialog__list .task__title { font-size: var(--fs-ui); }
 
 /* ============ 反馈条 ============ */
-/* 反馈条固定在正文列底部居中：正文列位于侧栏右侧、宽屏时自动居中，
-   其水平中心 = (视口宽 + 侧栏宽) / 2。底部只留一档间距，不遮挡顶部快速记录与日期选择。 */
+/* 桌面端反馈条固定在正文右下角，避开列表底部的键盘/滚动区域，
+   也不再横跨正文制造一条厚重的黑色横幅。 */
 .toast {
   position: fixed;
   z-index: 20;
-  left: calc((100vw + var(--sidebar-w)) / 2);
+  right: var(--sp-6);
   bottom: var(--sp-6);
-  transform: translateX(-50%);
   max-width: min(420px, calc(100vw - var(--sp-8)));
   border-radius: var(--r-md);
   background: var(--ink);
@@ -1455,10 +1500,10 @@ input::placeholder { color: var(--muted); }
   font-size: var(--fs-ui);
   animation: toast-in var(--dur-base) var(--ease-out);
 }
-/* 进入只用 opacity/transform；transform 里保留 translateX(-50%) 以免丢掉居中。 */
+/* 进入只用 opacity/transform，不影响右下角的固定定位。 */
 @keyframes toast-in {
-  from { opacity: 0; transform: translate(-50%, var(--sp-3)); }
-  to { opacity: 1; transform: translateX(-50%); }
+  from { opacity: 0; transform: translateY(var(--sp-3)); }
+  to { opacity: 1; transform: none; }
 }
 
 .toast button {
@@ -1479,7 +1524,13 @@ input::placeholder { color: var(--muted); }
 }
 
 @media (max-width: 680px) {
-  .toast { left: 50%; bottom: var(--sp-4); }
+  .toast {
+    right: auto;
+    left: 50%;
+    bottom: var(--sp-4);
+    transform: translateX(-50%);
+    animation-name: toast-in-centered;
+  }
   .brand { margin: 0 0 var(--sp-2); }
   /* 窄屏下边框选中态的唯一来源：左侧竖条在窄屏被换成下边框。 */
   .nav button[aria-current="page"] { border-bottom-color: var(--teal); }
@@ -1548,6 +1599,11 @@ input::placeholder { color: var(--muted); }
   .tag-option { flex: 1 1 calc(50% - 7px); min-width: 0; }
 }
 
+@keyframes toast-in-centered {
+  from { opacity: 0; transform: translate(-50%, var(--sp-3)); }
+  to { opacity: 1; transform: translateX(-50%); }
+}
+
 @media (min-width: 1600px) {
   .task-editor { width: min(460px, 100%); }
 }
@@ -1591,8 +1647,8 @@ input::placeholder { color: var(--muted); }
   .quick-add__fields #quick-add-title { flex: 1 1 100%; }
   .quick-add__fields select, .quick-add__fields .quick-add__custom { flex: 1 1 140px; width: auto; }
   .quick-add__fields .button-primary { flex: 1 1 auto; }
-  .today-focus { gap: var(--sp-5); }
-  .today-summary { flex-basis: 100%; gap: var(--sp-6); }
+  .today-focus { display: flex; gap: var(--sp-5); }
+  .today-summary { display: flex; flex-basis: 100%; gap: var(--sp-6); }
   .today-summary__next { flex-basis: 100%; min-width: 0; border-top: 1px solid var(--line); border-left: 0; padding-top: var(--sp-5); padding-left: 0; }
   .history-insight, .history-rate { flex-basis: 100%; }
   .history-report-top { grid-template-columns: 1fr; }

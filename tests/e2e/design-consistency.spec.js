@@ -181,6 +181,22 @@ test('任务菜单用动作名称表达破坏性操作并只保留一个编辑�
   await expect(completedRow.locator('.task__check')).toHaveText('✓');
 });
 
+test('已完成任务的恢复按钮保持实心完成状态', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await dashboard.getByLabel('记录一个新事项').fill('已完成状态视觉回归');
+  await dashboard.getByRole('button', { name: '记录', exact: true }).click();
+  await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
+
+  const row = dashboard.locator('[data-task-id]').filter({ hasText: '已完成状态视觉回归' });
+  await row.getByRole('checkbox', { name: '完成任务' }).click();
+  await dashboard.getByRole('button', { name: '已完成', exact: true }).click();
+
+  const check = dashboard.locator('[data-task-id]').filter({ hasText: '已完成状态视觉回归' }).locator('.task__check');
+  await expect(check).toHaveClass(/task__check--restore/);
+  await expect.poll(() => check.evaluate((node) => getComputedStyle(node, '::before').backgroundColor))
+    .not.toBe('rgba(0, 0, 0, 0)');
+});
+
 test('加星标与取消星标的 Toast 报出新状态，不只说“已更新”', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('星标反馈任务');
@@ -189,7 +205,7 @@ test('加星标与取消星标的 Toast 报出新状态，不只说“已更新�
 
   const row = dashboard.locator('[data-task-id]').filter({ hasText: '星标反馈任务' });
   await row.locator('summary[aria-label^="更多任务操作"]').click();
-  await row.getByRole('button', { name: '加星标', exact: true }).click();
+  await row.locator('.task__menu').getByRole('button', { name: '加星标', exact: true }).click();
   await expect(dashboard.getByText('已加星标')).toBeVisible();
   await expect(row.locator('.task__star')).toHaveAttribute('aria-label', '已标记星标');
   expect(await row.locator('.task__title-line').evaluate((node) => [...node.children].map((child) => child.className)))
@@ -198,7 +214,7 @@ test('加星标与取消星标的 Toast 报出新状态，不只说“已更新�
   // 行内动作会原地刷新、菜单保持展开（见 list-patch carryMenuOpenState）：
   // “取消星标”已在开着的菜单里，直接点它而不是再展开一次（再点会把菜单收起）。
   await expect(row.locator('summary[aria-label^="更多任务操作"]')).toBeVisible();
-  await row.getByRole('button', { name: '取消星标', exact: true }).click();
+  await row.locator('.task__menu').getByRole('button', { name: '取消星标', exact: true }).click();
   await expect(dashboard.getByText('已取消星标')).toBeVisible();
   await expect(row.locator('.task__star')).toHaveCount(0);
   await expect(row).not.toContainText('已星标');
@@ -233,7 +249,8 @@ test('任务行标签独立成块，超过两个折叠为 +N 且全文留在 tit
     await dialog.getByRole('checkbox', { name, exact: true }).check();
   }
   await expect(dialog.locator('input[name="tagIds"]:checked')).toHaveCount(3);
-  await dialog.getByRole('button', { name: '保存任务' }).click();
+  await expect(dialog.locator('[data-editor-save-state]')).toHaveText('已保存', { timeout: 3000 });
+  await dashboard.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 
   const row = dashboard.locator('[data-task-id]').filter({ hasText: '标签展示任务' });
@@ -249,12 +266,11 @@ test('任务行标签独立成块，超过两个折叠为 +N 且全文留在 tit
     .toEqual(['task__meta-text', 'task__tags']);
 });
 
-test('抽屉有未保存修改时关闭前先确认', async ({ extension }) => {
+test('已有任务自动保存后关闭不再弹放弃确认', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
-  await createTodayTask(dashboard, '未保存任务');
-  const titleButton = dashboard.getByRole('button', { name: '未保存任务', exact: true });
+  await createTodayTask(dashboard, '自动保存关闭任务');
+  const titleButton = dashboard.getByRole('button', { name: '自动保存关闭任务', exact: true });
   const editor = dashboard.locator('#task-editor');
-  const confirmation = dashboard.locator('#confirm-dialog');
 
   await titleButton.click();
   await expect(editor).toBeVisible();
@@ -263,18 +279,11 @@ test('抽屉有未保存修改时关闭前先确认', async ({ extension }) => {
   await expect(titleButton).toBeFocused();
 
   await titleButton.click();
-  await editor.getByLabel('任务名称').fill('改过的标题');
+  await editor.getByLabel('任务名称').fill('自动保存后的标题');
+  await expect(editor.locator('[data-editor-save-state]')).toHaveText('已保存', { timeout: 3000 });
   await dashboard.keyboard.press('Escape');
-  await expect(confirmation).toBeVisible();
-  await expect(confirmation.getByRole('heading', { name: '放弃未保存的修改？' })).toBeVisible();
-
-  await confirmation.getByRole('button', { name: '取消' }).click();
-  await expect(editor).toBeVisible();
-
-  await dashboard.keyboard.press('Escape');
-  await confirmation.getByRole('button', { name: '放弃修改' }).click();
   await expect(editor).toBeHidden();
-  await expect(dashboard.getByRole('button', { name: '未保存任务', exact: true })).toBeVisible();
+  await expect(dashboard.getByRole('button', { name: '自动保存后的标题', exact: true })).toBeVisible();
 });
 
 test('月历用方向键在日期之间移动焦点', async ({ extension }) => {

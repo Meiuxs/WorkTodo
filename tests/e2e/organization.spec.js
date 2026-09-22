@@ -19,7 +19,8 @@ test('任务编辑器可以创建、选择并保留标签', async ({ extension }
   await editor.getByLabel('新标签').fill('客户');
   await editor.getByRole('button', { name: '创建标签' }).click();
   await editor.getByRole('checkbox', { name: '客户' }).check();
-  await editor.getByRole('button', { name: '保存任务' }).click();
+  await expect(editor.locator('[data-editor-save-state]')).toHaveText('已保存', { timeout: 3000 });
+  await page.keyboard.press('Escape');
 
   await page.getByRole('button', { name: '整理报价' }).click();
   await openEditorGroup(page, 'tags');
@@ -37,7 +38,8 @@ test('全部任务可以按标签筛选并显示标签文字', async ({ extensio
   await editor.getByLabel('新标签').fill('客户');
   await editor.getByRole('button', { name: '创建标签' }).click();
   await editor.getByRole('checkbox', { name: '客户' }).check();
-  await editor.getByRole('button', { name: '保存任务' }).click();
+  await expect(editor.locator('[data-editor-save-state]')).toHaveText('已保存', { timeout: 3000 });
+  await page.keyboard.press('Escape');
 
   await page.getByLabel('记录一个新事项').fill('无标签事项');
   await page.locator('#quick-add-date').selectOption('today');
@@ -123,7 +125,7 @@ test('父任务编辑器可以新增并持久化子任务', async ({ extension }
   await editor.getByLabel('添加子任务').fill('整理资质文件');
   await editor.getByRole('button', { name: '添加子任务', exact: true }).click();
   await expect(editor.getByRole('button', { name: '整理资质文件，待办', exact: true })).toBeVisible();
-  await editor.getByRole('button', { name: '保存任务' }).click();
+  await page.keyboard.press('Escape');
 
   await page.reload();
   await page.getByRole('button', { name: '准备投标' }).click();
@@ -143,7 +145,7 @@ test('保存子任务后焦点返回父任务编辑按钮', async ({ extension }
   await editor.getByLabel('添加子任务').fill('整理资质文件');
   await editor.getByRole('button', { name: '添加子任务', exact: true }).click();
   await editor.getByRole('button', { name: '整理资质文件' }).click();
-  await editor.getByRole('button', { name: '保存任务' }).click();
+  await page.keyboard.press('Escape');
 
   await expect(page.locator('[data-action="edit"]').filter({ hasText: '准备投标' })).toBeFocused();
 });
@@ -160,7 +162,7 @@ test('子任务内联嵌套在父行下并可单独勾选更新进度', async ({
   await editor.getByRole('button', { name: '添加子任务', exact: true }).click();
   await editor.getByLabel('添加子任务').fill('同行评审');
   await editor.getByRole('button', { name: '添加子任务', exact: true }).click();
-  await editor.getByRole('button', { name: '保存任务' }).click();
+  await page.keyboard.press('Escape');
 
   const parent = page.locator('[data-task-id]').filter({ has: page.getByRole('button', { name: '编写文档' }) });
   await expect(parent.getByRole('button', { name: '拟初稿' })).toBeVisible();
@@ -181,7 +183,7 @@ test('完成父任务会先确认并级联完成子任务', async ({ extension }
   await openEditorGroup(page, 'subtasks');
   await editor.getByLabel('添加子任务').fill('执行回归测试');
   await editor.getByRole('button', { name: '添加子任务', exact: true }).click();
-  await editor.getByRole('button', { name: '保存任务' }).click();
+  await page.keyboard.press('Escape');
 
   const parent = page.locator('[data-task-id]').filter({ has: page.getByRole('button', { name: '发布版本' }) });
   await parent.getByRole('checkbox', { name: '完成任务' }).click();
@@ -256,18 +258,15 @@ test('标签和子任务在键盘与 390px 视口下不溢出并恢复焦点', a
   expect(editorLayout.subtaskRight).toBeLessThanOrEqual(editorLayout.contentRight + 1);
 
   await page.keyboard.press('Escape');
-
-  // 抽屉里已有未保存修改：Esc 先弹出放弃确认，确认后才关闭并恢复焦点。
-  const discardDialog = page.locator('#confirm-dialog');
-  await expect(discardDialog).toBeVisible();
-  await discardDialog.getByRole('button', { name: '放弃修改' }).click();
-
+  // 已有任务自动保存：Esc 直接关闭并恢复焦点。
+  await expect(editor).toBeHidden();
   await expect(page.getByRole('button', { name: '窄屏组织任务' })).toBeFocused();
 
   await page.getByRole('button', { name: '窄屏组织任务' }).click();
   await openEditorGroup(page, 'tags');
-  await editor.getByRole('checkbox', { name: longTag, exact: true }).check();
-  await editor.getByRole('button', { name: '保存任务' }).click();
+  // 重新打开时标签已是持久化的选中态；没有发生变化，不应人为触发一次保存。
+  await expect(editor.getByRole('checkbox', { name: longTag, exact: true })).toBeChecked();
+  await page.keyboard.press('Escape');
   await page.getByLabel('记录一个新事项').fill('无标签窄屏任务');
   await page.locator('#quick-add-date').selectOption('today');
   await page.getByRole('button', { name: '记录', exact: true }).click();

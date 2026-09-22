@@ -15,7 +15,7 @@ test('导出包含版本信息，导入经过预览后可合并', async ({ exten
   await resourceDialog.locator('[data-resource-url]').fill('https://example.com/backup');
   await resourceDialog.getByRole('button', { name: '保存资料' }).click();
   await expect(editor.getByText('备份资料')).toBeVisible();
-  await editor.getByRole('button', { name: '取消' }).click();
+  await editor.getByRole('button', { name: '关闭', exact: true }).click();
 
   await dashboard.getByRole('button', { name: '设置' }).click();
   const downloadPromise = dashboard.waitForEvent('download');
