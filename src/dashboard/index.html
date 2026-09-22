@@ -87,6 +87,7 @@
       <form method="dialog">
         <header class="drawer-header">
           <div><p class="eyebrow">任务详情</p><h2 data-editor-title>新增任务</h2></div>
+          <span class="editor-save-state" data-editor-save-state role="status" aria-live="polite"></span>
           <button type="button" class="icon-button" data-editor-close aria-label="关闭任务编辑器">×</button>
         </header>
         <div class="drawer-body">
@@ -169,8 +170,8 @@
           </div>
         </div>
         <footer class="drawer-actions">
-          <button type="button" data-editor-close>取消</button>
-          <button type="submit" class="button-primary">保存任务</button>
+          <button type="button" data-editor-close><span data-editor-close-label>取消</span></button>
+          <button type="submit" class="button-primary" data-editor-submit>保存任务</button>
         </footer>
       </form>
     </dialog>

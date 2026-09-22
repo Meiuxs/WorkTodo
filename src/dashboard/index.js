@@ -340,6 +340,7 @@ const taskEditor = createTaskEditor({
   onReload: (taskId) => taskService.getTask(taskId),
   resourceService,
   openResourcePicker: (taskId, source) => resourcePicker.openForTask(taskId, source),
+  onClose: () => controller.refresh(),
   onError,
   confirmDiscard: () => confirmAction({
     title: '放弃未保存的修改？',
