@@ -4,6 +4,7 @@ test('资料收集箱可以创建、搜索并关联网页资料', async ({ exten
   const dashboard = await openDashboard(extension);
   await dashboard.getByRole('button', { name: '资料收集箱' }).click();
   await expect(dashboard.locator('#resources-heading')).toBeVisible();
+  await expect(dashboard.getByLabel('搜索资料')).toHaveAttribute('title', '名称、链接、文件名或片段');
 
   await dashboard.getByRole('button', { name: '添加资料' }).click();
   const createDialog = dashboard.getByRole('dialog');
