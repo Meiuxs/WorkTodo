@@ -112,7 +112,7 @@ const input = document.querySelector('#quick-title');
 const message = document.querySelector('#form-message');
 const toast = document.querySelector('#toast');
 const dateButtons = [...document.querySelectorAll('[data-date]')];
-let selectedDate = 'inbox';
+let selectedDate = 'today';
 
 function setSelectedDate(value) {
   selectedDate = value;
@@ -157,7 +157,7 @@ form.addEventListener('submit', async (event) => {
   try {
     const task = await controller.quickCreate(input.value, scheduledDate);
     input.value = '';
-    setSelectedDate('inbox');
+    setSelectedDate('today');
     showPopupSuccess(getQuickAddFeedback({ scheduledDate }), async () => {
       await controller.undoCreate(task);
       await refresh();

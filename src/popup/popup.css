@@ -101,8 +101,8 @@ h1 {
 .task-row__detail { color: var(--muted); font-size: var(--fs-caption); font-variant-numeric: tabular-nums; }
 .task-row__detail--overdue { color: var(--coral); font-weight: 700; }
 
-/* 记录区与上面的"回顾"内容之间留出最大一段间距：弹窗只有一个主入口。 */
-.popup__form { margin-top: var(--sp-8); border-top: 1px solid var(--line); padding-top: var(--sp-5); }
+/* 记录输入紧跟主标题，减少从打开弹窗到开始输入的视觉距离。 */
+.popup__form { margin-top: var(--sp-4); }
 .popup__input-row { gap: var(--sp-3); align-items: stretch; }
 /* 高度和字号都写死：表单控件默认继承浏览器默认字号，用户把默认字号调小就会比按钮矮一截。 */
 .popup__input-row input {

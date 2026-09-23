@@ -1,19 +1,20 @@
 import { test, expect, openPopup, openDashboard } from './fixtures.js';
 
-test('Popup 快速新增任务后 Dashboard 收集箱可见且刷新后仍存在', async ({ extension }) => {
+test('Popup 默认把新任务安排到今天，Dashboard 今日列表刷新后仍可见', async ({ extension }) => {
   const popup = await openPopup(extension);
+  await expect(popup.getByRole('button', { name: '今天', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await popup.getByLabel('记录一个新事项').fill('联系客户');
   await popup.getByRole('button', { name: '添加任务' }).click();
-  await expect(popup.getByText('已添加到收集箱')).toBeVisible();
+  await expect(popup.locator('#toast')).toContainText('已安排到');
+  await expect(popup.getByRole('button', { name: '今天', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(popup.getByRole('button', { name: '打开工作台' })).toBeVisible();
 
   const dashboard = await openDashboard(extension);
-  await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
-  await expect(dashboard.getByRole('heading', { name: '收集箱 · 1' })).toBeVisible();
+  await expect(dashboard.locator('#today-list')).toContainText('联系客户');
   await expect(dashboard.getByRole('button', { name: '联系客户' })).toBeVisible();
 
   await dashboard.reload();
-  await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
+  await expect(dashboard.locator('#today-list')).toContainText('联系客户');
   await expect(dashboard.getByRole('button', { name: '联系客户' })).toBeVisible();
 });
 
@@ -25,8 +26,7 @@ test('Popup 快速新增可直接撤销创建', async ({ extension }) => {
   await expect(popup.getByText('已撤销创建')).toBeVisible();
 
   const dashboard = await openDashboard(extension);
-  await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
-  await expect(dashboard.getByRole('button', { name: '误记任务' })).toHaveCount(0);
+  await expect(dashboard.locator('#today-list').getByRole('button', { name: '误记任务' })).toHaveCount(0);
   await dashboard.getByRole('button', { name: '回收站', exact: true }).click();
   await expect(dashboard.getByRole('button', { name: '误记任务' })).toHaveCount(0);
 });
@@ -35,7 +35,7 @@ test('Popup 成功反馈不遮挡底部日期选择', async ({ extension }) => {
   const popup = await openPopup(extension);
   await popup.getByLabel('记录一个新事项').fill('检查反馈位置');
   await popup.getByRole('button', { name: '添加任务' }).click();
-  await expect(popup.getByText('已添加到收集箱')).toBeVisible();
+  await expect(popup.locator('#toast')).toContainText('已安排到');
 
   const positions = await popup.evaluate(() => {
     const toast = document.querySelector('#toast').getBoundingClientRect();

@@ -16,6 +16,19 @@
       </header>
       <h1>记下下一件事</h1>
       <p class="popup__capture-label">快速记录 <span>只写标题，稍后再整理</span></p>
+      <form class="popup__form" id="quick-create-form" novalidate>
+        <label class="sr-only" for="quick-title">记录一个新事项</label>
+        <div class="popup__input-row">
+          <input id="quick-title" name="title" autocomplete="off" maxlength="200" placeholder="写下下一件要推进的事……" required>
+          <button class="popup__submit" type="submit" aria-label="添加任务">＋</button>
+        </div>
+        <div class="popup__date-options" aria-label="计划日期">
+          <button class="date-option" type="button" data-date="today" aria-pressed="true">今天</button>
+          <button class="date-option" type="button" data-date="tomorrow" aria-pressed="false">明天</button>
+          <button class="date-option" type="button" data-date="inbox" aria-pressed="false">收集箱</button>
+        </div>
+        <p class="form-message" id="form-message" role="alert"></p>
+      </form>
       <div class="popup__summary" aria-label="今日完成摘要">
         <span id="summary-text" aria-live="polite">正在加载…</span><span class="progress" aria-hidden="true"><span id="progress-bar"></span></span>
       </div>
@@ -26,22 +39,9 @@
         <h2 id="focus-heading">今天要推进</h2><ul class="task-list" id="focus-list"></ul>
         <div class="empty-state" id="empty-state" hidden>
           <p class="empty-state__title">今天还没有待办</p>
-          <p class="empty-state__text">在下面写下要做的事，按 Enter 保存到收集箱或今天。</p>
+          <p class="empty-state__text">在上方写下要做的事，按 Enter 保存到收集箱或今天。</p>
         </div>
       </section>
-      <form class="popup__form" id="quick-create-form" novalidate>
-        <label class="sr-only" for="quick-title">记录一个新事项</label>
-        <div class="popup__input-row">
-          <input id="quick-title" name="title" autocomplete="off" maxlength="200" placeholder="写下下一件要推进的事……" required>
-          <button class="popup__submit" type="submit" aria-label="添加任务">＋</button>
-        </div>
-        <div class="popup__date-options" aria-label="计划日期">
-          <button class="date-option" type="button" data-date="today" aria-pressed="false">今天</button>
-          <button class="date-option" type="button" data-date="tomorrow" aria-pressed="false">明天</button>
-          <button class="date-option" type="button" data-date="inbox" aria-pressed="true">收集箱</button>
-        </div>
-        <p class="form-message" id="form-message" role="alert"></p>
-      </form>
       <div class="toast" id="toast" role="status" hidden></div>
     </main>
     <script type="module" src="./popup.js"></script>

@@ -610,7 +610,7 @@
 /* 格子里三行黏在一起，是因为行高完全由 44px 命中区撑起、行与行零间距。
    命中区收敛到 40px（仍高于 32px 触控下限），行与行之间给 --sp-2（4px），
    任务条读起来就是彼此独立的条目。 */
-.month-day .task { position: relative; grid-template-columns: 40px minmax(0, 1fr); gap: var(--sp-2); min-height: 40px; }
+.month-day .task { position: relative; grid-template-columns: 40px minmax(0, 1fr) 32px; gap: var(--sp-2); min-height: 40px; }
 .month-day .task + .task { margin-top: var(--sp-2); }
 /* 复选框视觉尺寸缩到 16px，与 12px 标题匹配；外框仍占满 40px 命中区，点击范围不变。
    对齐靠外框居中完成，::before 只表达方块本身。 */
@@ -621,12 +621,9 @@
    让未完成任务保持正常墨色，视觉重心留在"还需要做的事"上。 */
 .month-day .task--completed { opacity: .6; }
 .month-day .task--completed .task__title { color: var(--muted); }
-/* 格子只有 140px 左右，"更多"若占一列，标题就只剩两个字的位置。
-   把它移出文档流、悬停或键盘聚焦时浮出，标题拿回整行宽度。 */
+/* 菜单固定占任务行尾的 32px 列，悬停或键盘聚焦时显示，避免落到任务标题下方。 */
 .month-day .task__more {
-  position: absolute;
-  top: 0;
-  right: 0;
+  position: static;
   opacity: 0;
   transition: opacity var(--dur-fast) var(--ease-out);
 }
@@ -646,6 +643,9 @@
 .month-day .task__title-line { gap: var(--sp-2); }
 .month-day .task__star { padding-inline: var(--sp-1); }
 .month-day .task__meta { display: none; }
+/* 快捷星标/改期图标在列表模式是独立网格列；月历中只保留归属在任务行内的菜单入口，
+   避免它们被自动放到下一行并漂到日期格边缘。低频动作仍可从菜单访问。 */
+.month-day .task__quick-actions { display: none; }
 /* 每格最多 3 条，超出的任务收进“+N 更多”弹窗。
    顶部一条极淡分割线把它与展示出的任务分开；居中、用动作色，读起来是入口而不是第四行任务。 */
 .month-day__more {
@@ -1133,7 +1133,6 @@ input::placeholder { color: var(--muted); }
   border-radius: var(--r-sm) var(--r-sm) 0 0;
   background: var(--teal);
 }
-.history-day--attention .history-day__column span { background: var(--coral); }
 .history-day--today strong,
 .history-day--today > small:not(.history-day__status) { color: var(--teal); }
 .history-day strong { font-variant-numeric: tabular-nums; }
@@ -1142,7 +1141,6 @@ input::placeholder { color: var(--muted); }
 .history-day--attention .history-day__status { color: var(--coral); font-weight: 700; }
 .history-legend { display: flex; flex-wrap: wrap; gap: var(--sp-6); margin-top: var(--sp-4); color: var(--muted); font-size: var(--fs-caption); }
 .history-legend span::before { display: inline-block; width: 8px; height: 8px; margin-right: var(--sp-2); border-radius: var(--r-pill); background: var(--teal); content: ""; }
-.history-legend span:last-child::before { background: var(--coral); }
 .history-day-summary { margin: var(--sp-5) 0 0; color: var(--ink); font-size: var(--fs-ui); }
 .history-extra-metrics { margin-top: var(--sp-4); border-top: 1px solid var(--line); padding-top: var(--sp-3); }
 .history-extra-metrics summary { color: var(--muted); font-size: var(--fs-caption); font-weight: 400; }
@@ -1566,13 +1564,12 @@ input::placeholder { color: var(--muted); }
 .day-dialog__list .task__title { font-size: var(--fs-ui); }
 
 /* ============ 反馈条 ============ */
-/* 桌面端反馈条固定在正文右下角，避开列表底部的键盘/滚动区域，
-   也不再横跨正文制造一条厚重的黑色横幅。 */
+/* 桌面反馈条占用页头右侧日期位，避免遮挡任务列表，也不推动当前滚动内容。 */
 .toast {
   position: fixed;
   z-index: 20;
+  top: var(--sp-6);
   right: var(--sp-6);
-  bottom: var(--sp-6);
   max-width: min(420px, calc(100vw - var(--sp-8)));
   border-radius: var(--r-md);
   background: var(--ink);
@@ -1583,7 +1580,7 @@ input::placeholder { color: var(--muted); }
   transition: opacity var(--dur-base) var(--ease-out);
   animation: toast-in var(--dur-base) var(--ease-out);
 }
-/* 进入只用 opacity/transform，不影响右下角的固定定位。 */
+/* 进入只用 opacity/transform，不改变正文布局。 */
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(var(--sp-3)); }
   to { opacity: 1; transform: none; }
@@ -1606,15 +1603,19 @@ input::placeholder { color: var(--muted); }
 }
 .toast button:hover { background: transparent; }
 
+/* Toast 暂时替代页头的系统日期，避免提示与日期文字重叠。 */
+:root:has(#toast:not([hidden])) .workspace-date { visibility: hidden; }
+
 @media (max-width: 900px) {
   .metrics { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 }
 
 @media (max-width: 680px) {
   .toast {
+    top: auto;
     right: auto;
-    left: 50%;
     bottom: var(--sp-4);
+    left: 50%;
     transform: translateX(-50%);
     animation-name: toast-in-centered;
   }

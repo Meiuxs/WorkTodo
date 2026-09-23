@@ -134,7 +134,7 @@ export function createHistoryView({
       const breakdown = requestedMode === 'weekly'
         ? `<div class="history-breakdown__heading"><h3 id="history-breakdown-heading">工作节奏</h3><span>用每天的完成量看变化，不只看一个百分比。</span></div>
           <div class="history-days${hasWeeklyData ? '' : ' history-days--empty'}" role="list" aria-label="本周每日完成量">${renderWeeklyDays(weeklyDays, todayDate)}${hasWeeklyData ? '' : '<p class="history-days__hint" aria-hidden="true">本周暂无数据，完成任务后将在此生成趋势图。</p>'}</div>
-          <div class="history-legend"><span>已完成</span><span>有延期或待处理</span></div>`
+          <div class="history-legend"><span>柱高表示完成项数；延期或待处理见日期下方状态。</span></div>`
         : `<div class="history-breakdown__heading"><h3 id="history-breakdown-heading">今日回顾</h3><span>日视图优先查看完成事项，不强行展示趋势。</span></div>
           <p class="history-day-summary">${summary.completedCount === 0 ? '今天还没有完成记录，先完成一件小事，再回来看看进度。' : `今天完成 ${summary.completedCount} 项，计划任务 ${summary.plannedCount} 项。`}</p>`;
       root.innerHTML = `<section class="view-section" aria-labelledby="history-heading">
