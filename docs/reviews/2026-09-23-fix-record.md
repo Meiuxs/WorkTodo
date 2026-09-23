@@ -63,9 +63,9 @@
 |---|---:|
 | `npm test` | 单元 240/240；E2E 共享 129/129、冲突 2/2 |
 | `node --check` | `src/` 53 个 JavaScript 文件通过 |
-| `npm run package` | 待 v1.9.0 发布构建完成后回填 |
-| `npm run verify:package` | 60 个允许文件、Manifest V3、CSP、权限通过 |
-| `npm run preview:edge` | 待 v1.9.0 发布构建完成后回填 |
+| `npm run package` | 生成 `dist/WorkTodo-v1.9.0.zip`，149,785 字节 |
+| `npm run verify:package` | 61 个允许文件、Manifest V3、CSP、权限通过 |
+| `npm run preview:edge` | 独立预览配置成功启动，版本 1.9.0，视口 2040×974 |
 
 ## 备注
 
