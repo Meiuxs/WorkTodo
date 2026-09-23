@@ -10,3 +10,8 @@ test-results/
 test-results-run*/
 pw-run*.log
 .qoder/
+
+# 本地 Edge 预览与 UX 探查产物，不进入源码或发布包
+.preview-edge*/
+.ux-*/
+ux-review-screenshots-*/
