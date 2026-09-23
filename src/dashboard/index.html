@@ -50,7 +50,6 @@
         <header class="workspace-header">
           <div>
             <h1 id="page-title">今日工作</h1>
-            <p class="content__subtitle" id="page-subtitle">现在最需要推进的事项</p>
           </div>
           <!-- 系统日期是全局上下文，不是某个页面的标题前缀：
                放在页头右上角并弱化，避免与"全部任务"这类非日期页面抢读。 -->
@@ -72,7 +71,10 @@
               <option value="tomorrow">安排明天</option>
               <option value="custom">指定日期</option>
             </select>
-            <input class="quick-add__custom" id="quick-add-custom" type="date" hidden aria-label="指定计划日期">
+            <div class="quick-add__custom-field" id="quick-add-custom-field" hidden>
+              <input class="quick-add__custom" id="quick-add-custom" type="date" aria-label="指定计划日期" aria-describedby="quick-add-date-message">
+              <p class="quick-add__date-message" id="quick-add-date-message" role="alert" hidden></p>
+            </div>
             <button type="button" class="quick-add__more" id="quick-add-more" aria-label="补充详情" title="补充详情"><span aria-hidden="true">⋯</span></button>
             <button type="submit" class="button-primary">记录</button>
           </div>
@@ -99,29 +101,41 @@
               <span class="sr-only" data-star-text>标记为星标</span>
             </label>
           </div>
-          <p class="field-hint">先填标题和计划日期，其他可以稍后补。</p>
           <div class="field-grid">
             <label class="field">计划日期<input name="scheduledDate" type="date"></label>
             <label class="field">优先级<select name="priority"><option value="none">无</option><option value="low">低</option><option value="medium">中</option><option value="high">高</option></select></label>
           </div>
+          <label class="field editor-description">描述<textarea name="description" rows="3" maxlength="10000"></textarea></label>
+          <div class="field-grid">
+            <label class="field">开始时间<input name="startTime" type="time"></label>
+            <label class="field">截止时间<input name="dueTime" type="time"></label>
+          </div>
+          <div class="editor-properties">
+            <label class="editor-property" data-editor-group="category">
+              <span class="editor-property__label">列表</span>
+              <select name="categoryId"></select>
+            </label>
+            <section class="editor-property editor-property--tags" data-editor-group="tags">
+              <div class="editor-property__header">
+                <span class="editor-property__label">标签</span>
+                <span class="editor-property__value" data-group-value="tags">未添加</span>
+                <button type="button" class="button-text editor-property__action" data-toggle-tags aria-expanded="false">添加标签</button>
+              </div>
+              <div class="editor-property__panel" data-tag-panel hidden>
+                <fieldset class="tag-picker" data-tag-picker>
+                  <legend class="sr-only">标签</legend>
+                  <div class="tag-picker__options" data-tag-options></div>
+                  <div class="tag-picker__create">
+                    <label for="new-tag">新标签</label>
+                    <input id="new-tag" maxlength="50">
+                    <button type="button" data-create-tag>创建标签</button>
+                  </div>
+                  <p class="form-message" data-tag-message role="alert"></p>
+                </fieldset>
+              </div>
+            </section>
+          </div>
           <div class="editor-groups">
-            <details class="editor-group" data-editor-group="category">
-              <summary><span class="editor-group__label">列表</span><span class="editor-group__value" data-group-value="category">未归入列表</span></summary>
-              <label class="field">列表<select name="categoryId"></select></label>
-            </details>
-            <details class="editor-group" data-editor-group="tags">
-              <summary><span class="editor-group__label">标签</span><span class="editor-group__value" data-group-value="tags">未添加</span></summary>
-              <fieldset class="tag-picker" data-tag-picker>
-                <legend class="sr-only">标签</legend>
-                <div class="tag-picker__options" data-tag-options></div>
-                <div class="tag-picker__create">
-                  <label for="new-tag">新标签</label>
-                  <input id="new-tag" maxlength="50">
-                  <button type="button" data-create-tag>创建标签</button>
-                </div>
-                <p class="form-message" data-tag-message role="alert"></p>
-              </fieldset>
-            </details>
             <details class="editor-group" data-editor-group="recurring" hidden>
               <summary><span class="editor-group__label">重复任务</span><span class="editor-group__value" data-group-value="recurring">不重复</span></summary>
               <fieldset class="recurring-picker" data-recurring-picker>
@@ -153,14 +167,6 @@
                 </div>
                 <p class="form-message" data-subtask-message role="alert"></p>
               </section>
-            </details>
-            <details class="editor-group" data-editor-group="more">
-              <summary><span class="editor-group__label">更多信息</span><span class="editor-group__value" data-group-value="more">未填写</span></summary>
-              <label class="field">描述<textarea name="description" rows="4" maxlength="10000"></textarea></label>
-              <div class="field-grid">
-                <label class="field">开始时间<input name="startTime" type="time"></label>
-                <label class="field">截止时间<input name="dueTime" type="time"></label>
-              </div>
             </details>
           </div>
           <p class="form-message" data-editor-message role="alert"></p>

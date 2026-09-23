@@ -76,13 +76,12 @@ export function createHistoryView({
     summaryVersion += 1;
     const output = root.querySelector('#history-summary-text');
     if (output !== null) output.value = '';
+    const outputContainer = root.querySelector('[data-summary-output]');
+    if (outputContainer !== null) outputContainer.hidden = true;
     const copy = root.querySelector('[data-summary-copy]');
     if (copy !== null) {
       copy.disabled = true;
-      copy.hidden = true;
     }
-    const editor = root.querySelector('#history-summary-text');
-    if (editor !== null) editor.hidden = true;
     const empty = root.querySelector('[data-summary-empty]');
     if (empty !== null) empty.hidden = false;
   }
@@ -129,9 +128,12 @@ export function createHistoryView({
         ? '完成率暂无计划'
         : `完成率 ${completionPercent}%`;
       const todayDate = today();
+      // 本周无任何完成/计划数据时，柱状图会成一片贴地的等高平线；
+      // 用一层居中水印说明“以后会在这里长趋势”，给新用户建立预期而不误导为未加载。
+      const hasWeeklyData = weeklyDays.some((day) => (day.completedCount ?? 0) > 0 || (day.plannedCount ?? 0) > 0);
       const breakdown = requestedMode === 'weekly'
         ? `<div class="history-breakdown__heading"><h3 id="history-breakdown-heading">工作节奏</h3><span>用每天的完成量看变化，不只看一个百分比。</span></div>
-          <div class="history-days" role="list" aria-label="本周每日完成量">${renderWeeklyDays(weeklyDays, todayDate)}</div>
+          <div class="history-days${hasWeeklyData ? '' : ' history-days--empty'}" role="list" aria-label="本周每日完成量">${renderWeeklyDays(weeklyDays, todayDate)}${hasWeeklyData ? '' : '<p class="history-days__hint" aria-hidden="true">本周暂无数据，完成任务后将在此生成趋势图。</p>'}</div>
           <div class="history-legend"><span>已完成</span><span>有延期或待处理</span></div>`
         : `<div class="history-breakdown__heading"><h3 id="history-breakdown-heading">今日回顾</h3><span>日视图优先查看完成事项，不强行展示趋势。</span></div>
           <p class="history-day-summary">${summary.completedCount === 0 ? '今天还没有完成记录，先完成一件小事，再回来看看进度。' : `今天完成 ${summary.completedCount} 项，计划任务 ${summary.plannedCount} 项。`}</p>`;
@@ -178,8 +180,12 @@ export function createHistoryView({
             <button type="button" class="button-secondary" data-summary-kind="month">生成本月总结</button>
           </div>
           <p class="summary-empty" data-summary-empty>先看结论，再按需生成可复制总结。</p>
-          <textarea id="history-summary-text" aria-label="总结文本" readonly hidden></textarea>
-          <button type="button" class="button-secondary summary-copy" data-summary-copy disabled hidden>复制总结</button>
+          <div class="summary-output" data-summary-output hidden>
+            <textarea id="history-summary-text" aria-label="总结文本" readonly></textarea>
+            <button type="button" class="button-secondary summary-copy" data-summary-copy aria-label="复制总结" title="复制总结" disabled>
+              <span aria-hidden="true">⧉</span><span class="sr-only">复制总结</span>
+            </button>
+          </div>
         </section>
         <section class="history-details" aria-labelledby="history-details-heading">
           <div class="history-details__heading"><h3 id="history-details-heading">实际完成明细</h3><span>${completed.length} 项</span></div>
@@ -229,15 +235,16 @@ export function createHistoryView({
               return;
             }
             const output = root.querySelector('#history-summary-text');
+            const outputContainer = root.querySelector('[data-summary-output]');
             const copy = root.querySelector('[data-summary-copy]');
             if (output === null) return;
             output.value = generated.text;
-            output.hidden = !shouldShowSummaryEditor(generated.text);
+            const shouldShow = shouldShowSummaryEditor(generated.text);
+            if (outputContainer !== null) outputContainer.hidden = !shouldShow;
             const empty = root.querySelector('[data-summary-empty]');
-            if (empty !== null) empty.hidden = output.hidden;
+            if (empty !== null) empty.hidden = shouldShow;
             if (copy !== null) {
-              copy.disabled = output.hidden;
-              copy.hidden = output.hidden;
+              copy.disabled = !shouldShow;
             }
           }, { signal, onError });
         });

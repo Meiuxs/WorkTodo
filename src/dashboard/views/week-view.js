@@ -1,5 +1,5 @@
 import { addLocalDays, formatLocalDay, formatLocalDayWithWeekday } from '../../domain/dates.js';
-import { renderTaskList, renderTaskRow } from '../task-list.js';
+import { renderTaskList, renderTaskRow, emptyStateMarkup } from '../task-list.js';
 import { patchTaskContainers } from '../list-patch.js';
 
 export function createWeekView({
@@ -67,11 +67,12 @@ export function createWeekView({
 
       const grid = root.querySelector('.week-grid');
       if (plannedDays.length === 0) {
-        grid.innerHTML = `<div class="empty-state">
-          <p class="empty-state__title">${singleDate ? '明天还没有计划' : '本周还没有计划'}</p>
-          <p class="empty-state__text">${singleDate ? '先把明天要做的一件事写下来。' : '先记录一件要推进的事，再回来安排日期。'}</p>
-          <button type="button" class="button-primary empty-state__action" data-focus-quick-add>记录一件事</button>
-        </div>`;
+        grid.innerHTML = emptyStateMarkup({
+          title: singleDate ? '明天还没有计划' : '本周还没有计划',
+          text: singleDate ? '先把明天要做的一件事写下来。' : '先记录一件要推进的事，再回来安排日期。',
+          action: '记录一件事',
+          art: 'calendar',
+        });
         grid.querySelector('[data-focus-quick-add]').addEventListener('click', () => {
           document.querySelector('#quick-add-title')?.focus();
         });

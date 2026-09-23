@@ -34,18 +34,20 @@ import { ResourceService } from '../services/resource-service.js';
 import { createResourcePicker } from './resource-picker.js';
 import { createResourcesView } from './views/resources-view.js';
 
+// 只保留视图标题：解释性副标题违反"别让我读"，占据首屏空间却不传递信息，
+// 视图含义已由标题与导航清楚表达，不再附加说明文案。
 const routeMeta = {
-  today: ['今日工作', '现在最需要推进的事项'],
-  tomorrow: ['明天', '提前看清下一日安排'],
-  week: ['本周', '按天查看这一周的计划'],
-  month: ['月历', '按月查看计划和任务分布'],
-  inbox: ['收集箱', '先记录，再整理'],
-  resources: ['资料收集箱', '先保存上下文，再决定归属'],
-  all: ['全部任务', '查找、筛选和调整工作'],
-  completed: ['已完成', '回看已经结束的任务'],
-  trash: ['回收站', '恢复或永久删除已删除任务'],
-  history: ['工作记录', '按实际完成日期回顾工作'],
-  settings: ['设置', '列表与本地数据管理'],
+  today: '今日工作',
+  tomorrow: '明天',
+  week: '本周',
+  month: '月历',
+  inbox: '收集箱',
+  resources: '资料收集箱',
+  all: '全部任务',
+  completed: '已完成',
+  trash: '回收站',
+  history: '工作记录',
+  settings: '设置',
 };
 
 const repository = new TaskRepository();
@@ -81,10 +83,12 @@ const app = document.querySelector('.app');
 const dayDialog = document.querySelector('#month-day-dialog');
 let controller;
 let toastTimer;
+let toastExitTimer;
 const undoController = new UndoController();
-// 移出可见列表且无确认框的动作（移入回收站、取消）用的加长撤销窗口：
-// 行一旦离开视线就没有二次机会，5 秒不够把手放回鼠标。
-const TRASH_UNDO_WINDOW = 10000;
+// 移出可见列表且无确认框的动作（移入回收站、取消）仍保留撤销入口，
+// 但不让 Toast 长时间遮挡底部内容；文案会明确告诉用户剩余窗口。
+const TRASH_UNDO_WINDOW = 5000;
+const TOAST_EXIT_DURATION = 180;
 
 async function getResourceCounts(tasks) {
   return new Map(await Promise.all(tasks.map(async (task) => [task.id, (await resourceService.listTaskIds(task.id)).length])));
@@ -104,6 +108,8 @@ function formatWorkspaceDate(date) {
 
 function showToast(message, { actionLabel = null, onAction = null, duration = 5000 } = {}) {
   clearTimeout(toastTimer);
+  clearTimeout(toastExitTimer);
+  toast.classList.remove('toast--exiting');
   toast.replaceChildren(document.createTextNode(message));
   if (actionLabel !== null && onAction !== null) {
     undoController.offer({ message, undo: onAction }, duration);
@@ -123,8 +129,12 @@ function showToast(message, { actionLabel = null, onAction = null, duration = 50
     undoController.dismiss();
   }
   toast.hidden = false;
+  toastExitTimer = setTimeout(() => {
+    toast.classList.add('toast--exiting');
+  }, Math.max(0, duration - TOAST_EXIT_DURATION));
   toastTimer = setTimeout(() => {
     toast.hidden = true;
+    toast.classList.remove('toast--exiting');
     undoController.dismiss();
   }, duration);
 }
@@ -242,8 +252,8 @@ async function onAction(action, taskId, revision, value) {
     });
   } else if (action === 'trash') {
     // 移入回收站不再叠加确认框：它本来就可撤销，确认 + 撤销是双摩擦。
-    // 代价是误触即走，所以把撤销窗口加长，并把它写进 Toast 文案。
-    showToast('已移入回收站，10 秒内可撤销', {
+    // 代价是误触即走，所以保留 5 秒撤销窗口，并把它写进 Toast 文案。
+    showToast('已移入回收站，5 秒内可撤销', {
       actionLabel: '撤销',
       duration: TRASH_UNDO_WINDOW,
       onAction: async () => {
@@ -386,17 +396,51 @@ function markCurrentRoute(route) {
   });
 }
 
+const quickAddDefaultsByRoute = Object.freeze({
+  today: 'today',
+  tomorrow: 'tomorrow',
+  week: 'inbox',
+  month: 'inbox',
+  inbox: 'inbox',
+  all: 'inbox',
+});
+
+function clearQuickAddDateError() {
+  const quickAdd = document.querySelector('#quick-add');
+  const custom = document.querySelector('#quick-add-custom');
+  const dateMessage = document.querySelector('#quick-add-date-message');
+  quickAdd?.classList.remove('quick-add--error');
+  custom?.removeAttribute('aria-invalid');
+  if (dateMessage !== null) {
+    dateMessage.textContent = '';
+    dateMessage.hidden = true;
+  }
+}
+
+function updateQuickAddContext(route) {
+  const quickAdd = document.querySelector('#quick-add');
+  const select = document.querySelector('#quick-add-date');
+  const custom = document.querySelector('#quick-add-custom');
+  const customField = document.querySelector('#quick-add-custom-field');
+  const defaultDate = quickAddDefaultsByRoute[route];
+  quickAdd.hidden = defaultDate === undefined;
+  if (defaultDate !== undefined) {
+    select.value = defaultDate;
+    custom.value = '';
+    customField.hidden = true;
+  }
+  document.querySelector('#quick-add-message').textContent = '';
+  clearQuickAddDateError();
+}
+
 async function navigate(route) {
   const nextRoute = routeMeta[route] === undefined ? 'today' : route;
   // hash 是路由的唯一来源：进入某视图时把路径写回地址栏（replaceState 不触发
   // hashchange，不会与下方监听互相回环），刷新、深链、收藏都能停在当前视图。
   lastRoutePath = nextRoute;
   writeRoute(nextRoute);
-  const [title, subtitle] = routeMeta[nextRoute];
-  document.querySelector('#page-title').textContent = title;
-  document.querySelector('#page-subtitle').textContent = subtitle;
-  document.querySelector('#quick-add').hidden = ['history', 'settings', 'resources'].includes(nextRoute);
-  document.querySelector('#quick-add-message').textContent = '';
+  document.querySelector('#page-title').textContent = routeMeta[nextRoute];
+  updateQuickAddContext(nextRoute);
   markCurrentRoute(nextRoute);
   await controller.navigate(nextRoute);
 }
@@ -422,7 +466,12 @@ dayDialog.querySelectorAll('[data-day-dialog-close]').forEach((button) => {
 });
 
 document.querySelector('#quick-add-date').addEventListener('change', (event) => {
-  document.querySelector('#quick-add-custom').hidden = event.target.value !== 'custom';
+  document.querySelector('#quick-add-custom-field').hidden = event.target.value !== 'custom';
+  clearQuickAddDateError();
+});
+
+document.querySelector('#quick-add-custom').addEventListener('input', (event) => {
+  if (event.target.value.length > 0) clearQuickAddDateError();
 });
 
 document.querySelector('#quick-add-more').addEventListener('click', () => {
@@ -450,9 +499,14 @@ document.querySelector('#quick-add').addEventListener('submit', async (event) =>
   const select = document.querySelector('#quick-add-date');
   const custom = document.querySelector('#quick-add-custom');
   const message = document.querySelector('#quick-add-message');
+  const quickAdd = document.querySelector('#quick-add');
+  const customField = document.querySelector('#quick-add-custom-field');
+  const dateMessage = document.querySelector('#quick-add-date-message');
+  clearQuickAddDateError();
   message.textContent = '';
   // 空标题不走浏览器原生校验气泡（表单已 novalidate），改用行内提示并聚焦输入框。
   if (input.value.trim().length === 0) {
+    quickAdd.classList.add('quick-add--error');
     message.textContent = '先写下一件要做的事，再记录。';
     input.focus();
     return;
@@ -464,7 +518,11 @@ document.querySelector('#quick-add').addEventListener('submit', async (event) =>
   if (select.value === 'custom') {
     scheduledDate = custom.value;
     if (scheduledDate.length === 0) {
-      message.textContent = '请选择任务计划日期。';
+      quickAdd.classList.add('quick-add--error');
+      customField.hidden = false;
+      custom.setAttribute('aria-invalid', 'true');
+      dateMessage.textContent = '请选择任务计划日期。';
+      dateMessage.hidden = false;
       custom.focus();
       return;
     }
@@ -475,13 +533,14 @@ document.querySelector('#quick-add').addEventListener('submit', async (event) =>
     // 保留本次日期选择：连续安排多件“今天”的任务时不必每件重选；
     // 自定义日期仍然清空，避免下一个标题悄悄落到旧日期上。
     custom.value = '';
-    if (select.value === 'custom') custom.hidden = true;
+    if (select.value === 'custom') customField.hidden = true;
     showToast(scheduledDate === null ? '已添加到收集箱' : `已安排到 ${formatLocalDay(scheduledDate)}`, {
       actionLabel: '撤销',
       onAction: () => onAction('undo-create', result.task.id, result.task.revision).catch(onError),
     });
     input.focus();
   } catch (error) {
+    quickAdd.classList.add('quick-add--error');
     message.textContent = error?.message || '任务没有保存。你的输入还在，请重试。';
     input.focus();
   }

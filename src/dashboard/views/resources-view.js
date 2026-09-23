@@ -1,12 +1,30 @@
 import { escapeHtml, runViewAction } from '../../shared/ui.js';
 import { ValidationError } from '../../domain/errors.js';
+import { emptyStateArt } from '../empty-state-art.js';
 
 function typeLabel(type) {
   return type === 'url' ? '网页链接' : type === 'file' ? '本地文件' : '文本片段';
 }
 
 function resourceSource(resource) {
-  return resource.url ?? resource.fileName ?? (resource.content ?? '').slice(0, 100);
+  return resource.url ?? resource.fileName ?? resource.content ?? '';
+}
+
+function resourceCardMarkup(resource) {
+  const id = escapeHtml(resource.id);
+  const title = escapeHtml(resource.title);
+  const source = escapeHtml(resourceSource(resource));
+  const type = `${typeLabel(resource.type)}${resource.storageMode === 'copy' ? ' · 已保存副本' : ''}`;
+  const fileAction = resource.type === 'file' && resource.storageMode === 'copy'
+    ? '<button type="button" data-resource-download>下载副本</button>'
+    : resource.type === 'file'
+      ? '<button type="button" data-resource-relink>重新选择文件</button>'
+      : '';
+  return `<article class="resource-card" data-resource-id="${id}" role="listitem"><div class="resource-card__body"><p class="resource-card__type">${type}</p><h3><button type="button" class="resource-card__title" data-resource-edit aria-label="编辑资料：${title}">${title}</button></h3><button type="button" class="resource-card__source" data-resource-edit aria-label="查看资料内容：${title}">${source}</button>${resource.note ? `<p class="resource-card__note">${escapeHtml(resource.note)}</p>` : ''}</div><div class="resource-card__actions">${fileAction}<button type="button" data-resource-associate>关联任务</button><button type="button" data-resource-delete>删除</button></div></article>`;
+}
+
+function resourceEmptyStateMarkup() {
+  return `<div class="empty-state empty-state--art resource-empty-state">${emptyStateArt('folder')}<p class="empty-state__title">还没有资料</p><p class="empty-state__text">保存链接、文件或文本片段，之后再关联任务。</p><button type="button" class="button-primary empty-state__action" data-resource-create>立即添加第一份资料</button></div>`;
 }
 
 export function createResourcesView({ root, resourceService, query, onError, confirmAction }) {
@@ -20,12 +38,16 @@ export function createResourcesView({ root, resourceService, query, onError, con
       const resources = await resourceService.list({ text, type: type === 'all' ? null : type });
       const tasks = await query.all();
       const availableTasks = tasks.filter((task) => task.trashedAt === null);
-      const relationCounts = new Map(await Promise.all(resources.map(async (resource) => [resource.id, (await resourceService.listTaskIds(resource.id)).length])));
       if (signal?.aborted || version !== renderVersion) return;
+      // 空状态已经提供"立即添加第一份资料"这一个主入口，列表为空时不再渲染头部按钮：
+      // 否则同屏出现两个指向同一动作的主按钮，违反规范 §4.6 的「唯一主入口」。
+      const headerCreateButton = resources.length === 0
+        ? ''
+        : '<button type="button" class="button-primary" data-resource-create>添加资料</button>';
       root.innerHTML = `<section class="view-section" aria-labelledby="resources-heading">
-        <div class="section-heading"><div><h2 id="resources-heading">资料收集箱 · ${resources.length}</h2><p>先保存上下文，再决定它属于哪个任务。</p></div><button type="button" class="button-primary" data-resource-create>添加资料</button></div>
+        <div class="section-heading"><div><h2 id="resources-heading">资料收集箱</h2></div>${headerCreateButton}</div>
         <div class="resource-toolbar"><label class="filter-search">搜索资料<input type="search" data-resource-search value="${escapeHtml(text)}" placeholder="名称、链接、文件名或片段" title="名称、链接、文件名或片段"></label><label>类型<select data-resource-filter><option value="all">全部资料</option><option value="url">网页链接</option><option value="file">本地文件</option><option value="snippet">文本片段</option></select></label></div>
-        <div class="resources-list"${resources.length === 0 ? '' : ' role="list"'}>${resources.length === 0 ? '<div class="empty-state"><p class="empty-state__title">还没有资料</p><p class="empty-state__text">可以先保存一个链接、文件或文本片段，之后再关联到任务。</p></div>' : resources.map((resource) => `<article class="resource-card" data-resource-id="${escapeHtml(resource.id)}" role="listitem"><div><p class="resource-card__type">${typeLabel(resource.type)}${resource.storageMode === 'copy' ? ' · 已保存副本' : ''}</p><h3><button type="button" class="resource-card__title" data-resource-edit aria-label="编辑资料：${escapeHtml(resource.title)}">${escapeHtml(resource.title)}</button></h3><p class="resource-card__source">${escapeHtml(resourceSource(resource))}</p>${resource.note ? `<p class="resource-card__note">${escapeHtml(resource.note)}</p>` : ''}</div><div class="resource-card__actions"><span>${relationCounts.get(resource.id) === 0 ? '未关联任务' : `已关联 ${relationCounts.get(resource.id)} 个任务`}</span>${resource.type === 'file' && resource.storageMode === 'copy' ? '<button type="button" data-resource-download>下载副本</button>' : ''}${resource.type === 'file' && resource.storageMode !== 'copy' ? '<button type="button" data-resource-relink>重新选择文件</button>' : ''}<button type="button" data-resource-associate>关联任务</button><button type="button" data-resource-delete>删除</button></div></article>`).join('')}</div>
+        <div class="resources-list"${resources.length === 0 ? '' : ' role="list"'}>${resources.length === 0 ? resourceEmptyStateMarkup() : resources.map(resourceCardMarkup).join('')}</div>
         <dialog class="modal" data-resource-create-dialog><form method="dialog" data-resource-create-form><h2 data-resource-dialog-title>添加资料</h2><label class="field">资料类型<select data-resource-type aria-describedby="resource-message"><option value="url">网页链接</option><option value="snippet">文本片段</option><option value="file">本地文件</option></select></label><label class="field">资料名称<input data-resource-title maxlength="200" required aria-describedby="resource-message"></label><label class="field" data-url-field>网页链接<input data-resource-url type="url" placeholder="https://" aria-describedby="resource-message"></label><label class="field" data-snippet-field hidden>文本片段<textarea data-resource-content maxlength="20000" aria-describedby="resource-message"></textarea></label><label class="field" data-file-field hidden>本地文件<input data-resource-file type="file" aria-describedby="resource-message"></label><p class="field-hint" data-file-current hidden></p><label class="check-field" data-copy-field hidden><input data-resource-copy type="checkbox"><span>保存一份副本（单个文件不超过 20 MB）</span></label><label class="field">备注<textarea data-resource-note aria-label="资料备注" maxlength="2000" rows="2"></textarea></label><p class="form-message" id="resource-message" data-resource-message role="alert"></p><div class="dialog-actions"><button type="button" data-resource-cancel>取消</button><button type="submit" class="button-primary" data-resource-submit>保存资料</button></div></form></dialog>
         <dialog class="modal" data-resource-associate-dialog><form method="dialog" data-resource-associate-form><h2>关联任务</h2>${availableTasks.length === 0 ? '<p class="empty">还没有可关联的任务。请先记录一个任务。</p>' : `<label class="field">选择任务<select data-resource-task-select>${availableTasks.map((task) => `<option value="${escapeHtml(task.id)}">${escapeHtml(task.title)}</option>`).join('')}</select></label>`}<p class="form-message" data-associate-message role="alert"></p><div class="dialog-actions"><button type="button" data-associate-cancel>取消</button><button type="submit" class="button-primary" ${availableTasks.length === 0 ? 'disabled' : ''}>关联</button></div></form></dialog>
       </section>`;
@@ -81,18 +103,18 @@ export function createResourcesView({ root, resourceService, query, onError, con
         resourceFile.value = '';
         resourceDialogTitle.textContent = '编辑资料';
         resourceSubmit.textContent = '保存修改';
-        fileCurrent.textContent = resource.fileName ? `当前文件：${resource.fileName}。如需更换，请使用资料卡上的“重新选择文件”。` : '';
+        fileCurrent.textContent = resource.fileName ? `当前文件：${resource.fileName}。如需更换，请使用资料卡上的"重新选择文件"。` : '';
         updateCreateType();
         createDialog.showModal();
         resourceTitle.focus();
       };
       resourceType.addEventListener('change', updateCreateType);
-      root.querySelector('[data-resource-create]').addEventListener('click', (event) => {
+      root.querySelectorAll('[data-resource-create]').forEach((button) => button.addEventListener('click', (event) => {
         resetResourceForm();
         createTrigger = event.currentTarget;
         createDialog.showModal();
         resourceTitle.focus();
-      });
+      }));
       createDialog.addEventListener('close', () => {
         createTrigger?.focus();
         createTrigger = null;

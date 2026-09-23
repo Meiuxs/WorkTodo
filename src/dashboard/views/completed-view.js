@@ -5,7 +5,8 @@ export function createCompletedView({ root, query, tagService, today, onAction, 
   function completedEmpty() {
     return emptyStateMarkup({
       title: '还没有已完成任务',
-      text: '点任务行左侧的圆圈即可完成，完成记录会按实际完成日期出现在这里。',
+      text: '勾选待办任务即可完成，完成记录会按实际完成日期出现在这里。',
+      art: 'done-box',
     });
   }
 
@@ -40,8 +41,8 @@ export function createCompletedView({ root, query, tagService, today, onAction, 
       const { completedTop, cancelledTop, childrenByParent } = await arrange(completed, cancelled);
       const resourceCounts = await getResourceCounts?.(completedTop) ?? new Map();
       root.innerHTML = `<section class="view-section" aria-labelledby="completed-heading">
-        <div class="section-heading"><div><h2 id="completed-heading">已完成 · <span id="completed-count">${completedTop.length}</span></h2><p>按完成时间保留工作记录，可恢复为待办或复制为新任务。</p></div></div>
-        <div id="completed-list"></div>
+        <div class="section-heading"><div><h2 id="completed-heading">已完成 · <span id="completed-count">${completedTop.length}</span></h2>${completedTop.length === 0 ? '' : '<p>按完成时间保留工作记录，可恢复为待办或复制为新任务。</p>'}</div></div>
+        <div id="completed-list"${completedTop.length === 0 ? ' class="completed-list--empty"' : ''}></div>
       </section>
       <details class="completed-fold">
         <summary id="cancelled-count">已取消 ${cancelledTop.length} 项</summary>
@@ -72,7 +73,11 @@ export function createCompletedView({ root, query, tagService, today, onAction, 
           container: root.querySelector('#completed-list'),
           tasks: completedTop,
           // 恢复掉最后一个已完成项时补回页面级空状态，不留一片空白。
-          onEmpty: () => { root.querySelector('#completed-list').innerHTML = completedEmpty(); },
+          onEmpty: () => {
+            const emptyList = root.querySelector('#completed-list');
+            emptyList.classList.add('completed-list--empty');
+            emptyList.innerHTML = completedEmpty();
+          },
         },
         { container: root.querySelector('#cancelled-list'), tasks: cancelledTop },
       ], {

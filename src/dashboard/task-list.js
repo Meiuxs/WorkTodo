@@ -1,6 +1,7 @@
 import { formatLocalDay, toLocalDate } from '../domain/dates.js';
 import { isSubtask } from '../domain/task.js';
 import { escapeHtml } from '../shared/ui.js';
+import { emptyStateArt } from './empty-state-art.js';
 
 const ACTIVE_LIFECYCLES = new Set(['todo', 'in_progress']);
 
@@ -78,33 +79,43 @@ function taskStatus(task, today) {
 }
 
 function taskActions(task, today) {
-  const actions = [];
   if (task.trashedAt !== null) {
     // 恢复由行首圆环按钮承担，所以这里只剩一个低频的破坏性动作。
     // 单个动作藏进「更多」要多一次展开，因此它不套菜单外壳，直接作为行内按钮。
     // 可访问名带上任务标题：回收站里每行都有同名按钮时，读屏无法分辨动作对象。
-    actions.push(`<button type="button" class="task__danger" data-action="delete-permanently" aria-label="永久删除 ${escapeHtml(task.title)}">永久删除</button>`);
-    return actions.join('');
+    return `<button type="button" class="task__danger" data-action="delete-permanently" aria-label="永久删除 ${escapeHtml(task.title)}">永久删除</button>`;
   }
-  if (task.lifecycle === 'todo') actions.push('<button type="button" data-action="start">开始</button>');
+  // 按逻辑分组排布菜单：状态 → 改期 → 管理 → 危险，组间用分隔线区隔，
+  // 让用户扫视时一眼辨认每类动作，而不必逐条阅读平铺项。
+  const groups = [];
+  const status = [];
+  if (task.lifecycle === 'todo') status.push('<button type="button" data-action="start">开始</button>');
   if (ACTIVE_LIFECYCLES.has(task.lifecycle)) {
     // 「完成」由行首圆环承担，菜单不再重复；这里只留取消/星标等次级动作。
-    actions.push('<button type="button" data-action="cancel">取消</button>');
-    actions.push(`<button type="button" data-action="set-starred" data-starred="${task.starred ? 'false' : 'true'}">${task.starred ? '取消星标' : '加星标'}</button>`);
-    // 改期是高频动作，但只保留换算好的快捷档；自定义日期和移除日期走编辑抽屉，
-    // 优先级同样收进抽屉（行内按 P 循环切换），避免菜单里再套子菜单。
+    status.push('<button type="button" data-action="cancel">取消</button>');
+    status.push(`<button type="button" data-action="set-starred" data-starred="${task.starred ? 'false' : 'true'}">${task.starred ? '取消星标' : '加星标'}</button>`);
+  } else {
+    status.push('<button type="button" data-action="restore">恢复待办</button>');
+  }
+  groups.push(`<div class="task__menu-group">${status.join('')}</div>`);
+  // 改期是高频动作，但只保留换算好的快捷档；自定义日期和移除日期走编辑抽屉，
+  // 优先级同样收进抽屉（行内按 P 循环切换），避免菜单里再套子菜单。
+  if (ACTIVE_LIFECYCLES.has(task.lifecycle)) {
     const quick = getScheduleOptions(today).filter((option) => ['今天', '明天', '下周'].includes(option.label));
-    actions.push(`<div class="task__date-group" data-menu-section="date" role="group" aria-label="安排 ${escapeHtml(task.title)}">
+    groups.push(`<div class="task__menu-group task__date-group" data-menu-section="date" role="group" aria-label="安排 ${escapeHtml(task.title)}">
       ${quick.map((option) => `<button type="button" data-action="reschedule" data-date="${option.value}">${option.label} · ${formatLocalDay(option.value)}</button>`).join('')}
     </div>`);
-  } else {
-    actions.push('<button type="button" data-action="restore">恢复待办</button>');
   }
   // 子任务、标签和更多字段都在同一个编辑抽屉里，菜单只保留一个与行为一致的入口。
-  actions.push('<button type="button" data-action="edit">编辑任务</button>');
-  actions.push('<button type="button" data-action="copy">复制</button>');
-  actions.push('<button type="button" data-action="trash">移入回收站</button>');
-  return actions.join('');
+  groups.push(`<div class="task__menu-group">
+    <button type="button" data-action="edit">编辑任务</button>
+    <button type="button" data-action="copy">复制</button>
+  </div>`);
+  // 移入回收站是菜单里唯一的破坏性动作，单独成组与日常操作隔开。
+  groups.push(`<div class="task__menu-group task__menu-group--danger">
+    <button type="button" data-action="trash">移入回收站</button>
+  </div>`);
+  return groups.join('');
 }
 
 /* 桌面端把两个最高频的次级动作提到行尾：完成仍由行首圆环承担，
@@ -226,10 +237,14 @@ function taskMarkup(task, today, tags, resourceCounts, children = []) {
   </article>`;
 }
 
-/* 页面级空状态唯一结构（规范 §5.1）：标题 + 说明 + 可选的唯一主入口。
-   首屏渲染与列表"满→空"过渡共用同一函数，避免两处文案/结构漂移。 */
-export function emptyStateMarkup({ title, text, action }) {
-  return `<div class="empty-state">
+/* 页面级空状态唯一结构（规范 §5.1）：可选插画锚点 + 标题 + 说明 + 可选的唯一主入口。
+   首屏渲染与列表"满→空"过渡共用同一函数，避免两处文案/结构漂移。
+   传入 art 时前置一张 aria-hidden 内联插画并居中；无 art 时结构与以前一致。 */
+export function emptyStateMarkup({ title, text, action, art, variant }) {
+  const artMarkup = art === undefined ? '' : emptyStateArt(art);
+  const variantClass = variant === 'celebrate' ? ' empty-state--celebrate' : '';
+  return `<div class="empty-state${artMarkup === '' ? '' : ' empty-state--art'}${variantClass}">
+    ${artMarkup}
     <p class="empty-state__title">${escapeHtml(title)}</p>
     <p class="empty-state__text">${escapeHtml(text)}</p>
     ${action === undefined ? '' : `<button type="button" class="button-primary empty-state__action" data-focus-quick-add>${escapeHtml(action)}</button>`}
@@ -404,10 +419,14 @@ if (typeof document !== 'undefined') {
     const spaceBelow = window.innerHeight - box.bottom - margin;
     const spaceAbove = box.top - margin;
     const contentHeight = menu.scrollHeight;
+    // max-height 走 border-box：若按内容高直接设值，上下边框会吃掉约 2px，
+    // 使可用内容区比内容矮一点，即便视口很宽裕也会因这 2px 溢出弹出生硬的滚动条。
+    // 把边框占位计入目标高，让"放得下"时真正放得下，只在视口确实不够时才滚动。
+    const frame = menu.offsetHeight - menu.clientHeight;
     const openUp = contentHeight > spaceBelow && spaceAbove > spaceBelow;
     if (openUp) menu.classList.add('task__menu--up');
     const available = openUp ? spaceAbove : spaceBelow;
-    menu.style.maxHeight = `${Math.max(120, Math.min(contentHeight, available))}px`;
+    menu.style.maxHeight = `${Math.max(120, Math.min(contentHeight + frame, available))}px`;
   }
 
   /* 动作菜单是临时浮层：点击菜单外任意位置就收起，避免多行菜单同时开着。 */

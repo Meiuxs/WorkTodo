@@ -160,7 +160,7 @@ export function createAllTasksView({ root, query, taskService, tagService, today
       const activeCount = activeFilterCount(filters);
       root.innerHTML = `<section class="view-section" aria-labelledby="all-tasks-heading">
         <div class="section-heading">
-          <div><h2 id="all-tasks-heading">全部任务</h2><p>搜索和状态常驻，时间、列表、标签等条件收在“高级筛选”里。</p></div>
+          <div><h2 id="all-tasks-heading">全部任务</h2></div>
           <span id="filter-count" class="filter-count">显示 0 项</span>
         </div>
         <form class="filters" id="task-filters">

@@ -134,6 +134,20 @@ a {
 .empty-state__text { margin: var(--sp-2) 0 0; color: var(--muted); font-size: var(--fs-ui); }
 .empty-state__action { margin-top: var(--sp-5); }
 
+/* 带插画锚点的页面级空状态：居中排版，插画在上、文字与主入口在下。
+   未加 --art 的空状态保持原来的左对齐，不影响行内/弹窗空状态。 */
+.empty-state--art { text-align: center; }
+.empty-state__art {
+  display: block;
+  width: 120px;
+  height: auto;
+  margin: 0 auto var(--sp-5);
+  color: var(--art-line);
+}
+.empty-state--celebrate { padding-top: var(--sp-8); }
+.empty-state--celebrate .empty-state__art { color: var(--teal); }
+.empty-state--celebrate .empty-state__title { color: var(--teal); }
+
 /* 键盘用户跳过侧边导航直达主体。默认移出视口，获得焦点时滑入。 */
 .skip-link {
   position: fixed;

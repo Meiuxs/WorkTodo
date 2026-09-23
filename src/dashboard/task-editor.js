@@ -60,6 +60,8 @@ export function createTaskEditor({
   const tagOptions = dialog.querySelector('[data-tag-options]');
   const newTag = dialog.querySelector('#new-tag');
   const tagMessage = dialog.querySelector('[data-tag-message]');
+  const tagToggle = dialog.querySelector('[data-toggle-tags]');
+  const tagPanel = dialog.querySelector('[data-tag-panel]');
   const subtaskList = dialog.querySelector('[data-subtask-list]');
   const subtaskTitle = dialog.querySelector('#subtask-title');
   const subtaskMessage = dialog.querySelector('[data-subtask-message]');
@@ -94,11 +96,18 @@ export function createTaskEditor({
     if (row !== undefined) row.hidden = !visible;
   }
 
-  /* details[open] 是常驻 DOM 状态，抽屉关闭后仍留在元素上。
-     不重置的话，用户展开过的组在下一次打开时还是展开的——展开六组就退回字段墙，
-     正是这次改造要消灭的东西。所以每次打开都从头收起。 */
+  function setTagPanelVisible(visible) {
+    tagPanel.hidden = !visible;
+    tagToggle.setAttribute('aria-expanded', String(visible));
+  }
+
+  /* 低频 details 是常驻 DOM 状态，抽屉关闭后仍留在元素上；
+     标签选择区也要在重新打开时收起，避免一次展开后再次变成字段墙。 */
   function collapseGroups() {
-    groupRows.forEach((row) => { row.open = false; });
+    groupRows.forEach((row) => {
+      if (row instanceof HTMLDetailsElement) row.open = false;
+    });
+    setTagPanelVisible(false);
   }
 
   const groupValues = new Map(
@@ -145,10 +154,9 @@ export function createTaskEditor({
   /* 收起不丢信息：摘要是用户在收起状态下判断这条任务现状的唯一依据，
      所以每次改动都要重算，而不是只在打开抽屉时算一次。 */
   function renderGroupSummaries() {
-    setGroupValue('category', category.selectedOptions[0]?.textContent ?? '未归入列表');
-
     const tagCount = selectedTagIds().length;
     setGroupValue('tags', tagCount === 0 ? '未添加' : `${tagCount} 个`);
+    tagToggle.textContent = tagCount === 0 ? '添加标签' : '编辑标签';
 
     setGroupValue('recurring', recurringSummary());
 
@@ -159,10 +167,6 @@ export function createTaskEditor({
     const subtaskDone = subtaskList.querySelectorAll('[data-subtask-id][data-subtask-done]').length;
     setGroupValue('subtasks', subtaskTotal === 0 ? '无' : `${subtaskDone}/${subtaskTotal} 完成`);
 
-    const filled = field(form, 'description').value.trim().length > 0
-      || field(form, 'startTime').value.length > 0
-      || field(form, 'dueTime').value.length > 0;
-    setGroupValue('more', filled ? '已填写' : '未填写');
   }
 
   async function renderResources() {
@@ -547,6 +551,11 @@ export function createTaskEditor({
       showMessage(errorMessage(error));
       void Promise.resolve(onError(error)).catch(() => {});
     });
+  });
+  tagToggle.addEventListener('click', () => {
+    const visible = tagPanel.hidden;
+    setTagPanelVisible(visible);
+    if (visible) requestAnimationFrame(() => newTag.focus());
   });
   dialog.querySelector('[data-create-tag]').addEventListener('click', createTag);
   newTag.addEventListener('keydown', (event) => {

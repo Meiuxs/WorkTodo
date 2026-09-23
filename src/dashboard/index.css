@@ -160,23 +160,20 @@
   line-height: var(--lh-display);
   letter-spacing: var(--tracking-display);
 }
-.content__subtitle {
-  margin: var(--sp-2) 0 0;
-  color: var(--muted);
-  font-size: var(--fs-ui);
-}
 
 /* ============ 区块 ============ */
 .view-root {
   margin-top: var(--sp-7);
   flex: 0 0 auto;
 }
+/* 区块之间只用留白分层，不再画顶线：每个区块的标题下都紧跟列表自身的顶线，
+   区块再画一条就成对出现两条等重横线，而它们只分隔同一处关系。
+   层级改由 --sp-8 留白与 20px 标题承担，线的位置和语义不变。 */
 .view-section {
   margin-top: var(--sp-8);
-  border-top: 1px solid var(--line);
   padding-top: var(--sp-6);
 }
-.view-section:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.view-section:first-child { margin-top: 0; padding-top: 0; }
 .view-section h2 {
   margin: 0;
   font-size: var(--fs-h2);
@@ -214,8 +211,9 @@
   grid-template-columns: minmax(180px, .55fr) minmax(240px, .85fr) minmax(260px, 1fr);
   align-items: stretch;
   gap: var(--sp-6);
+  /* 只保留顶线：下方区块自带边界，再画底线会与它成对出现，
+     而两条线只分隔"摘要 / 任务区块"这同一处关系。 */
   border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
   padding: var(--sp-4) 0;
 }
 .today-summary { display: contents; }
@@ -580,6 +578,7 @@
   color: var(--muted);
   padding: var(--sp-2) var(--sp-3);
   font-size: var(--fs-caption);
+  font-weight: 700;
   text-align: left;
 }
 .month-day {
@@ -591,6 +590,9 @@
   padding: var(--sp-3);
 }
 .month-day--muted { background: var(--canvas); color: var(--muted); }
+/* 跨月日期仍可辨认，但日期数字要比当月日期再退后一层，
+   让浏览的第一落点稳定停在当前月份。 */
+.month-day--muted h3 { opacity: .58; }
 .month-day--muted .task__title { color: var(--muted); }
 .month-day__header { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); min-height: 24px; margin-bottom: var(--sp-2); }
 .month-day h3 { margin: 0; color: currentColor; font-size: var(--fs-caption); }
@@ -599,6 +601,11 @@
 /* 今天：整格染色 + 内描边，30 天里一眼能找到当天。 */
 .month-day--today { background: var(--teal-soft); box-shadow: inset 0 0 0 2px var(--teal); }
 .month-day--today h3 { color: var(--teal); font-weight: 700; }
+/* 整格的极浅色反馈当前操作位置；今天已有更强的青绿色语义，不覆盖它。 */
+.month-day:not(.month-day--today):focus-within { background: var(--hover-tint); }
+@media (hover: hover) and (pointer: fine) {
+  .month-day:not(.month-day--today):hover { background: var(--hover-tint); }
+}
 .month-day .task-list { border-top: 0; }
 /* 格子里三行黏在一起，是因为行高完全由 44px 命中区撑起、行与行零间距。
    命中区收敛到 40px（仍高于 32px 触控下限），行与行之间给 --sp-2（4px），
@@ -707,7 +714,7 @@
   max-height: min(70vh, 520px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  gap: var(--sp-1);
+  gap: 0;
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   background: var(--surface-raised);
@@ -734,20 +741,16 @@
 /* 破坏性操作与普通操作必须能一眼区分，否则"删除"和"复制"外形完全一样。 */
 .task__menu button[data-action="trash"] { color: var(--coral); }
 .task__menu button[data-action="trash"]:hover { background: var(--coral-soft); }
-/* 菜单扁平化后不再套子菜单：改期快捷档用小分组平铺，
-   自定义日期和优先级收进编辑抽屉，菜单整屏不滚动。 */
-.task__date-group {
+/* 菜单按逻辑分组：组内按钮紧凑排列，组与组之间用分隔线区隔，
+   状态 / 改期 / 管理 / 危险四类一眼可辨。 */
+.task__menu-group {
   display: grid;
   gap: var(--sp-1);
-  margin-top: var(--sp-2);
-  border-top: 1px solid var(--line);
-  padding-top: var(--sp-1);
 }
-/* 移入回收站是菜单里唯一的破坏性动作，用分隔线把它和日常操作隔开。 */
-.task__menu button[data-action="trash"] {
-  margin-top: var(--sp-2);
-  border-top: 1px solid var(--line);
+.task__menu-group + .task__menu-group {
+  margin-top: var(--sp-3);
   padding-top: var(--sp-3);
+  border-top: 1px solid var(--line);
 }
 
 /* ============ 空状态 ============ */
@@ -765,10 +768,11 @@
 
 /* 空状态样式已上移到 base.css：工作台与 Popup 共用同一结构，避免各页自造一套。 */
 
+/* 折叠区收尾交给内部最后一行的下边线，自身不再补一条底线：
+   它下面已没有内容，而展开后两条线会贴在一起叠成 2px。 */
 .completed-fold {
   margin-top: var(--sp-8);
   border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
 }
 .completed-fold > summary {
   cursor: pointer;
@@ -778,6 +782,7 @@
 }
 .completed-fold[open] > summary { color: var(--ink); }
 .completed-fold .task-list { border-top: 0; }
+.completed-list--empty .empty-state { border-bottom: 0; }
 
 /* ============ 快速记录 ============ */
 /* 内联表单：标签与输入带在同一水平带内流式排列，不吸底、不浮层。 */
@@ -802,8 +807,13 @@
 .quick-add__fields { display: flex; flex: 1 1 420px; align-items: center; gap: var(--sp-3); min-width: min(100%, 280px); }
 .quick-add__fields #quick-add-title { flex: 1 1 auto; min-width: 0; background: var(--surface); }
 .quick-add__fields select { flex: 0 0 auto; width: auto; min-width: 120px; background: var(--surface); }
-.quick-add__fields .quick-add__custom { flex: 0 0 auto; width: 148px; }
+.quick-add__fields .quick-add__custom-field { display: flex; flex: 0 1 148px; min-width: 148px; flex-direction: column; gap: var(--sp-2); }
+.quick-add__fields .quick-add__custom { width: 100%; }
 .quick-add__fields .button-primary { flex: 0 0 auto; min-width: 72px; }
+.quick-add--error { border-color: var(--coral); }
+.quick-add input.quick-add__custom[aria-invalid="true"] { border-color: var(--coral); background: var(--coral-soft); }
+.quick-add input.quick-add__custom[aria-invalid="true"]:focus-visible { outline-color: var(--coral); }
+.quick-add__date-message { margin: 0; color: var(--coral); font-size: var(--fs-caption); line-height: var(--lh-caption); }
 /* 补充详情是次级图标按钮：方形、与输入同高，不使用主行动色，不与记录争夺视觉焦点。 */
 .quick-add .quick-add__more {
   display: inline-grid;
@@ -1024,12 +1034,17 @@ input::placeholder { color: var(--muted); }
 .summary-panel { margin-top: var(--sp-6); border-top: 1px solid var(--line); padding-top: var(--sp-6); }
 .summary-panel h3 { margin-top: 0; }
 .summary-actions { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--sp-4); }
+.summary-output {
+  position: relative;
+  width: 100%;
+  max-width: 42em;
+  margin-top: var(--sp-4);
+}
 .summary-panel textarea {
   display: block;
   width: 100%;
-  max-width: 42em;
   min-height: 180px;
-  margin-top: var(--sp-4);
+  padding-top: calc(var(--sp-3) + var(--control-h-sm));
   font: inherit;
   line-height: var(--lh-body);
 }
@@ -1056,15 +1071,46 @@ input::placeholder { color: var(--muted); }
 .history-bar strong { color: var(--ink); font-variant-numeric: tabular-nums; }
 .history-bar__track--coral span { background: var(--coral); }
 .summary-empty { margin: var(--sp-4) 0 0; color: var(--muted); font-size: var(--fs-ui); }
-.summary-copy { margin-top: var(--sp-3); }
+.summary-copy {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h-sm);
+  min-height: var(--control-h-sm);
+  padding: 0;
+  border-color: var(--line);
+  background: var(--surface-raised);
+  color: var(--muted);
+  font-size: var(--fs-ui);
+  line-height: 1;
+}
+.summary-copy:hover:not(:disabled),
+.summary-copy:focus-visible { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
 
 .history-days {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(7, minmax(32px, 1fr));
   gap: var(--sp-3);
   align-items: end;
   min-height: 178px;
   margin-top: var(--sp-5);
+}
+/* 无数据时把贴地的平条压得更淡，让居中的“暂无数据”水印成为阅读落点。 */
+.history-days--empty .history-day__column span { opacity: .28; }
+.history-days__hint {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--fs-caption);
+  text-align: center;
+  pointer-events: none;
 }
 .history-day {
   display: grid;
@@ -1111,7 +1157,10 @@ input::placeholder { color: var(--muted); }
 .history-details__heading h3 { margin: 0; }
 .history-details__heading span { color: var(--teal); font-size: var(--fs-caption); }
 .history-details__card { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-raised); padding-inline: var(--sp-4); }
-.history-details__card .task-list { background: transparent; }
+/* 卡片只有横向内边距，内部列表的首行顶线与末行底线会贴住卡片自身的上下边界，
+   各自叠成一条 2px 粗线；这两条由卡片边界承担，内部不再重复。 */
+.history-details__card .task-list { border-top: 0; background: transparent; }
+.history-details__card .task:last-child { border-bottom: 0; }
 
 .editor-resource-list { display: flex; flex-direction: column; gap: var(--sp-2); }
 /* 资料的主操作跟在列表或空提示之后，左边界和"说明在前、动作在后"的顺序都与其他次级区一致。
@@ -1135,10 +1184,34 @@ input::placeholder { color: var(--muted); }
 .resource-card__title { border: 0; background: transparent; color: var(--ink); padding: 0; font: inherit; font-weight: 700; text-align: left; }
 .resource-card__title:hover { background: transparent; color: var(--teal); text-decoration: underline; }
 /* 长链接和长文件名必须能换行，否则资料卡片会把整页撑出横向滚动条。 */
-.resource-card > div { min-width: 0; }
-.resource-card__type, .resource-card__source, .resource-card__note { margin: var(--sp-1) 0 0; color: var(--muted); font-size: var(--fs-caption); overflow-wrap: anywhere; }
+.resource-card__body { min-width: 0; flex: 1 1 auto; }
+.resource-card__type, .resource-card__note { margin: var(--sp-1) 0 0; color: var(--muted); font-size: var(--fs-caption); overflow-wrap: anywhere; }
 .resource-card__type { color: var(--teal); font-weight: 700; }
+.resource-card__source {
+  display: -webkit-box;
+  width: 100%;
+  margin: var(--sp-1) 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 0;
+  font: inherit;
+  font-size: var(--fs-caption);
+  line-height: var(--lh-body);
+  text-align: left;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  cursor: pointer;
+}
+.resource-card__source:hover { background: transparent; color: var(--teal); text-decoration: underline; }
+.resource-card__note { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .resource-card__actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); color: var(--muted); font-size: var(--fs-caption); }
+/* 这里只调整空状态的排布，不再单独关掉收尾下边线：
+   收集箱、回收站、今天、本周的空状态都保留 .empty-state 的那条线，资料页关掉就不一致了。 */
+.resource-empty-state { padding: var(--sp-10) var(--sp-4); text-align: center; }
+.resource-empty-state .empty-state__text { max-width: 34rem; margin-inline: auto; }
 @media (max-width: 700px) {
   .resource-toolbar { grid-template-columns: 1fr; }
   .resource-card { display: grid; }
@@ -1177,7 +1250,8 @@ input::placeholder { color: var(--muted); }
 /* 外观、数据管理、列表、快捷键四类设置互不相关，各自装进一块分区面板：
    视线在区块之间移动的距离比"只有一条分隔线"的松散长列表短得多。
    面板只用 --shadow-card 这一档抬起暗示，完整投影留给抽屉、菜单和 Toast。
-   选择器带 :first-child 是因为共享的 .view-section:first-child 会抹掉首块的面板边界。 */
+   选择器带 :first-child 是因为共享的 .view-section:first-child 会抹掉首块的内边距，
+   面板需要把它拿回 --sp-6。 */
 .view-section--panel,
 .view-section--panel:first-child {
   margin-top: var(--sp-6);
@@ -1232,7 +1306,6 @@ input::placeholder { color: var(--muted); }
    它和数据管理区不再同屏相邻，误触路径比"一条分隔线"长得多。 */
 .view-section--danger {
   margin-top: var(--sp-6);
-  border-top: 0;
   padding-top: 0;
 }
 .danger-zone {
@@ -1385,8 +1458,8 @@ input::placeholder { color: var(--muted); }
 .drawer-body { display: block; flex: 1 1 auto; overflow: auto; overscroll-behavior: contain; padding: var(--sp-6); }
 .field { display: grid; gap: var(--sp-2); color: var(--muted); font-size: var(--fs-caption); }
 .field-hint { margin: var(--sp-2) 0 0; color: var(--muted); font-size: var(--fs-caption); }
-.field-grid { display: flex; flex-wrap: wrap; gap: var(--sp-4); margin-top: var(--sp-5); }
-.field-grid > .field { flex: 1 1 180px; }
+.field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-5); margin-top: var(--sp-5); }
+.field-grid > .field { min-width: 0; }
 .check-field { display: flex; align-items: center; gap: var(--sp-3); color: var(--ink); font-size: var(--fs-body); }
 /* 名称行：输入框占满，右侧是星标开关。 */
 .title-row { display: flex; align-items: flex-end; gap: var(--sp-3); }
@@ -1406,7 +1479,16 @@ input::placeholder { color: var(--muted); }
 .star-toggle:has(input:checked) { border-color: var(--teal); color: var(--teal); }
 .star-toggle:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-/* 入口行：容器一条上边线、每行一条下边线，避免相邻行叠成双线。 */
+/* 常用属性平铺展示：列表直接可选，标签只把选择器收进一个轻量入口。 */
+.editor-properties { margin-top: var(--sp-6); border-top: 1px solid var(--line); }
+.editor-property { display: grid; gap: var(--sp-2); border-bottom: 1px solid var(--line); padding: var(--sp-4) 0; }
+.editor-property__header { display: flex; align-items: center; gap: var(--sp-3); min-height: var(--control-h-sm); }
+.editor-property__label { color: var(--ink); font-size: var(--fs-ui); font-weight: 700; }
+.editor-property__value { margin-left: auto; color: var(--muted); font-size: var(--fs-ui); }
+.editor-property__action { flex: 0 0 auto; }
+.editor-property__panel { margin-top: var(--sp-3); }
+
+/* 低频设置仍用 details：容器一条上边线、每行一条下边线，避免相邻行叠成双线。 */
 .editor-groups { margin-top: var(--sp-6); border-top: 1px solid var(--line); }
 .editor-group { border-bottom: 1px solid var(--line); }
 .editor-group > summary {
@@ -1498,12 +1580,17 @@ input::placeholder { color: var(--muted); }
   color: var(--surface-raised);
   padding: var(--sp-3) var(--sp-4);
   font-size: var(--fs-ui);
+  transition: opacity var(--dur-base) var(--ease-out);
   animation: toast-in var(--dur-base) var(--ease-out);
 }
 /* 进入只用 opacity/transform，不影响右下角的固定定位。 */
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(var(--sp-3)); }
   to { opacity: 1; transform: none; }
+}
+.toast--exiting {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .toast button {
@@ -1645,7 +1732,7 @@ input::placeholder { color: var(--muted); }
   /* 窄屏：输入框独占一行，日期、补充详情与记录排到下一行，主按钮仍在行尾。 */
   .quick-add__fields { flex-wrap: wrap; }
   .quick-add__fields #quick-add-title { flex: 1 1 100%; }
-  .quick-add__fields select, .quick-add__fields .quick-add__custom { flex: 1 1 140px; width: auto; }
+  .quick-add__fields select, .quick-add__fields .quick-add__custom-field { flex: 1 1 140px; width: auto; }
   .quick-add__fields .button-primary { flex: 1 1 auto; }
   .today-focus { display: flex; gap: var(--sp-5); }
   .today-summary { display: flex; flex-basis: 100%; gap: var(--sp-6); }

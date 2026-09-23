@@ -10,19 +10,40 @@ function formatDate(date) {
   }).format(new Date(`${date}T00:00:00`));
 }
 
+function isAllPlannedComplete({ overdue, planned, summary }) {
+  return overdue.length === 0
+    && planned.length === 0
+    && summary.plannedCount > 0
+    && summary.completionRate === 1;
+}
+
 export function createTodayView({ root, query, statistics, tagService, today, onAction, onEdit, onError, getResourceCounts }) {
-  // 首屏空状态：不止告诉用户"没有任务"，还要把唯一的下一步动作递到手上。
+  // 顶部快速记录已经是今日页唯一的主入口，空状态只补充方向，不再重复放按钮。
   function plannedEmpty() {
     return emptyStateMarkup({
       title: '今天还没有待办',
-      text: '在上方快速记录里写下一件要做的事，按 Enter 保存后就会出现在这里。',
-      action: '记录第一件事',
+      text: '今天是个好的开始，在上方写下你的第一个任务吧。',
+      art: 'sun',
     });
   }
-  function bindEmptyStateActions() {
-    root.querySelector('[data-focus-quick-add]')?.addEventListener('click', () => {
-      document.querySelector('#quick-add-title')?.focus();
+
+  function completedDayEmpty() {
+    return emptyStateMarkup({
+      title: '太棒了！今天的任务已全部搞定',
+      text: '今日事今日毕，为你点赞。好好休息一下吧！',
+      art: 'celebrate',
+      variant: 'celebrate',
     });
+  }
+
+  function nextActionMarkup({ nextTask, overdue, summary, planned }) {
+    if (nextTask !== null) {
+      return `<span class="eyebrow">下一步</span><button type="button" class="today-summary__task" aria-label="下一步任务" data-next-task="${escapeHtml(nextTask.id)}">${escapeHtml(nextTask.title)}</button><span>${overdue.length > 0 ? '先处理逾期事项' : '今天可以推进'}</span>`;
+    }
+    if (isAllPlannedComplete({ overdue, planned, summary })) {
+      return '<span class="eyebrow">今日完成</span><strong>全部搞定</strong><span>好好休息一下吧</span>';
+    }
+    return '<span class="eyebrow">下一步</span><strong>记录第一件事</strong><span>从上方快速记录开始</span>';
   }
 
   function bindNextTaskAction() {
@@ -51,9 +72,7 @@ export function createTodayView({ root, query, statistics, tagService, today, on
     if (todayHeading !== null) todayHeading.textContent = `今天 · ${planned.length}`;
     if (overdueHeading !== null) overdueHeading.textContent = `逾期 · ${overdue.length}`;
     if (next !== null) {
-      next.innerHTML = nextTask === null
-        ? '<span class="eyebrow">下一步</span><strong>记录第一件事</strong><span>从上方快速记录开始</span>'
-        : `<span class="eyebrow">下一步</span><button type="button" class="today-summary__task" aria-label="下一步任务" data-next-task="${escapeHtml(nextTask.id)}">${escapeHtml(nextTask.title)}</button><span>${overdue.length > 0 ? '先处理逾期事项' : '今天可以推进'}</span>`;
+      next.innerHTML = nextActionMarkup({ nextTask, overdue, summary, planned });
       bindNextTaskAction();
     }
   }
@@ -107,11 +126,8 @@ export function createTodayView({ root, query, statistics, tagService, today, on
           <div class="today-summary__metric"><span class="eyebrow">今日进度</span><strong>${summary.completedCount} / ${summary.plannedCount}</strong><span>项计划已完成</span></div>
           <div class="progress-block"><span class="eyebrow" id="today-progress-label">完成率 ${summary.completionRate === null ? '暂无计划' : `${progress}%`}</span><progress aria-labelledby="today-progress-label" value="${progress}" max="100">${progress}%</progress></div>
         </div>
-        <div class="today-summary__next" data-next-action>
-          <span class="eyebrow">下一步</span>
-          ${nextTask === null
-            ? '<strong>记录第一件事</strong><span>从上方快速记录开始</span>'
-            : `<button type="button" class="today-summary__task" aria-label="下一步任务" data-next-task="${escapeHtml(nextTask.id)}">${escapeHtml(nextTask.title)}</button><span>${overdue.length > 0 ? '先处理逾期事项' : '今天可以推进'}</span>`}
+          <div class="today-summary__next" data-next-action>
+          ${nextActionMarkup({ nextTask, overdue, summary, planned })}
         </div>
       </section>
       ${overdue.length > 0 ? `<section class="view-section view-section--overdue" aria-labelledby="overdue-heading">
@@ -119,7 +135,7 @@ export function createTodayView({ root, query, statistics, tagService, today, on
         <div id="overdue-list"></div>
       </section>` : ''}
       <section class="view-section" aria-labelledby="today-tasks-heading">
-        <div class="section-heading"><div><h2 id="today-tasks-heading">今天 · ${planned.length}</h2><p>${formatDate(date)}，按星标、优先级和时间排列。</p></div></div>
+        <div class="section-heading"><div><h2 id="today-tasks-heading">今天 · ${planned.length}</h2><p>${formatDate(date)}</p></div></div>
         <div id="today-list"></div>
       </section>
       <details class="completed-fold">
@@ -135,7 +151,9 @@ export function createTodayView({ root, query, statistics, tagService, today, on
         });
       }
       if (planned.length === 0) {
-        root.querySelector('#today-list').innerHTML = plannedEmpty();
+        root.querySelector('#today-list').innerHTML = isAllPlannedComplete({ overdue, planned, summary })
+          ? completedDayEmpty()
+          : plannedEmpty();
       } else {
         renderTaskList(root.querySelector('#today-list'), planned, listOptions);
       }
@@ -143,7 +161,6 @@ export function createTodayView({ root, query, statistics, tagService, today, on
         ...listOptions,
         emptyMessage: '今天还没有完成记录。',
       });
-      bindEmptyStateActions();
       bindNextTaskAction();
     },
 
@@ -163,8 +180,9 @@ export function createTodayView({ root, query, statistics, tagService, today, on
           container: root.querySelector('#today-list'),
           tasks: planned,
           onEmpty: () => {
-            root.querySelector('#today-list').innerHTML = plannedEmpty();
-            bindEmptyStateActions();
+            root.querySelector('#today-list').innerHTML = isAllPlannedComplete({ overdue, planned, summary })
+              ? completedDayEmpty()
+              : plannedEmpty();
           },
         },
         { container: root.querySelector('#completed-today-list'), tasks: completed },

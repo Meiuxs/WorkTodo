@@ -64,7 +64,7 @@ function carryMenuOpenState(oldRow, newRow) {
 
 function moveFocusToNeighbor(neighbor) {
   const target = neighbor?.querySelector('[data-action="edit"]');
-  if (target !== null && target !== undefined) target.focus();
+  if (target !== null && target !== undefined) target.focus({ preventScroll: true });
 }
 
 /* containers: [{ container, tasks, onEmpty }]；renderRow(task) 返回单行 markup。
