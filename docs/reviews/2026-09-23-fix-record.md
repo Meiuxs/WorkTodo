@@ -27,7 +27,7 @@
 ### 测试稳定性
 
 - `playwright.config.js`
-  - Windows 默认 worker 限制为最多 2 个，避免持久化 Chromium 进程过量争抢 CPU 导致交互断言偶发超时。
+  - Windows 默认 worker 限制为最多 3 个，避免持久化 Chromium 进程过量争抢 CPU 导致交互断言偶发超时。
 
 ### UX 与安全复核
 
@@ -35,15 +35,37 @@
 - 复核 Manifest V3、权限、CSP、运行时网络边界、用户输入渲染和发布包 allowlist：均通过。
 - 保留工作区已有的用户改动和预览/截图目录，没有执行回滚或清理。
 
+### 后续 UX 优化批次
+
+- `src/dashboard/index.html`、`src/dashboard/task-editor.js`、`src/dashboard/index.css`
+  - 描述、开始时间、截止时间和列表改为首屏平铺；标签改为常驻入口与按需展开的选择器；重复规则、资料和子任务保留低频折叠。
+  - 计划控件统一网格、控件高度、边框与间距，390px 下自动单列。
+- `src/dashboard/views/today-view.js`
+  - 今日空状态移除重复的“记录第一件事”按钮，仅保留顶部快速记录入口，并清理已删除入口对应的残留回调。
+- `src/dashboard/list-patch.js`
+  - 相邻焦点恢复使用 `focus({ preventScroll: true })`，避免列表动作后视口被焦点恢复带动。
+- `tests/e2e/task-editor-first-screen.spec.js`、`tests/e2e/design-consistency.spec.js`、`tests/e2e/ux-refactor.spec.js`、`tests/e2e/editor-conflict.spec.js`
+  - 补充平铺字段、标签键盘操作、统一控件网格、空状态唯一入口、列表滚动和冲突校验回归覆盖。
+- 对比度复核保留现有 `--muted` 令牌：当前值已满足项目记录的 WCAG AA 对比度，因此没有为了视觉加深而破坏文字层级。
+
+### 文案精简收尾
+
+- `src/dashboard/index.html`
+  - 删除“先填标题和计划日期，其他可以稍后补。”，让字段层级承担引导职责。
+- `src/dashboard/views/today-view.js`
+  - 将“日期 + 排序规则”说明收敛为仅显示日期和星期，保留上下文但去掉开发说明感。
+- `tests/e2e/editor-conflict.spec.js`、`tests/e2e/design-consistency.spec.js`
+  - 增加冗余文案不回归的断言。
+
 ## 验证记录
 
 | 检查 | 结果 |
 |---|---:|
-| `npm test` | 单元 240/240；E2E 121/121 |
-| `node --check` | `src/` 全部 JavaScript 文件通过 |
-| `npm run package` | 生成 `dist/WorkTodo-v1.8.1.zip` |
+| `npm test` | 单元 240/240；E2E 共享 129/129、冲突 2/2 |
+| `node --check` | `src/` 53 个 JavaScript 文件通过 |
+| `npm run package` | 待 v1.9.0 发布构建完成后回填 |
 | `npm run verify:package` | 60 个允许文件、Manifest V3、CSP、权限通过 |
-| `npm run preview:edge` | 默认临时配置首次遇到 Edge 进程立即退出；改用独立 `.preview-edge-final` 配置后成功启动 |
+| `npm run preview:edge` | 待 v1.9.0 发布构建完成后回填 |
 
 ## 备注
 
