@@ -7,12 +7,12 @@ async function createTodayTask(dashboard, title) {
   await expect(dashboard.getByRole('button', { name: title })).toBeVisible();
 }
 
-/* 测试库每次都是干净的，categoryId 下拉只有"未归入列表"一项，
-   要验证列表摘要随选择变化就得先真的建一个列表。 */
+/* 测试库每次都是干净的，categoryId 下拉只有"未设置分类"一项，
+   要验证分类随选择变化就得先真的建一个分类。 */
 async function createList(dashboard, name) {
   await dashboard.getByRole('button', { name: '设置', exact: true }).click();
   await dashboard.locator('#new-category').fill(name);
-  await dashboard.getByRole('button', { name: '创建列表' }).click();
+  await dashboard.getByRole('button', { name: '创建分类' }).click();
   await dashboard.getByRole('button', { name: '今天', exact: true }).click();
   await expect(dashboard.locator('#page-title')).toHaveText('今日工作');
 }
@@ -30,6 +30,9 @@ test('新建任务时常用字段平铺，低频区收起', async ({ extension }
   await expect(editor.getByLabel('描述')).toBeVisible();
   await expect(editor.getByLabel('开始时间')).toBeVisible();
   await expect(editor.getByLabel('截止时间')).toBeVisible();
+  await expect(editor.getByLabel('分类')).toBeVisible();
+  await expect(editor.getByLabel('分类')).toHaveValue('');
+  await expect(editor.getByLabel('分类').locator('option').first()).toHaveText('未设置分类');
   await expect(editor.locator('[data-editor-group="category"] select[name="categoryId"]')).toBeVisible();
   await expect(editor.locator('[data-editor-group="tags"] [data-toggle-tags]')).toBeVisible();
 
@@ -168,16 +171,16 @@ test('入口行摘要随编辑实时更新', async ({ extension }) => {
   await expect(editor.getByLabel('描述')).toHaveValue('一段描述');
 });
 
-test('切换列表与勾选标签后摘要立即更新', async ({ extension }) => {
+test('切换分类与勾选标签后摘要立即更新', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await createList(dashboard, '工作');
-  await createTodayTask(dashboard, '列表摘要任务');
-  await dashboard.getByRole('button', { name: '列表摘要任务' }).click();
+  await createTodayTask(dashboard, '分类摘要任务');
+  await dashboard.getByRole('button', { name: '分类摘要任务' }).click();
 
   const editor = dashboard.locator('#task-editor');
   const categoryGroup = dashboard.locator('#task-editor [data-editor-group="category"]');
-  await categoryGroup.getByLabel('列表').selectOption({ label: '工作' });
-  await expect(categoryGroup.getByLabel('列表')).toHaveValue(/.+/);
+  await categoryGroup.getByLabel('分类').selectOption({ label: '工作' });
+  await expect(categoryGroup.getByLabel('分类')).toHaveValue(/.+/);
 
   const tagGroup = await openEditorGroup(dashboard, 'tags');
   await tagGroup.getByLabel('新标签').fill('摘要标签');

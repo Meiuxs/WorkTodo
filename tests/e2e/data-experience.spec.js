@@ -218,7 +218,7 @@ test('设置页可以下载 CSV 文件而不申请 downloads 权限', async ({ e
   const contents = await readFile(filePath);
   expect([...contents.subarray(0, 3)]).toEqual([0xEF, 0xBB, 0xBF]);
   expect(contents.toString('utf8').slice(1).split('\r\n')[0]).toBe(
-    '"标题","状态","优先级","列表","标签","计划日期","开始时间","截止时间","完成时间","创建时间"',
+    '"标题","状态","优先级","分类","标签","计划日期","开始时间","截止时间","完成时间","创建时间"',
   );
 });
 

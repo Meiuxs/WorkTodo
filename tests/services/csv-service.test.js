@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { CsvExportService } from '../../src/services/csv-service.js';
 
-const HEADER = '"标题","状态","优先级","列表","标签","计划日期","开始时间","截止时间","完成时间","创建时间"';
+const HEADER = '"标题","状态","优先级","分类","标签","计划日期","开始时间","截止时间","完成时间","创建时间"';
 const CREATED_AT = '2026-09-17T08:00:00.000Z';
 
 function task(overrides = {}) {

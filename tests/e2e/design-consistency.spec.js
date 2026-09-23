@@ -78,14 +78,14 @@ test('相邻区块只在需要处保留一条边线，不出现成对的分隔�
   expect(borders.foldBottom).toBe('0px');
 });
 
-test('设置页按数据优先级排列，初始不显示数据状态且列表空状态统一', async ({ extension }) => {
+test('设置页按数据优先级排列，初始不显示数据状态且分类空状态统一', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByRole('button', { name: '设置', exact: true }).click();
 
   await expect.poll(() => dashboard.locator('#view-root > .view-section > .section-heading h2').allTextContents())
-    .toEqual(['外观', '数据管理', '列表', '键盘快捷键']);
+    .toEqual(['外观', '数据管理', '分类', '键盘快捷键']);
   await expect(dashboard.locator('#data-state .data-state')).toHaveCount(0);
-  await expect(dashboard.locator('.category-list .empty-state__title')).toHaveText('还没有列表');
+  await expect(dashboard.locator('.category-list .empty-state__title')).toHaveText('还没有分类');
   await expect(dashboard.locator('.category-list .empty-state__text')).toHaveText('创建后可在任务编辑器中分配。');
 
   await dashboard.setViewportSize({ width: 1280, height: 1000 });
@@ -116,21 +116,21 @@ test('设置页用分区面板组织，危险动作独立成最下方的危险�
 
 async function createCategory(dashboard, name) {
   await dashboard.locator('#new-category').fill(name);
-  await dashboard.getByRole('button', { name: '创建列表' }).click();
+  await dashboard.getByRole('button', { name: '创建分类' }).click();
   await expect(dashboard.locator('.category-row__name', { hasText: name })).toHaveCount(1);
 }
 
-test('列表管理的创建表单把标签折进 placeholder，创建是实心主按钮', async ({ extension }) => {
+test('分类管理的创建表单把标签折进 placeholder，创建是实心主按钮', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByRole('button', { name: '设置', exact: true }).click();
 
   const form = dashboard.locator('#create-category');
   // 可见标签退场，规则交给 placeholder；sr-only 标签仍为读屏保留可访问名。
   await expect(form.locator('label')).toHaveClass(/sr-only/);
-  await expect(form.locator('#new-category')).toHaveAttribute('placeholder', '输入新列表名称……');
-  await expect(form.getByLabel('新列表名称')).toHaveAttribute('id', 'new-category');
+  await expect(form.locator('#new-category')).toHaveAttribute('placeholder', '输入新分类名称……');
+  await expect(form.getByLabel('新分类名称')).toHaveAttribute('id', 'new-category');
 
-  const create = form.getByRole('button', { name: '创建列表' });
+  const create = form.getByRole('button', { name: '创建分类' });
   await expect(create).toHaveClass(/button-primary/);
   const formBox = await form.boundingBox();
   const createBox = await create.boundingBox();
@@ -139,7 +139,7 @@ test('列表管理的创建表单把标签折进 placeholder，创建是实心�
   expect(formBox.width).toBeLessThanOrEqual(560);
 });
 
-test('列表行是只读行结构，重命名与删除用行尾图标完成', async ({ extension }) => {
+test('分类行是只读行结构，重命名与删除用行尾图标完成', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByRole('button', { name: '设置', exact: true }).click();
   await createCategory(dashboard, '客户');
@@ -147,12 +147,12 @@ test('列表行是只读行结构，重命名与删除用行尾图标完成', as
 
   const rows = dashboard.locator('.category-row');
   await expect(rows).toHaveCount(2);
-  // 只读行不再常驻输入框：名称是一段文字，动作只有图标（aria-label 带列表名）。
+  // 只读行不再常驻输入框：名称是一段文字，动作只有图标（aria-label 带分类名）。
   await expect(rows.locator('input')).toHaveCount(0);
   const row = rows.filter({ hasText: '内部' });
-  await expect(row.getByRole('button', { name: '重命名列表：内部' })).toBeVisible();
-  const renameBox = await row.getByRole('button', { name: '重命名列表：内部' }).boundingBox();
-  const deleteBox = await row.getByRole('button', { name: '删除列表：内部' }).boundingBox();
+  await expect(row.getByRole('button', { name: '重命名分类：内部' })).toBeVisible();
+  const renameBox = await row.getByRole('button', { name: '重命名分类：内部' }).boundingBox();
+  const deleteBox = await row.getByRole('button', { name: '删除分类：内部' }).boundingBox();
   // 高危的删除动作固定排在行尾。
   expect(deleteBox.x).toBeGreaterThan(renameBox.x);
 
@@ -162,17 +162,17 @@ test('列表行是只读行结构，重命名与删除用行尾图标完成', as
 
   // 重命名：名称就地换成输入框（编辑行的文本在 value 里，不参与 hasText 匹配），
   // Enter 保存后回到只读行，焦点留在同一个图标上。
-  await row.getByRole('button', { name: '重命名列表：内部' }).click();
+  await row.getByRole('button', { name: '重命名分类：内部' }).click();
   const editor = dashboard.locator('.category-row--editing');
   await editor.locator('input').fill('团队');
   await editor.locator('input').press('Enter');
   await expect(dashboard.locator('.category-row--editing')).toHaveCount(0);
   await expect(dashboard.locator('.category-row__name', { hasText: '团队' })).toHaveCount(1);
   expect((await dashboard.locator('.category-row__name').allTextContents()).sort()).toEqual(['客户', '团队'].sort());
-  await expect(dashboard.getByRole('button', { name: '重命名列表：团队' })).toBeFocused();
+  await expect(dashboard.getByRole('button', { name: '重命名分类：团队' })).toBeFocused();
 
   // 删除：走迁移确认对话框，默认焦点落在取消；确认后行消失。
-  await dashboard.getByRole('button', { name: '删除列表：团队' }).click();
+  await dashboard.getByRole('button', { name: '删除分类：团队' }).click();
   const dialog = dashboard.locator('#delete-category-dialog');
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('[value="cancel"]')).toBeFocused();
@@ -180,9 +180,9 @@ test('列表行是只读行结构，重命名与删除用行尾图标完成', as
   await expect(rows).toHaveCount(1);
 
   // 删掉最后一条后空状态回到原位，焦点退回创建输入框；空状态也不与卡片底边叠成双线。
-  await dashboard.getByRole('button', { name: '删除列表：客户' }).click();
+  await dashboard.getByRole('button', { name: '删除分类：客户' }).click();
   await dialog.getByRole('button', { name: '删除并迁移' }).click();
-  await expect(dashboard.locator('.category-list .empty-state__title')).toHaveText('还没有列表');
+  await expect(dashboard.locator('.category-list .empty-state__title')).toHaveText('还没有分类');
   const emptyBorder = await dashboard.locator('.category-list .empty-state').evaluate((node) => getComputedStyle(node).borderBottomWidth);
   expect(emptyBorder).toBe('0px');
   await expect(dashboard.locator('#new-category')).toBeFocused();

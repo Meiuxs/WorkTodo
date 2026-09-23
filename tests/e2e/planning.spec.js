@@ -709,8 +709,8 @@ test('导航后完成的分类变更仍刷新当前路由', async ({ extension }
   });
 
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByLabel('新列表名称').fill('导航刷新列表');
-  await page.getByRole('button', { name: '创建列表', exact: true }).click();
+  await page.getByLabel('新分类名称').fill('导航刷新分类');
+  await page.getByRole('button', { name: '创建分类', exact: true }).click();
   await page.getByRole('button', { name: '今天', exact: true }).click();
   await page.waitForTimeout(400);
 

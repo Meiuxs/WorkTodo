@@ -39,7 +39,7 @@ export class DataManagementController {
       this.#state = {
         kind: 'preview',
         canConfirm: true,
-        message: `可以导入 ${preview.taskCount} 个任务、${preview.categoryCount} 个列表、${preview.eventCount} 条事件和 ${preview.resourceCount} 条资料。`,
+        message: `可以导入 ${preview.taskCount} 个任务、${preview.categoryCount} 个分类、${preview.eventCount} 条事件和 ${preview.resourceCount} 条资料。`,
         preview,
         text,
       };
@@ -126,7 +126,7 @@ export class DataManagementController {
 }
 
 function categoryOptions(categories, selectedId = '') {
-  return '<option value="">转为未归入列表</option>' + categories
+  return '<option value="">转为未设置分类</option>' + categories
     .filter((item) => item.id !== selectedId)
     .map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`)
     .join('');
@@ -147,7 +147,7 @@ function rowIcon(name) {
 
 function categoryEmptyState() {
   return `<div class="empty-state">
-      <p class="empty-state__title">还没有列表</p>
+      <p class="empty-state__title">还没有分类</p>
       <p class="empty-state__text">创建后可在任务编辑器中分配。</p>
     </div>`;
 }
@@ -159,8 +159,8 @@ function categoryRow(item) {
   return `<div class="category-row" data-category-id="${id}">
     <span class="category-row__name">${name}</span>
     <span class="category-row__actions">
-      <button type="button" class="icon-button icon-button--row" data-category-action="rename" aria-label="重命名列表：${name}" title="重命名列表">${rowIcon('rename')}</button>
-      <button type="button" class="icon-button icon-button--row icon-button--row-danger" data-category-action="delete" aria-label="删除列表：${name}" title="删除列表">${rowIcon('delete')}</button>
+      <button type="button" class="icon-button icon-button--row" data-category-action="rename" aria-label="重命名分类：${name}" title="重命名分类">${rowIcon('rename')}</button>
+      <button type="button" class="icon-button icon-button--row icon-button--row-danger" data-category-action="delete" aria-label="删除分类：${name}" title="删除分类">${rowIcon('delete')}</button>
     </span>
   </div>`;
 }
@@ -170,10 +170,10 @@ function categoryEditRow(item) {
   const id = escapeHtml(item.id);
   const name = escapeHtml(item.name);
   return `<form class="category-row category-row--editing" data-category-id="${id}">
-    <label class="sr-only" for="rename-${id}">列表名称</label>
+    <label class="sr-only" for="rename-${id}">分类名称</label>
     <input id="rename-${id}" name="name" value="${name}" maxlength="100" required>
     <span class="category-row__actions">
-      <button type="submit" class="icon-button icon-button--row" aria-label="保存列表名称" title="保存名称">${rowIcon('save')}</button>
+      <button type="submit" class="icon-button icon-button--row" aria-label="保存分类名称" title="保存名称">${rowIcon('save')}</button>
       <button type="button" class="icon-button icon-button--row" data-category-action="cancel" aria-label="取消重命名" title="取消">${rowIcon('cancel')}</button>
     </span>
   </form>`;
@@ -203,7 +203,7 @@ export function createSettingsView({
     const preview = state.preview;
     return `<div class="data-state data-state--${state.kind}" role="status">
       <p>${escapeHtml(state.message)}</p>
-      ${state.kind === 'preview' ? `<p class="data-preview">任务 ${preview.taskCount} · 列表 ${preview.categoryCount} · 事件 ${preview.eventCount} · 资料 ${preview.resourceCount} · 冲突 ${preview.conflicts.length}</p>${preview.omittedFileCopies > 0 ? `<p class="data-warning">有 ${preview.omittedFileCopies} 个文件副本不会包含在 JSON 备份中，导入后需要重新选择文件。</p>` : ''}` : ''}
+      ${state.kind === 'preview' ? `<p class="data-preview">任务 ${preview.taskCount} · 分类 ${preview.categoryCount} · 事件 ${preview.eventCount} · 资料 ${preview.resourceCount} · 冲突 ${preview.conflicts.length}</p>${preview.omittedFileCopies > 0 ? `<p class="data-warning">有 ${preview.omittedFileCopies} 个文件副本不会包含在 JSON 备份中，导入后需要重新选择文件。</p>` : ''}` : ''}
       ${state.kind === 'preview' ? `<fieldset class="import-mode"><legend>选择导入方式</legend>
         <label><input type="radio" name="import-mode" value="merge" checked> 合并（冲突保留较新版本）</label>
         <label><input type="radio" name="import-mode" value="replace"> 覆盖（先建立本机恢复点）</label>
@@ -227,11 +227,11 @@ export function createSettingsView({
       const submit = confirmation.querySelector('[data-import-confirm-submit]');
       if (mode === 'replace') {
         title.textContent = '覆盖本机数据？';
-        message.textContent = `覆盖前会建立本机恢复点；导入 ${preview.taskCount} 个任务、${preview.categoryCount} 个列表和 ${preview.resourceCount} 条资料后，当前数据将以备份文件为准。${preview.omittedFileCopies > 0 ? ` ${preview.omittedFileCopies} 个文件副本不会导入，之后需要重新选择文件。` : ''}`;
+        message.textContent = `覆盖前会建立本机恢复点；导入 ${preview.taskCount} 个任务、${preview.categoryCount} 个分类和 ${preview.resourceCount} 条资料后，当前数据将以备份文件为准。${preview.omittedFileCopies > 0 ? ` ${preview.omittedFileCopies} 个文件副本不会导入，之后需要重新选择文件。` : ''}`;
         submit.textContent = '确认覆盖并导入';
       } else {
         title.textContent = '合并到本机数据？';
-        message.textContent = `将合并 ${preview.taskCount} 个任务、${preview.categoryCount} 个列表和 ${preview.resourceCount} 条资料；发现 ${preview.conflicts.length} 个冲突时保留较新版本。${preview.omittedFileCopies > 0 ? ` ${preview.omittedFileCopies} 个文件副本不会导入。` : ''}`;
+        message.textContent = `将合并 ${preview.taskCount} 个任务、${preview.categoryCount} 个分类和 ${preview.resourceCount} 条资料；发现 ${preview.conflicts.length} 个冲突时保留较新版本。${preview.omittedFileCopies > 0 ? ` ${preview.omittedFileCopies} 个文件副本不会导入。` : ''}`;
         submit.textContent = '确认导入';
       }
       confirmation.showModal();
@@ -274,7 +274,7 @@ export function createSettingsView({
     csvService.exportDownload(contents, filename);
   }
 
-  /* 列表的增删改只影响 .category-list 区域：重取数据后只重建这一块，
+  /* 分类的增删改只影响 .category-list 区域：重取数据后只重建这一块，
      不碰整个设置视图——否则主题选择、导入预览状态会被连带重置。 */
   async function renderCategoryList(signal) {
     categories = await taskService.listCategories();
@@ -326,19 +326,19 @@ export function createSettingsView({
     </section>
     <section class="view-section view-section--panel" aria-labelledby="category-heading">
       <div class="section-heading">
-        <div><h2 id="category-heading">列表</h2><p>删除列表时必须把任务迁移到未归入列表或其他列表，任务本身不会删除。</p></div>
+        <div><h2 id="category-heading">分类</h2><p>删除分类时必须把任务迁移到未设置分类或其他分类，任务本身不会删除。</p></div>
       </div>
       <form id="create-category" class="category-create">
-        <label class="sr-only" for="new-category">新列表名称</label>
-        <input id="new-category" name="name" maxlength="100" placeholder="输入新列表名称……" required>
-        <button type="submit" class="button-primary">创建列表</button>
+        <label class="sr-only" for="new-category">新分类名称</label>
+        <input id="new-category" name="name" maxlength="100" placeholder="输入新分类名称……" required>
+        <button type="submit" class="button-primary">创建分类</button>
       </form>
       <p class="form-message" id="category-message" role="alert"></p>
       <div class="category-list">${categoryRows(categories)}</div>
       <dialog class="modal" id="delete-category-dialog">
         <form method="dialog">
-          <h2>删除列表</h2>
-          <p>该列表下的任务会迁移到：</p>
+          <h2>删除分类</h2>
+          <p>该分类下的任务会迁移到：</p>
           <label>迁移目标<select name="destination"></select></label>
           <p class="form-message" data-delete-message></p>
           <div class="dialog-actions"><button value="cancel">取消</button><button class="button-danger" value="confirm">删除并迁移</button></div>
@@ -366,14 +366,14 @@ export function createSettingsView({
       <div class="danger-zone">
         <div class="danger-zone__body">
           <h2 id="danger-zone-heading">危险区域</h2>
-          <p>清除本机的全部任务、列表、标签、资料和工作记录，并清空回收站；主题等偏好设置会保留。清除后无法恢复，建议先导出 JSON 备份。</p>
+          <p>清除本机的全部任务、分类、标签、资料和工作记录，并清空回收站；主题等偏好设置会保留。清除后无法恢复，建议先导出 JSON 备份。</p>
         </div>
         <button type="button" id="clear-all-data" class="button-danger">清除所有数据</button>
       </div>
       <dialog class="modal" id="clear-all-dialog">
         <form method="dialog">
           <h2>清除所有数据？</h2>
-          <p>会删除全部任务、列表、标签、资料、重复规则和工作记录，并清空回收站。主题等偏好设置会保留。</p>
+          <p>会删除全部任务、分类、标签、资料、重复规则和工作记录，并清空回收站。主题等偏好设置会保留。</p>
           <p>清除后无法恢复，也不能撤销。建议先导出 JSON 备份。</p>
           <div class="dialog-actions"><button value="cancel">取消</button><button class="button-danger" value="confirm">清除所有数据</button></div>
         </form>
@@ -459,7 +459,7 @@ export function createSettingsView({
     const categoryMessage = root.querySelector('#category-message');
 
     /* 增删改后 .category-list 会整段重建，旧节点已经不在文档里；
-       焦点目标只能按列表 id 现取，取不到就退回创建输入框，不丢到 body。 */
+       焦点目标只能按分类 id 现取，取不到就退回创建输入框，不丢到 body。 */
     function focusRowAction(categoryId, action) {
       if (signal?.aborted) return;
       const row = root.querySelector(`.category-list [data-category-id="${CSS.escape(categoryId)}"]`);
@@ -496,7 +496,7 @@ export function createSettingsView({
           await taskService.deleteCategory(categoryId, destination);
           await renderCategoryList(signal);
           if (signal?.aborted) return;
-          // 删掉的可能就是最后一条：没有列表时焦点回到创建输入框。
+          // 删掉的可能就是最后一个分类：没有分类时焦点回到创建输入框。
           const nextRow = root.querySelector('.category-list [data-category-id]');
           if (nextRow === null) root.querySelector('#new-category')?.focus();
           else focusRowAction(nextRow.dataset.categoryId, 'rename');

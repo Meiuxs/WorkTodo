@@ -231,7 +231,7 @@ test('复制使用编辑抽屉当前内容并重置首次计划日期', async ()
   assert.equal(copied.task.description, '保留当前编辑内容');
 });
 
-test('分类可创建和改名，删除时可明确迁移至未分类', async () => {
+test('分类可创建和改名，删除时可明确迁移至未设置分类', async () => {
   const { repo, service } = createService();
   const created = await service.createCategory('  待跟进  ');
   assert.deepEqual(created, { id: 'id-1', name: '待跟进', createdAt: NOW, updatedAt: NOW });
@@ -247,5 +247,5 @@ test('删除分类必须显式指定目标，且目标分类必须存在', async
   const { service } = createService();
   await assert.rejects(() => service.deleteCategory('old'), /明确指定/);
   await assert.rejects(() => service.deleteCategory('old', 'missing'), /不存在/);
-  await assert.rejects(() => service.deleteCategory('old', 'old'), /另一列表/);
+  await assert.rejects(() => service.deleteCategory('old', 'old'), /另一分类/);
 });

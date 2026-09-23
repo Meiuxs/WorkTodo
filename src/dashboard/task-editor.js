@@ -187,7 +187,7 @@ export function createTaskEditor({
   }
 
   function populateCategories(categories, selectedId) {
-    category.innerHTML = '<option value="">未归入列表</option>'
+    category.innerHTML = '<option value="">未设置分类</option>'
       + categories.map((item) => `<option value="${item.id}">${item.name.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')}</option>`).join('');
     category.value = selectedId ?? '';
     renderGroupSummaries();

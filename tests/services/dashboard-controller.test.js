@@ -424,7 +424,7 @@ test('清除数据成功或失败都会通过统一状态返回结果', async ()
   assert.equal(failure.state.canConfirm, false);
 });
 
-test('设置页首屏渲染分区、空列表和核心事件入口', async () => {
+test('设置页首屏渲染分区、空分类和核心事件入口', async () => {
   const listeners = new Map();
   const elements = new Map();
   const element = (selector) => ({
@@ -467,7 +467,7 @@ test('设置页首屏渲染分区、空列表和核心事件入口', async () =>
 
   assert.match(root.innerHTML, /外观/);
   assert.match(root.innerHTML, /数据管理/);
-  assert.match(root.innerHTML, /还没有列表/);
+  assert.match(root.innerHTML, /还没有分类/);
   assert.match(root.innerHTML, /键盘快捷键/);
   assert.match(root.innerHTML, /危险区域/);
   assert.ok(listeners.has('[data-theme-setting]:change'));

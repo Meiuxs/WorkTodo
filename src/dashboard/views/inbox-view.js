@@ -31,7 +31,7 @@ export function createInboxView({ root, query, tagService, today, onAction, onEd
       const resourceCounts = await getResourceCounts?.(topLevel) ?? new Map();
       root.innerHTML = `<section class="view-section" aria-labelledby="inbox-heading">
         <div class="section-heading">
-          <div><h2 id="inbox-heading">收集箱 · <span id="inbox-count" data-view-count="inbox">${topLevel.length}</span></h2>${topLevel.length === 0 ? '' : '<p>先记录，再决定日期、优先级和列表。</p>'}</div>
+          <div><h2 id="inbox-heading">收集箱 · <span id="inbox-count" data-view-count="inbox">${topLevel.length}</span></h2>${topLevel.length === 0 ? '' : '<p>先记录，再决定日期、优先级和分类。</p>'}</div>
         </div>
         <div id="inbox-list"></div>
       </section>`;

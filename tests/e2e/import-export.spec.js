@@ -32,7 +32,7 @@ test('导出包含版本信息，导入经过预览后可合并', async ({ exten
   expect(backup.taskResources).toHaveLength(1);
 
   await dashboard.locator('#import-file').setInputFiles(filePath);
-  await expect(dashboard.getByText(/任务 1 · 列表 0 · 事件 1 · 资料 1/)).toBeVisible();
+  await expect(dashboard.getByText(/任务 1 · 分类 0 · 事件 1 · 资料 1/)).toBeVisible();
   await dashboard.locator('#confirm-import').click();
   await expect(dashboard.locator('#import-confirm')).toBeVisible();
   await expect(dashboard.getByText('合并到本机数据？')).toBeVisible();
