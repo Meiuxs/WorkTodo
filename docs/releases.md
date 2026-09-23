@@ -12,7 +12,7 @@
 - **测试结果**：单元测试 240 通过、共享 E2E 129 通过、并发冲突 E2E 2 通过；并发冲突用例额外重复 5 次共 10/10 通过；JavaScript 语法检查 54/54 通过；扩展包策略校验通过（2026-09-23）。
 - **包文件名**：`WorkTodo-v1.9.0.zip`（149,785 字节）
 - **sha256**：`E396EE0D0337F5987D13C5D170C076CFBA5344932F958AB0A2A58A7D2AB9DFAB`
-- **GitHub Release**：待发布
+- **GitHub Release**：<https://github.com/Meiuxs/WorkTodo/releases/tag/v1.9.0>
 
 ## v1.8.1
 
