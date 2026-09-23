@@ -311,12 +311,15 @@ export class TaskQueryService {
     const wanted = new Set(parentIds);
     const grouped = new Map();
     if (wanted.size === 0) return grouped;
-    const tasks = await this.#repository.list();
-    for (const task of tasks) {
-      if (task.trashedAt !== null || !isSubtask(task) || !wanted.has(task.parentId)) continue;
-      const bucket = grouped.get(task.parentId);
-      if (bucket === undefined) grouped.set(task.parentId, [task]);
-      else bucket.push(task);
+    const entries = await Promise.all(
+      [...wanted].map(async (parentId) => [
+        parentId,
+        await this.#repository.listByParent(parentId, { trashedAt: null }),
+      ]),
+    );
+    for (const [parentId, tasks] of entries) {
+      const children = tasks.filter((task) => isSubtask(task) && task.parentId === parentId);
+      if (children.length > 0) grouped.set(parentId, children);
     }
     for (const children of grouped.values()) {
       children.sort((left, right) => left.createdAt.localeCompare(right.createdAt));

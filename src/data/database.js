@@ -118,7 +118,11 @@ export function openWorkTodoDatabase() {
     request.onupgradeneeded = () => {
       upgradeDatabase(request.result, request.transaction);
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const database = request.result;
+      database.onversionchange = () => database.close();
+      resolve(database);
+    };
     request.onerror = () => reject(request.error);
     request.onblocked = () => reject(new Error('WorkTodo 数据库正被其他页面占用'));
   });

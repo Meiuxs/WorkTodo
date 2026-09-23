@@ -286,6 +286,10 @@ export class TaskRepository {
     return this.#listTaskIndex('lifecycle', IDBKeyRange.only(lifecycle), criteria);
   }
 
+  async listByParent(parentId, criteria = {}) {
+    return this.#listTaskIndex('parentId', IDBKeyRange.only(parentId), criteria);
+  }
+
   async listEventsByOccurredAt(fromIso, toIso, types = null) {
     const database = await this.#getDatabase();
     const transaction = database.transaction('events', 'readonly');

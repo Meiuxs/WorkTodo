@@ -1,4 +1,8 @@
-# WorkTodo 1.3.1 UX 评审入口
+# WorkTodo UX 评审入口
+
+当前评审基线：`manifest.json` 版本 `1.9.0`，更新日期 `2026-09-23`。
+
+统一设计规范：[docs/superpowers/designs/2026-09-17-worktodo-ui-design.md](superpowers/designs/2026-09-17-worktodo-ui-design.md)。
 
 ## 评审目标
 
@@ -6,11 +10,11 @@
 
 > 临时记录 → 看清今天 → 推进下一步 → 完成或延期 → 回顾结果
 
-评审重点不是功能数量，而是信息层级、动作优先级、视觉噪点和移动端可用性。
+评审重点不是功能数量，而是信息层级、动作优先级、视觉噪点、桌面 Chromium 可用性，以及 390px 窄视口下的降级体验。
 
 完整前端评审入口：[docs/review/index.html](review/index.html)
 
-该页面是无依赖的静态预览，集中呈现今日工作台、快速记录、任务详情、计划、工作记录和 Popup，并支持桌面/390px 两种视图切换。
+该页面是无依赖的静态预览，集中呈现今日工作台、快速记录、任务详情、计划、工作记录和 Popup，并支持桌面/390px 两种视图切换。390px 是防止内容溢出的回退验收视口，不代表产品转为移动端设计。
 
 ## 推荐评审顺序
 
@@ -98,19 +102,18 @@
 - [src/popup/popup.css](../src/popup/popup.css)：Popup 记录优先的视觉层级。
 - [src/popup/popup.html](../src/popup/popup.html)：Popup 文案和结构。
 - [tests/e2e/ux-refactor.spec.js](../tests/e2e/ux-refactor.spec.js)：新增 UX 回归测试。
-- [manifest.json](../manifest.json)：版本号升级到 `1.3.1`。
+- [tests/e2e/responsive.spec.js](../tests/e2e/responsive.spec.js)：窄屏与高缩放回归测试。
+- [src/styles/tokens.css](../src/styles/tokens.css)：运行时设计令牌与深色主题。
+- [manifest.json](../manifest.json)：当前扩展版本 `1.9.0`。
 
 ## 验证结果
 
-- 单元测试：195/195 通过。
-- 端到端测试：53/53 通过。
-- 390px 响应式检查通过。
-- 月历键盘交互与七列结构检查通过。
-- 扩展打包成功：`dist/WorkTodo-v1.3.1.zip`。
+- 单元测试：当前以 `npm test` 为准，包含单元测试、共享环境 E2E 和并发冲突 E2E。
+- 覆盖率门槛：行 75%、分支 80%、函数 80%，通过 `npm run test:coverage` 验证。
+- 运行时语法检查：`npm run check:syntax`，覆盖 `src/` 下全部 JavaScript 文件。
+- 390px 响应式检查、200% 缩放检查、月历键盘交互与七列结构检查通过。
+- 扩展打包校验：`npm run package` 和 `npm run verify:package`。
 
 ## Git 版本信息
 
-- 上一版本 tag：`v1.2.0`
-- 上一版本提交：`c336842`
-- 当前版本提交：`9cc4d55`
-- 当前分支：`main`
+版本 tag、提交和 Release 以发布流程为准，本文不再固定记录易过期的提交号。

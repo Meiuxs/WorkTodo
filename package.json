@@ -9,7 +9,10 @@
   "scripts": {
     "package": "node scripts/package.mjs",
     "verify:package": "node scripts/verify-package.mjs",
+    "check:syntax": "node scripts/check-syntax.mjs",
     "test:unit": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=75 --test-coverage-branches=80 --test-coverage-functions=80",
+    "check:quality": "npm run check:syntax && npm run test:coverage",
     "test:e2e:shared": "playwright test --grep-invert \"两个 Dashboard 同时编辑同一 revision 时显示冲突并提供恢复|并发冲突时冲突面板可见且焦点落在载入最新版本\"",
     "test:e2e:conflict": "playwright test --grep \"两个 Dashboard 同时编辑同一 revision 时显示冲突并提供恢复|并发冲突时冲突面板可见且焦点落在载入最新版本\" --workers=1",
     "test:e2e": "npm run test:e2e:shared && npm run test:e2e:conflict",

@@ -578,6 +578,25 @@ test('listTrashed 只通过 trashedAt 索引读取回收站任务', async () => 
   assert.equal(database.indexReads.at(-1).indexName, 'trashedAt');
 });
 
+test('listByParent 只通过 parentId 索引读取子任务', async () => {
+  const database = new IndexedDbFake({
+    tasks: [
+      { ...BASE_TASK, id: 'parent' },
+      { ...BASE_TASK, id: 'child', parentId: 'parent', scheduledDate: null, firstScheduledDate: null },
+      { ...BASE_TASK, id: 'other-child', parentId: 'other', scheduledDate: null, firstScheduledDate: null },
+      { ...BASE_TASK, id: 'trashed-child', parentId: 'parent', scheduledDate: null, firstScheduledDate: null, trashedAt: NOW },
+    ],
+  });
+  const repository = new TaskRepository(database);
+
+  assert.deepEqual(
+    (await repository.listByParent('parent', { trashedAt: null })).map(({ id }) => id),
+    ['child'],
+  );
+  assert.equal(database.indexReads.at(-1).storeName, 'tasks');
+  assert.equal(database.indexReads.at(-1).indexName, 'parentId');
+});
+
 test('replaceAll 替换数据且不复用传入快照', async () => {
   const repo = new InMemoryTaskRepository([BASE_TASK]);
   const snapshot = {

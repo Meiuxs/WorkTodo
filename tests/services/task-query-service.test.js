@@ -313,6 +313,21 @@ test('核心查询通过索引仓库方法读取而不是无条件 list 全表',
   assert.equal(invoked.includes('exportAll'), false);
 });
 
+test('子任务按 parentId 索引读取而不是扫描全部任务', async () => {
+  const { query, calls } = createRecordingQuery([
+    task({ id: 'parent' }),
+    task({ id: 'child', parentId: 'parent', scheduledDate: null, firstScheduledDate: null }),
+    task({ id: 'other-child', parentId: 'other', scheduledDate: null, firstScheduledDate: null }),
+  ]);
+
+  const grouped = await query.subtasksByParent(['parent']);
+
+  assert.deepEqual(grouped.get('parent').map(({ id }) => id), ['child']);
+  const invoked = calls.map(({ method }) => method);
+  assert.ok(invoked.includes('listByParent'));
+  assert.equal(invoked.includes('list'), false);
+});
+
 test('completed 无完成日期过滤时使用 lifecycle 索引', async () => {
   const { query, calls } = createRecordingQuery([
     task({

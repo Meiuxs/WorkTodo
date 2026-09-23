@@ -229,6 +229,14 @@ export class InMemoryTaskRepository {
     );
   }
 
+  async listByParent(parentId, criteria = {}) {
+    return taskResults(
+      [...this.#tasks.values()].filter((task) => task.parentId === parentId),
+      criteria,
+      compareByIndex('createdAt'),
+    );
+  }
+
   async listEventsByOccurredAt(fromIso, toIso, types = null) {
     const acceptedTypes = types === null ? null : new Set(types);
     return this.#events

@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   DATABASE_VERSION,
   ensureIndexes,
+  openWorkTodoDatabase,
   upgradeDatabase,
 } from '../../src/data/database.js';
 
@@ -76,6 +77,29 @@ function createCursorStore(name, initialRecords = []) {
   store.snapshot = () => structuredClone([...records.values()]);
   return store;
 }
+
+test('数据库打开后会在版本升级时自动关闭旧连接', async () => {
+  const previousIndexedDb = globalThis.indexedDB;
+  let request;
+  let closed = false;
+  const database = { close: () => { closed = true; } };
+  globalThis.indexedDB = {
+    open() {
+      request = { result: database };
+      queueMicrotask(() => request.onsuccess?.());
+      return request;
+    },
+  };
+
+  try {
+    const opened = await openWorkTodoDatabase();
+    opened.onversionchange?.();
+    assert.equal(closed, true);
+  } finally {
+    if (previousIndexedDb === undefined) delete globalThis.indexedDB;
+    else globalThis.indexedDB = previousIndexedDb;
+  }
+});
 
 test('ensureIndexes 仅补建缺失索引', () => {
   const existing = new Set(['scheduledDate']);
