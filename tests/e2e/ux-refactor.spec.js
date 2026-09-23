@@ -16,6 +16,36 @@ test('今日工作台把快速记录作为首屏主入口并采用线性布局',
   expect(layout.quickAdd).toBe('flex');
 });
 
+test('快速记录只在执行与整理页面出现，并匹配当前路由的默认去向', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  const quickAdd = dashboard.locator('#quick-add');
+  const schedule = dashboard.locator('#quick-add-date');
+
+  await expect(quickAdd).toBeVisible();
+  await expect(schedule).toHaveValue('today');
+
+  await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
+  await expect(quickAdd).toBeVisible();
+  await expect(schedule).toHaveValue('inbox');
+
+  await dashboard.getByRole('button', { name: '全部任务', exact: true }).click();
+  await expect(quickAdd).toBeVisible();
+  await expect(schedule).toHaveValue('inbox');
+
+  await dashboard.getByRole('button', { name: '明天', exact: true }).click();
+  await expect(quickAdd).toBeVisible();
+  await expect(schedule).toHaveValue('tomorrow');
+
+  for (const route of ['已完成', '回收站', '工作记录', '资料收集箱', '设置']) {
+    await dashboard.getByRole('button', { name: route, exact: true }).click();
+    await expect(quickAdd).toBeHidden();
+  }
+
+  await dashboard.locator('#page-title').click();
+  await dashboard.keyboard.press('n');
+  await expect(dashboard.getByLabel('记录一个新事项')).not.toBeFocused();
+});
+
 test('Popup 先让用户记录，再展示少量今日重点', async ({ extension }) => {
   const popup = await openPopup(extension);
 
@@ -69,6 +99,7 @@ test('侧栏角标提示逾期与待整理数量且不改变导航项名称', as
 
   // 只写标题的新事项落在收集箱，角标随之出现；
   // 角标同时标了 aria-hidden，所以按钮的可访问名称仍然是干净的两个字。
+  await dashboard.locator('#quick-add-date').selectOption('inbox');
   await dashboard.getByLabel('记录一个新事项').fill('待整理事项');
   await dashboard.getByRole('button', { name: '记录', exact: true }).click();
   await expect(inboxBadge).toHaveText('1');
@@ -130,17 +161,21 @@ test('完成任务后滚动位置与其他行菜单展开态保持', async ({ ex
     await expect(dashboard.getByRole('button', { name: `滚动保持任务 ${index}`, exact: true })).toBeVisible();
   }
 
-  // 等 8 行全部渲染完再设滚动位置。列表没渲染完时文档不够高，scrollTo 会被钳成 0：
-  // 基线于是记成 0，随后 Playwright 点击末行时先触发自动滚动把它滚入视口，
-  // 断言就变成在比"点击带来的滚动"而不是"完成操作是否保持滚动位置"。
+  // 等 8 行全部渲染完再设滚动位置。滚动位置距离文档底部留出余量，
+  // 避免移除末行后浏览器因新文档高度不足而合法钳回 scrollY，
+  // 让断言只验证列表补丁是否保持滚动，而不是验证不存在的滚动范围。
   await expect(dashboard.locator('#today-list [data-task-id]')).toHaveCount(8);
-  await dashboard.evaluate(() => window.scrollTo(0, 300));
+  const scrollBefore = await dashboard.evaluate(() => {
+    const maxScroll = Math.max(0, document.scrollingElement.scrollHeight - window.innerHeight);
+    const target = Math.max(0, Math.min(240, maxScroll - 80));
+    window.scrollTo(0, target);
+    return window.scrollY;
+  });
   const rowByTitle = (title) => dashboard.locator('#today-list [data-task-id]').filter({ has: dashboard.getByRole('button', { name: title, exact: true }) });
   const bystander = rowByTitle('滚动保持任务 1');
   const victim = rowByTitle('滚动保持任务 8');
   // 在“旁观点”行节点上贴一个内存标记：只有同一 DOM 节点存活到 patch 后才能读到它。
   await bystander.evaluate((row) => { row.__keptAlive = true; });
-  const scrollBefore = await dashboard.evaluate(() => window.scrollY);
   const topBefore = await bystander.evaluate((row) => row.getBoundingClientRect().top);
 
   // 完成靠后位置的一行：只移除该行、不重建列表，上方行节点与滚动位置均不变。

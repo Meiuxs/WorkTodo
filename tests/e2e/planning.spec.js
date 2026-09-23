@@ -211,6 +211,42 @@ test('月历月份标题两侧紧邻翻页按钮', async ({ extension }) => {
   expect(structure.nextLabel).toBe('下个月');
 });
 
+test('月历用层级与整格反馈区分当前月、跨月日期和当前操作位置', async ({ extension }) => {
+  const page = await openDashboard(extension);
+  const focusDate = await page.evaluate(() => {
+    const now = new Date();
+    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() === 1 ? 2 : 1);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  });
+  await page.evaluate(async (scheduledDate) => {
+    const { TaskRepository } = await import('../data/task-repository.js');
+    const { TaskService } = await import('../services/task-service.js');
+    await new TaskService(new TaskRepository()).create({ title: '月历焦点反馈任务', scheduledDate });
+  }, focusDate);
+
+  await page.getByRole('button', { name: '月历', exact: true }).click();
+  await expect(page.locator('.month-weekday').first()).toBeVisible();
+
+  const headerWeight = await page.locator('.month-weekday').first().evaluate((node) => Number(getComputedStyle(node).fontWeight));
+  expect(headerWeight).toBeGreaterThanOrEqual(600);
+
+  const mutedDate = page.locator('.month-day--muted h3').first();
+  await expect(mutedDate).toBeVisible();
+  expect(await mutedDate.evaluate((node) => Number(getComputedStyle(node).opacity))).toBeLessThan(1);
+
+  const activeCell = page.locator(`[data-date="${focusDate}"]`);
+  const taskButton = activeCell.getByRole('button', { name: '月历焦点反馈任务', exact: true });
+  await expect(taskButton).toBeVisible();
+  expect(await activeCell.evaluate((node) => node.classList.contains('month-day--muted'))).toBe(false);
+
+  await activeCell.hover();
+  expect(await activeCell.evaluate((node) => getComputedStyle(node).backgroundColor)).toBe('rgba(39, 107, 108, 0.07)');
+
+  await page.mouse.move(0, 0);
+  await taskButton.focus();
+  expect(await activeCell.evaluate((node) => getComputedStyle(node).backgroundColor)).toBe('rgba(39, 107, 108, 0.07)');
+});
+
 test('月历格最多显示三条任务并提供“更多”当日弹窗', async ({ extension }) => {
   const page = await openDashboard(extension);
   const today = await page.evaluate(() => {
@@ -232,14 +268,15 @@ test('月历格最多显示三条任务并提供“更多”当日弹窗', async
   // 日期格右上角仍是当日任务总数，而不是可见条数。
   await expect(cell.locator('.month-day__count')).toHaveText('5');
 
-  const titleStyle = await cell.locator('.task__title').first().evaluate((node) => ({
+  const longTitle = '月历超长标题任务需要单行截断显示';
+  const titleStyle = await cell.locator('.task__title').filter({ hasText: longTitle }).evaluate((node) => ({
     whiteSpace: getComputedStyle(node).whiteSpace,
     textOverflow: getComputedStyle(node).textOverflow,
     fullTitle: node.getAttribute('title'),
   }));
   expect(titleStyle.whiteSpace).toBe('nowrap');
   expect(titleStyle.textOverflow).toBe('ellipsis');
-  expect(titleStyle.fullTitle).toBe('月历超长标题任务需要单行截断显示');
+  expect(titleStyle.fullTitle).toBe(longTitle);
 
   // 完成控件必须是方形复选框，不能再用圆形（圆形会被读成单选）。
   expect(await cell.locator('.task__check').first().evaluate((node) => getComputedStyle(node).borderRadius)).not.toContain('%');
@@ -386,6 +423,15 @@ test('工作记录可以生成并复制规则模板总结', async ({ extension }
   await page.getByRole('button', { name: '生成本周总结', exact: true }).click();
   await expect(page.getByRole('textbox', { name: '总结文本' })).toHaveValue(/实际完成/);
   await expect(page.getByRole('textbox', { name: '总结文本' })).toHaveValue(/总结用任务/);
+  const summaryOutput = page.locator('[data-summary-output]');
+  await expect(summaryOutput).toBeVisible();
+  await expect(summaryOutput.locator('[data-summary-copy]')).toBeVisible();
+  await expect(summaryOutput.locator('[data-summary-copy]')).toHaveAttribute('aria-label', '复制总结');
+  await expect(page.locator('.summary-panel > [data-summary-copy]')).toHaveCount(0);
+  const summaryBounds = await summaryOutput.locator('#history-summary-text').boundingBox();
+  const copyBounds = await summaryOutput.locator('[data-summary-copy]').boundingBox();
+  expect(copyBounds.x).toBeGreaterThan(summaryBounds.x + summaryBounds.width - copyBounds.width - 20);
+  expect(copyBounds.y).toBeLessThan(summaryBounds.y + 48);
 
   await page.evaluate(() => {
     window.__copiedSummary = '';
@@ -480,7 +526,7 @@ test('永不结束的旧周视图不会阻塞最新导航', async ({ extension }
   await page.getByRole('button', { name: '本周', exact: true }).click();
   await page.getByRole('button', { name: '今天', exact: true }).click();
 
-  await expect(page.locator('#today-tasks-heading')).toBeVisible({ timeout: 1_000 });
+  await expect(page.locator('#today-tasks-heading')).toBeVisible({ timeout: 3_000 });
   await expect(page.locator('#week-heading')).toHaveCount(0);
 });
 

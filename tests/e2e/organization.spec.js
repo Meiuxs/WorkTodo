@@ -90,6 +90,7 @@ test('全部任务的筛选区默认只有搜索与状态，高级条件按需�
   await page.getByRole('button', { name: '记录', exact: true }).click();
 
   await page.getByRole('button', { name: '全部任务' }).click();
+  await expect(page.locator('section[aria-labelledby="all-tasks-heading"] .section-heading p')).toHaveCount(0);
   await expect(page.getByLabel('搜索')).toBeVisible();
   await expect(page.getByLabel('状态')).toBeVisible();
   await expect(page.locator('#advanced-filters')).toBeHidden();

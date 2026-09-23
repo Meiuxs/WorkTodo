@@ -86,27 +86,57 @@ export async function assertNoExternalRequests(extension) {
   expect(extension.externalRequests, '扩展运行期间不应发起外部网络请求').toEqual([]);
 }
 
+export async function blockEditorAutosave(page) {
+  await page.evaluate(async () => {
+    const { TaskService } = await import('../services/task-service.js');
+    const originalEdit = TaskService.prototype.edit;
+    let release;
+    window.__worktodoEditorAutosaveStarted = false;
+    window.__worktodoReleaseEditorAutosave = () => release?.();
+    TaskService.prototype.edit = async function blockedEditorAutosave(...args) {
+      window.__worktodoEditorAutosaveStarted = true;
+      await new Promise((resolve) => { release = resolve; });
+      return originalEdit.call(this, ...args);
+    };
+  });
+}
+
+export async function releaseEditorAutosave(page) {
+  await expect.poll(() => page.evaluate(() => window.__worktodoEditorAutosaveStarted)).toBe(true);
+  await page.evaluate(() => window.__worktodoReleaseEditorAutosave());
+}
+
 async function removeDirectory(directory) {
   await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => {});
 }
 
+async function closePages(context) {
+  await Promise.all(context.pages().map((page) => page.close().catch(() => {})));
+}
+
 export const test = base.extend({
-  extensionPath: [projectRoot, { option: true }],
+  extensionPath: [projectRoot, { option: true, scope: 'worker' }],
   userDataDir: async ({}, use) => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'worktodo-e2e-'));
     await use(directory);
     await removeDirectory(directory);
   },
-  // 每个用例一个全新浏览器：service worker 内存态、告警与 IndexedDB 都随之干净，
-  // 套件不依赖用例之间的隔离。性能靠多 worker 并行拿，不靠复用浏览器。
-  extension: async ({ extensionPath, userDataDir }, use, testInfo) => {
-    // 视频与 trace 只在失败时留证：常驻录屏是 CI 上每用例 ~15s 的主要开销，
-    // 改为失败时抓 failure.png + trace.zip（见下方 teardown），通过用例不产出视频。
+  workerUserDataDir: [async ({}, use) => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'worktodo-e2e-worker-'));
+    await use(directory);
+    await removeDirectory(directory);
+  }, { scope: 'worker' }],
+  workerExtension: [async ({ extensionPath, workerUserDataDir }, use) => {
     const extension = await launchExtension({
       extensionPath,
-      userDataDir,
-      trace: true,
+      userDataDir: workerUserDataDir,
     });
+    await use(extension);
+    await extension.context.close();
+  }, { scope: 'worker' }],
+  // 跨 Dashboard 的冲突用例单独运行，保留每例独立浏览器以验证真实消息时序。
+  isolatedExtension: async ({ extensionPath, userDataDir }, use, testInfo) => {
+    const extension = await launchExtension({ extensionPath, userDataDir, trace: true });
     const setupPage = await openDashboard(extension);
     await resetData(setupPage);
     await setupPage.close();
@@ -123,13 +153,44 @@ export const test = base.extend({
     expect(extension.externalRequests, '扩展运行期间不应发起外部网络请求').toEqual([]);
     await extension.context.close();
   },
+  // 常规用例在每个 worker 内复用扩展浏览器；每例清空数据并关闭页面，保持数据隔离。
+  extension: async ({ workerExtension }, use, testInfo) => {
+    const extension = workerExtension;
+    await closePages(extension.context);
+    extension.externalRequests.length = 0;
+    await extension.context.tracing.start({ snapshots: true });
+
+    try {
+      const setupPage = await openDashboard(extension);
+      try {
+        await resetData(setupPage);
+      } finally {
+        await setupPage.close().catch(() => {});
+      }
+      await use(extension);
+    } finally {
+      if (testInfo.status !== testInfo.expectedStatus) {
+        const page = extension.context.pages().at(-1);
+        if (page !== undefined) await page.screenshot({ path: testInfo.outputPath('failure.png') }).catch(() => {});
+        await extension.context.tracing.stop({ path: testInfo.outputPath('trace.zip') }).catch(() => {});
+      } else {
+        await extension.context.tracing.stop().catch(() => {});
+      }
+      await closePages(extension.context);
+      expect(extension.externalRequests, '扩展运行期间不应发起外部网络请求').toEqual([]);
+    }
+  },
 });
 
 /* 抽屉的次级区默认收起。幂等：已展开时不重复点击，避免把组收回去。 */
 export async function openEditorGroup(page, groupValue) {
   const group = page.locator(`#task-editor [data-editor-group="${groupValue}"]`);
-  if (!(await group.evaluate((node) => node.open))) {
-    await group.locator('summary').click();
+  const summary = group.locator('summary');
+  if (await summary.count() > 0) {
+    if (!(await group.evaluate((node) => node.open))) await summary.click();
+  } else {
+    const toggle = group.locator('[data-toggle-tags]');
+    if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
   }
   return group;
 }

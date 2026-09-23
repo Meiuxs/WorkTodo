@@ -13,6 +13,40 @@ test('空标题点“记录”不弹浏览器原生气泡，改为行内提示�
   await expect(dashboard.getByText('今天还没有待办')).toBeVisible();
 });
 
+test('指定日期未填写时错误定位到日期控件并取消录入区的激活色', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  const quickAdd = dashboard.locator('#quick-add');
+  const customDate = dashboard.locator('#quick-add-custom');
+
+  await dashboard.getByLabel('记录一个新事项').fill('缺少日期的事项');
+  await dashboard.locator('#quick-add-date').selectOption('custom');
+  await dashboard.getByRole('button', { name: '记录', exact: true }).click();
+
+  await expect(customDate).toBeFocused();
+  await expect(customDate).toHaveAttribute('aria-invalid', 'true');
+  await expect(customDate).toHaveAttribute('aria-describedby', 'quick-add-date-message');
+  await expect(dashboard.locator('#quick-add-date-message')).toHaveText('请选择任务计划日期。');
+  await expect(quickAdd).toHaveClass(/quick-add--error/);
+
+  const colors = await quickAdd.evaluate((form) => ({
+    formBorder: getComputedStyle(form).borderTopColor,
+    dateBorder: getComputedStyle(form.querySelector('#quick-add-custom')).borderTopColor,
+    dateBackground: getComputedStyle(form.querySelector('#quick-add-custom')).backgroundColor,
+  }));
+  expect(colors.formBorder).toBe('rgb(194, 63, 34)');
+  const dateBorderChannels = colors.dateBorder.match(/\d+/g).map(Number);
+  const dateBackgroundChannels = colors.dateBackground.match(/\d+/g).map(Number);
+  expect(dateBorderChannels[0]).toBeGreaterThan(dateBorderChannels[1]);
+  expect(colors.dateBorder).not.toBe('rgb(109, 155, 137)');
+  expect(dateBackgroundChannels[0]).toBeGreaterThan(dateBackgroundChannels[1]);
+  expect(dateBackgroundChannels[1]).toBeGreaterThan(dateBackgroundChannels[2]);
+
+  await customDate.fill('2026-09-30');
+  await expect(dashboard.locator('#quick-add-date-message')).toBeHidden();
+  await expect(customDate).not.toHaveAttribute('aria-invalid', 'true');
+  await expect(quickAdd).not.toHaveClass(/quick-add--error/);
+});
+
 test('安排今天并完成后进入实际完成的工作记录', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('完成项目报价');
@@ -49,6 +83,34 @@ test('完成任务后今日摘要、下一步和数量同步更新', async ({ ex
   await expect(dashboard.locator('#today-tasks-heading')).toHaveText('今天 · 1');
   await expect(dashboard.locator('[data-next-task]')).toHaveText('继续推进的任务');
   await expect(dashboard.locator('#completed-today-count')).toHaveText('已完成 1 项');
+});
+
+test('今天全部计划完成后显示庆祝空状态而不是继续催促记录', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  for (const title of ['庆祝完成任务一', '庆祝完成任务二']) {
+    await dashboard.getByLabel('记录一个新事项').fill(title);
+    await dashboard.locator('#quick-add-date').selectOption('today');
+    await dashboard.getByRole('button', { name: '记录', exact: true }).click();
+  }
+
+  const tasks = dashboard.locator('#today-list [data-task-id]');
+  await expect(tasks).toHaveCount(2);
+  for (const title of ['庆祝完成任务一', '庆祝完成任务二']) {
+    await dashboard.locator('#today-list [data-task-id]').filter({ hasText: title })
+      .getByRole('checkbox', { name: '完成任务' }).click();
+  }
+
+  const emptyState = dashboard.locator('#today-list .empty-state');
+  await expect(emptyState).toBeVisible();
+  await expect(emptyState.locator('.empty-state__art')).toBeVisible();
+  await expect(emptyState.locator('.empty-state__title')).toHaveText('太棒了！今天的任务已全部搞定');
+  await expect(emptyState.locator('.empty-state__text')).toHaveText('今日事今日毕，为你点赞。好好休息一下吧！');
+  await expect(emptyState).not.toContainText('在上方写下你的第一个任务');
+  await expect(dashboard.locator('.today-summary__metric strong')).toHaveText('2 / 2');
+  await expect(dashboard.locator('.progress-block .eyebrow')).toHaveText('完成率 100%');
+  await expect(dashboard.locator('[data-next-action]')).toContainText('全部搞定');
+  await expect(dashboard.locator('[data-next-action]')).toContainText('好好休息一下吧');
+  await expect(dashboard.getByLabel('记录一个新事项')).toBeVisible();
 });
 
 test('完成首个任务后，已完成折叠区的更多动作仍可用', async ({ extension }) => {
@@ -132,6 +194,7 @@ test('Dashboard 快速新增撤销不会再次要求确认', async ({ extension 
 test('任务行支持快捷日期和优先级操作', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('快捷操作任务');
+  await dashboard.locator('#quick-add-date').selectOption('inbox');
   await dashboard.getByRole('button', { name: '记录', exact: true }).click();
   await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
   const row = dashboard.locator('[data-task-id]').filter({ hasText: '快捷操作任务' });
@@ -163,7 +226,8 @@ test('移入回收站不再叠加确认框，撤销窗口可把任务取回', as
 
   // 可撤销的动作不用确认框拦一道：行直接离开列表，反馈只有一条带秒数的 Toast。
   await expect(dashboard.locator('#confirm-dialog')).toBeHidden();
-  await expect(dashboard.getByText('已移入回收站，10 秒内可撤销')).toBeVisible();
+  await expect(dashboard.getByText('已移入回收站，5 秒内可撤销')).toBeVisible();
+  await expect(dashboard.locator('#toast')).toBeHidden({ timeout: 6000 });
   await dashboard.getByRole('button', { name: '回收站', exact: true }).click();
   await expect(dashboard.locator('[data-task-id]').filter({ hasText: '可撤销删除任务' })).toBeVisible();
 

@@ -9,9 +9,14 @@ async function createTodayTask(dashboard, title) {
 test('页面级空状态使用同一结构且不重复表达同一件事', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
 
+  const todayDescription = dashboard.locator('section[aria-labelledby="today-tasks-heading"] .section-heading p');
+  await expect(todayDescription).toHaveText(/^\d+月\d+日星期[一二三四五六日]$/);
+  await expect(todayDescription).not.toContainText('按星标');
+
   await expect(dashboard.locator('.empty-state__title')).toHaveCount(1);
   await expect(dashboard.locator('.empty-state__title')).toHaveText('今天还没有待办');
-  await expect(dashboard.locator('.empty-state__action')).toBeVisible();
+  await expect(dashboard.locator('.empty-state__action')).toHaveCount(0);
+  await expect(dashboard.getByLabel('记录一个新事项')).toBeVisible();
 
   await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
   await expect(dashboard.locator('.empty-state__title')).toHaveCount(1);
@@ -19,13 +24,58 @@ test('页面级空状态使用同一结构且不重复表达同一件事', async
 
   await dashboard.getByRole('button', { name: '回收站', exact: true }).click();
   await expect(dashboard.locator('.empty-state__title')).toHaveCount(1);
-  await expect(dashboard.locator('.empty-state__title')).toHaveText('回收站是空的');
+  await expect(dashboard.locator('.empty-state__title')).toHaveText('回收站空空如也');
 
   // 本周页曾同时出现统计行与虚线卡片两处空状态；现在只允许一处。
   await dashboard.getByRole('button', { name: '本周', exact: true }).click();
   await expect(dashboard.locator('.empty-state')).toHaveCount(1);
   await expect(dashboard.locator('.empty-state__title')).toHaveText('本周还没有计划');
   await expect(dashboard.locator('.week-empty')).toHaveCount(0);
+});
+
+test('已完成空状态使用动作文案且不留下多余分割线', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await dashboard.getByRole('button', { name: '已完成', exact: true }).click();
+
+  const emptyState = dashboard.locator('#completed-list .empty-state');
+  await expect(emptyState.locator('.empty-state__text')).toHaveText('勾选待办任务即可完成，完成记录会按实际完成日期出现在这里。');
+  await expect(emptyState).not.toContainText('圆圈');
+
+  const borders = await dashboard.locator('.completed-fold').evaluate((fold) => ({
+    emptyBottom: getComputedStyle(fold.previousElementSibling.querySelector('.empty-state')).borderBottomWidth,
+    cancelledTop: getComputedStyle(fold).borderTopWidth,
+  }));
+  expect(borders.emptyBottom).toBe('0px');
+  expect(borders.cancelledTop).toBe('1px');
+});
+
+test('相邻区块只在需要处保留一条边线，不出现成对的分隔线', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await createTodayTask(dashboard, '用于校验边线的任务');
+
+  const borders = await dashboard.evaluate(() => {
+    const read = (selector, prop) => {
+      const node = document.querySelector(selector);
+      return node === null ? null : getComputedStyle(node)[prop];
+    };
+    return {
+      focusTop: read('.today-focus', 'borderTopWidth'),
+      focusBottom: read('.today-focus', 'borderBottomWidth'),
+      sectionTop: read('#view-root > .view-section', 'borderTopWidth'),
+      listTop: read('#today-list > .task-list', 'borderTopWidth'),
+      foldTop: read('.completed-fold', 'borderTopWidth'),
+      foldBottom: read('.completed-fold', 'borderBottomWidth'),
+    };
+  });
+
+  // 摘要区保留顶线；底线交给下方区块自己表达，同一处关系不再画两条线。
+  expect(borders.focusTop).toBe('1px');
+  expect(borders.focusBottom).toBe('0px');
+  // 区块之间改由留白分层；标题下的列表顶线仍在，是这段关系里唯一的一条线。
+  expect(borders.sectionTop).toBe('0px');
+  expect(borders.listTop).toBe('1px');
+  expect(borders.foldTop).toBe('1px');
+  expect(borders.foldBottom).toBe('0px');
 });
 
 test('设置页按数据优先级排列，初始不显示数据状态且列表空状态统一', async ({ extension }) => {
@@ -161,6 +211,7 @@ test('快捷键清单宽屏两列、窄屏单列，语义仍是表格', async ({
 test('任务菜单用动作名称表达破坏性操作并只保留一个编辑入口', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('术语检查任务');
+  await dashboard.locator('#quick-add-date').selectOption('inbox');
   await dashboard.getByRole('button', { name: '记录', exact: true }).click();
   await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
 
@@ -184,6 +235,7 @@ test('任务菜单用动作名称表达破坏性操作并只保留一个编辑�
 test('已完成任务的恢复按钮保持实心完成状态', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('已完成状态视觉回归');
+  await dashboard.locator('#quick-add-date').selectOption('inbox');
   await dashboard.getByRole('button', { name: '记录', exact: true }).click();
   await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
 
@@ -197,9 +249,10 @@ test('已完成任务的恢复按钮保持实心完成状态', async ({ extensio
     .not.toBe('rgba(0, 0, 0, 0)');
 });
 
-test('加星标与取消星标的 Toast 报出新状态，不只说“已更新”', async ({ extension }) => {
+test('加星标与取消星标的 Toast 报出新状态，不只说"已更新"', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('星标反馈任务');
+  await dashboard.locator('#quick-add-date').selectOption('inbox');
   await dashboard.getByRole('button', { name: '记录', exact: true }).click();
   await dashboard.getByRole('button', { name: '收集箱', exact: true }).click();
 
@@ -212,7 +265,7 @@ test('加星标与取消星标的 Toast 报出新状态，不只说“已更新�
     .toEqual(['task__star', 'task__title']);
 
   // 行内动作会原地刷新、菜单保持展开（见 list-patch carryMenuOpenState）：
-  // “取消星标”已在开着的菜单里，直接点它而不是再展开一次（再点会把菜单收起）。
+  // "取消星标"已在开着的菜单里，直接点它而不是再展开一次（再点会把菜单收起）。
   await expect(row.locator('summary[aria-label^="更多任务操作"]')).toBeVisible();
   await row.locator('.task__menu').getByRole('button', { name: '取消星标', exact: true }).click();
   await expect(dashboard.getByText('已取消星标')).toBeVisible();
@@ -226,10 +279,12 @@ test('列表从满到空后页面级空状态原地补回', async ({ extension }
   const row = dashboard.locator('[data-task-id]').filter({ hasText: '最后一个今天任务' });
   await expect(row).toBeVisible();
 
-  // 完成最后一个任务后不能只剩空白：空状态要带着引导文案和入口回到原位。
+  // 完成最后一个任务后显示专属庆祝状态，不再把 Inbox Zero 误说成还没有待办。
   await row.getByRole('checkbox', { name: '完成任务' }).click();
-  await expect(dashboard.locator('.empty-state__title')).toHaveText('今天还没有待办');
-  await expect(dashboard.locator('.empty-state__action')).toBeVisible();
+  await expect(dashboard.locator('.empty-state__title')).toHaveText('太棒了！今天的任务已全部搞定');
+  await expect(dashboard.locator('.empty-state--celebrate .empty-state__art')).toBeVisible();
+  await expect(dashboard.locator('.empty-state__text')).toHaveText('今日事今日毕，为你点赞。好好休息一下吧！');
+  await expect(dashboard.locator('.empty-state__action')).toHaveCount(0);
 
   // 撤销把行搬回来时，空状态占位被同一套协调算法清掉，不留双重表达。
   await dashboard.getByRole('button', { name: '撤销' }).click();
@@ -242,7 +297,7 @@ test('任务行标签独立成块，超过两个折叠为 +N 且全文留在 tit
   await createTodayTask(dashboard, '标签展示任务');
   await dashboard.getByRole('button', { name: '标签展示任务', exact: true }).click();
   const dialog = dashboard.getByRole('dialog');
-  await dialog.locator('[data-editor-group="tags"] > summary').click();
+  await dialog.locator('[data-editor-group="tags"] [data-toggle-tags]').click();
   for (const name of ['客户', '报价', '本周']) {
     await dialog.locator('#new-tag').fill(name);
     await dialog.locator('[data-create-tag]').click();

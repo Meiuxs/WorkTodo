@@ -48,6 +48,14 @@
 - 生成的压缩包解压后，在 Chromium 的扩展管理页开启"开发者模式"，选择"加载已解压的扩展程序"，指向解压目录即可安装。
 - 修改运行时代码或 `manifest.json` 后，先运行 `npm test`，再运行 `npm run package`。
 
+## 测试执行与隔离
+
+- 全量验证入口固定为 `npm test`：依次运行单元测试、共享环境 E2E 和并发冲突 E2E；不要以单独的 E2E 分组结果替代全量验证。
+- `npm run test:e2e:shared` 运行除两个并发编辑冲突用例外的全部 E2E。该组按 Playwright worker 复用扩展实例，并在每条用例前重置扩展数据；这是缩短 E2E 时长的主要手段。
+- `npm run test:e2e:conflict` 只运行两个并发编辑冲突用例，固定 `--workers=1`，且每条用例使用独立浏览器环境。不得把这两个用例改回共享环境，也不得移除其保存时序同步点，否则会重新引入跨页面 IndexedDB 竞争导致的偶发失败。
+- E2E 用例是否归入冲突隔离组由 `package.json` 中两条用例标题的 `--grep` / `--grep-invert` 共同定义。新增涉及两个 Dashboard/页面同时编辑同一任务 revision 的用例时，必须同步加入该正则表达式并使用 `isolatedExtension` fixture；改名现有两条冲突用例时，也必须同步更新脚本。
+- Windows 默认使用 3 个 E2E worker；不要无基准地继续提高该值。变更 worker 数、fixture 生命周期或分组规则后，至少运行一次 `npm test`，并使用 `npm run test:e2e:conflict -- --repeat-each=5` 验证冲突用例稳定性。
+
 ## 本地预览（Edge）
 
 - 每次验证（`npm test`）完成后，运行 `npm run preview:edge`（`scripts/preview-edge.mjs`）把最新代码以未打包扩展打开到 Edge；脚本会打印当前 `manifest.json` 的版本号，浏览器里是不是这一版一看便知。

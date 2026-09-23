@@ -92,13 +92,17 @@ test('回收站可以恢复任务，永久删除任务需要二次确认', async
   await row.getByRole('button', { name: '移入回收站', exact: true }).click();
 
   await page.getByRole('button', { name: '回收站', exact: true }).click();
+  await expect(page.getByText('删除的任务在这里等待恢复或永久删除；永久删除前会再次确认。')).toHaveCount(0);
   // 标题按钮用 exact：同行的「永久删除」可访问名含任务标题，子串匹配会撞出两个元素。
   await expect(page.getByRole('button', { name: '待删除任务', exact: true })).toBeVisible();
   // 已删行只剩「永久删除」一个动作，因此不再套「更多」菜单，直接点行内按钮。
   await row.getByRole('button', { name: '永久删除' }).click();
   const confirmation = page.locator('#confirm-dialog');
   await expect(confirmation.getByRole('heading', { name: '永久删除任务？' })).toBeVisible();
-  await confirmation.getByRole('button', { name: '取消' }).click();
+  const cancelButton = confirmation.getByRole('button', { name: '取消' });
+  await expect(cancelButton).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(confirmation).toBeHidden();
   await expect(page.getByRole('button', { name: '待删除任务', exact: true })).toBeVisible();
   // 取消后焦点回到触发按钮，不必重新展开任何菜单即可重试。
   await row.getByRole('button', { name: '永久删除' }).click();
@@ -153,7 +157,7 @@ test('回收站主复选框恢复四种状态并只清空 trashedAt', async ({ e
     await row.locator('.task__check').click();
     await expect(row).toHaveCount(0);
   }
-  await expect(page.locator('.empty-state__title')).toHaveText('回收站是空的');
+  await expect(page.locator('.empty-state__title')).toHaveText('回收站空空如也');
 
   const restored = await page.evaluate(async (ids) => {
     const database = await new Promise((resolve, reject) => {
@@ -399,5 +403,5 @@ test('清除所有数据需要确认，清除后业务数据清空而主题保�
   await page.getByRole('button', { name: '今天' }).click();
   await expect(page.getByRole('button', { name: '清除前任务' })).toHaveCount(0);
   await page.getByRole('button', { name: '回收站', exact: true }).click();
-  await expect(page.locator('.empty-state__title')).toHaveText('回收站是空的');
+  await expect(page.locator('.empty-state__title')).toHaveText('回收站空空如也');
 });

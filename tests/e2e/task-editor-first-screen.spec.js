@@ -1,4 +1,4 @@
-import { test, expect, openDashboard, openEditorGroup } from './fixtures.js';
+import { test, expect, openDashboard, openEditorGroup, blockEditorAutosave, releaseEditorAutosave } from './fixtures.js';
 
 async function createTodayTask(dashboard, title) {
   await dashboard.getByLabel('记录一个新事项').fill(title);
@@ -17,7 +17,7 @@ async function createList(dashboard, name) {
   await expect(dashboard.locator('#page-title')).toHaveText('今日工作');
 }
 
-test('新建任务时首屏只有三行字段，次级区全部收起', async ({ extension }) => {
+test('新建任务时常用字段平铺，低频区收起', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('首屏任务');
   await dashboard.getByRole('button', { name: '补充详情' }).click();
@@ -27,75 +27,92 @@ test('新建任务时首屏只有三行字段，次级区全部收起', async ({
   await expect(editor.getByLabel('计划日期')).toBeVisible();
   await expect(editor.getByLabel('优先级')).toBeVisible();
 
-  // 次级区默认全部收起。
-  await expect(editor.locator('.editor-group[open]')).toHaveCount(0);
+  await expect(editor.getByLabel('描述')).toBeVisible();
+  await expect(editor.getByLabel('开始时间')).toBeVisible();
+  await expect(editor.getByLabel('截止时间')).toBeVisible();
+  await expect(editor.locator('[data-editor-group="category"] select[name="categoryId"]')).toBeVisible();
+  await expect(editor.locator('[data-editor-group="tags"] [data-toggle-tags]')).toBeVisible();
 
-  // 新建时出现四行（列表/标签/重复任务/更多信息）；资料与子任务不出现。
-  // 行统一留在 DOM 里靠 hidden 控制，所以断言可见性而不是元素数量。
-  await expect(editor.locator('[data-editor-group]:not([hidden])')).toHaveCount(4);
+  // 只有低频复杂区默认收起。
+  await expect(editor.locator('.editor-group[open]')).toHaveCount(0);
+  await expect(editor.locator('[data-editor-group="recurring"]')).toBeVisible();
   await expect(editor.locator('[data-editor-group="resources"]')).toBeHidden();
   await expect(editor.locator('[data-editor-group="subtasks"]')).toBeHidden();
+  await expect(editor.locator('[data-editor-group="more"]')).toHaveCount(0);
 });
 
-test('已有任务时首屏三行字段可见，出现资料与子任务行而不出现重复行', async ({ extension }) => {
+test('已有任务时常用字段可见，资料与子任务仍保持低频折叠', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await createTodayTask(dashboard, '已有任务');
   await dashboard.getByRole('button', { name: '已有任务' }).click();
 
   const editor = dashboard.locator('#task-editor');
   await expect(editor.getByLabel('任务名称')).toHaveValue('已有任务');
+  await expect(editor.getByLabel('描述')).toBeVisible();
+  await expect(editor.getByLabel('开始时间')).toBeVisible();
+  await expect(editor.getByLabel('截止时间')).toBeVisible();
+  await expect(editor.locator('[data-editor-group="category"] select[name="categoryId"]')).toBeVisible();
+  await expect(editor.locator('[data-editor-group="tags"] [data-toggle-tags]')).toBeVisible();
   await expect(editor.locator('.editor-group[open]')).toHaveCount(0);
-  await expect(editor.locator('[data-editor-group]:not([hidden])')).toHaveCount(5);
+  await expect(editor.locator('[data-editor-group]:not([hidden])')).toHaveCount(4);
   await expect(editor.locator('[data-editor-group="resources"]')).toBeVisible();
   await expect(editor.locator('[data-editor-group="subtasks"]')).toBeVisible();
   await expect(editor.locator('[data-editor-group="recurring"]')).toBeHidden();
+  await expect(editor.locator('[data-editor-group="more"]')).toHaveCount(0);
 });
 
-test('入口行可键盘展开，展开后内部控件可聚焦', async ({ extension }) => {
+test('标签入口可键盘展开，展开后内部控件可聚焦', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await createTodayTask(dashboard, '键盘任务');
   await dashboard.getByRole('button', { name: '键盘任务' }).click();
 
   const group = dashboard.locator('#task-editor [data-editor-group="tags"]');
-  await group.locator('summary').focus();
+  const toggle = group.locator('[data-toggle-tags]');
+  await toggle.focus();
   await dashboard.keyboard.press('Enter');
-  await expect(group).toHaveAttribute('open', '');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(group.locator('[data-tag-panel]')).toBeVisible();
   await group.getByLabel('新标签').focus();
   await expect(group.getByLabel('新标签')).toBeFocused();
 
-  // Enter 与 Space 都要能展开：<details> 的原生键盘行为不能被破坏。
-  await group.locator('summary').focus();
+  // Enter 与 Space 都要能开关标签选择区。
+  await toggle.focus();
   await dashboard.keyboard.press('Space');
-  await expect(group).toHaveJSProperty('open', false);
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 });
 
-test('首屏无需滚动即可看全三行字段与全部入口行', async ({ extension }) => {
+test('首屏优先展示标题、描述和计划字段', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await createTodayTask(dashboard, '首屏高度任务');
   await dashboard.getByRole('button', { name: '首屏高度任务' }).click();
 
   const editor = dashboard.locator('#task-editor');
-  await expect(editor.locator('.editor-group[open]')).toHaveCount(0);
+  await expect(editor.getByLabel('任务名称')).toBeVisible();
+  await expect(editor.getByLabel('描述')).toBeVisible();
+  await expect(editor.getByLabel('计划日期')).toBeVisible();
+  await expect(editor.getByLabel('优先级')).toBeVisible();
+});
 
-  const measured = await editor.evaluate((node) => {
-    const drawerBody = node.querySelector('.drawer-body');
-    const bodyRect = drawerBody.getBoundingClientRect();
-    const fields = ['任务名称', '计划日期', '优先级'].map((label) => {
-      const field = [...node.querySelectorAll('.field')]
-        .find((item) => item.textContent.trim().startsWith(label));
-      const rect = field.getBoundingClientRect();
-      return rect.top >= bodyRect.top && rect.bottom <= bodyRect.bottom;
-    });
+test('任务抽屉的计划控件使用统一网格与间距', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await createTodayTask(dashboard, '控件统一任务');
+  await dashboard.getByRole('button', { name: '控件统一任务' }).click();
+
+  const styles = await dashboard.locator('#task-editor').evaluate((node) => {
+    const grid = node.querySelector('.field-grid');
+    const controls = [...grid.querySelectorAll('input, select')];
     return {
-      fieldsInside: fields.every((inside) => inside),
-      scrollHeight: drawerBody.scrollHeight,
-      clientHeight: drawerBody.clientHeight,
+      display: getComputedStyle(grid).display,
+      columnCount: getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+      gap: getComputedStyle(grid).columnGap,
+      heights: controls.map((control) => Math.round(control.getBoundingClientRect().height)),
     };
   });
 
-  expect(measured.fieldsInside).toBe(true);
-  // 首屏就是全部内容：六组默认收起时抽屉主体不该需要滚动。
-  expect(measured.scrollHeight).toBeLessThanOrEqual(measured.clientHeight + 1);
+  expect(styles.display).toBe('grid');
+  expect(styles.columnCount).toBe(2);
+  expect(styles.gap).toBe('16px');
+  expect(new Set(styles.heights).size).toBe(1);
 });
 
 test('关闭抽屉后重新打开，次级区仍全部收起', async ({ extension }) => {
@@ -105,7 +122,7 @@ test('关闭抽屉后重新打开，次级区仍全部收起', async ({ extensio
 
   const editor = dashboard.locator('#task-editor');
   const group = await openEditorGroup(dashboard, 'tags');
-  await expect(group).toHaveAttribute('open', '');
+  await expect(group.locator('[data-tag-panel]')).toBeVisible();
 
   await editor.getByRole('button', { name: '关闭', exact: true }).click();
   await expect(editor).toBeHidden();
@@ -113,6 +130,7 @@ test('关闭抽屉后重新打开，次级区仍全部收起', async ({ extensio
   await dashboard.getByRole('button', { name: '收起状态任务' }).click();
   await expect(editor).toBeVisible();
   await expect(editor.locator('.editor-group[open]')).toHaveCount(0);
+  await expect(editor.locator('[data-tag-panel]')).toBeHidden();
 });
 
 test('分区标题已删除且只保留一套折叠词汇', async ({ extension }) => {
@@ -123,7 +141,8 @@ test('分区标题已删除且只保留一套折叠词汇', async ({ extension }
   const editor = dashboard.locator('#task-editor');
   await expect(editor.locator('.drawer-section-label')).toHaveCount(0);
   await expect(editor.locator('.editor-more')).toHaveCount(0);
-  await expect(editor.locator('.editor-group:not([hidden])')).toHaveCount(5);
+  await expect(editor.locator('[data-editor-group]:not([hidden])')).toHaveCount(4);
+  await expect(editor.locator('[data-editor-group="more"]')).toHaveCount(0);
 });
 
 test('入口行摘要随编辑实时更新', async ({ extension }) => {
@@ -134,11 +153,9 @@ test('入口行摘要随编辑实时更新', async ({ extension }) => {
   const editor = dashboard.locator('#task-editor');
   const value = (name) => editor.locator(`[data-group-value="${name}"]`);
 
-  await expect(value('category')).toHaveText('未归入列表');
   await expect(value('tags')).toHaveText('未添加');
   await expect(value('resources')).toHaveText('无');
   await expect(value('subtasks')).toHaveText('无');
-  await expect(value('more')).toHaveText('未填写');
 
   // 子任务：先展开再添加，摘要变成 0/1 完成。
   const subtaskGroup = await openEditorGroup(dashboard, 'subtasks');
@@ -146,10 +163,9 @@ test('入口行摘要随编辑实时更新', async ({ extension }) => {
   await subtaskGroup.getByRole('button', { name: '添加子任务', exact: true }).click();
   await expect(value('subtasks')).toHaveText('0/1 完成');
 
-  // 更多信息：填描述后摘要不再是"未填写"。
-  const moreGroup = await openEditorGroup(dashboard, 'more');
-  await moreGroup.getByLabel('描述').fill('一段描述');
-  await expect(value('more')).toHaveText('已填写');
+  // 描述常驻展示，不再需要先展开“更多信息”。
+  await editor.getByLabel('描述').fill('一段描述');
+  await expect(editor.getByLabel('描述')).toHaveValue('一段描述');
 });
 
 test('切换列表与勾选标签后摘要立即更新', async ({ extension }) => {
@@ -159,9 +175,9 @@ test('切换列表与勾选标签后摘要立即更新', async ({ extension }) =
   await dashboard.getByRole('button', { name: '列表摘要任务' }).click();
 
   const editor = dashboard.locator('#task-editor');
-  const categoryGroup = await openEditorGroup(dashboard, 'category');
+  const categoryGroup = dashboard.locator('#task-editor [data-editor-group="category"]');
   await categoryGroup.getByLabel('列表').selectOption({ label: '工作' });
-  await expect(editor.locator('[data-group-value="category"]')).toHaveText('工作');
+  await expect(categoryGroup.getByLabel('列表')).toHaveValue(/.+/);
 
   const tagGroup = await openEditorGroup(dashboard, 'tags');
   await tagGroup.getByLabel('新标签').fill('摘要标签');
@@ -197,7 +213,7 @@ test('星标开关切换字形与可访问名，并能被键盘操作', async ({
   await expect(editor.locator('[data-star-glyph]')).toHaveText('★');
 });
 
-test('并发冲突时冲突面板可见且焦点落在载入最新版本', async ({ extension }) => {
+test('并发冲突时冲突面板可见且焦点落在载入最新版本', async ({ isolatedExtension: extension }) => {
   const first = await openDashboard(extension);
   await createTodayTask(first, '冲突焦点任务');
   const second = await openDashboard(extension);
@@ -206,8 +222,10 @@ test('并发冲突时冲突面板可见且焦点落在载入最新版本', async
 
   await secondTitle.click();
   const dialog = second.locator('#task-editor');
+  await blockEditorAutosave(second);
   await dialog.getByLabel('任务名称').fill('本地修改');
   await first.getByRole('checkbox', { name: '完成任务' }).first().click();
+  await releaseEditorAutosave(second);
 
   const reload = dialog.getByRole('button', { name: '载入最新版本' });
   await expect(reload).toBeFocused();
@@ -229,7 +247,7 @@ test('深色主题下入口行细线可见且摘要用弱化色', async ({ exten
 
   const style = await dashboard.evaluate(() => ({
     border: getComputedStyle(document.querySelector('#task-editor .editor-group')).borderBottomColor,
-    value: getComputedStyle(document.querySelector('#task-editor [data-group-value="category"]')).color,
+    value: getComputedStyle(document.querySelector('#task-editor [data-group-value="tags"]')).color,
   }));
   expect(style.border).toBe('rgb(49, 80, 75)');    // --line 深色 #31504b
   expect(style.value).toBe('rgb(165, 184, 179)');  // --muted 深色 #a5b8b3
@@ -257,8 +275,7 @@ test('超长任务标题不会把入口行挤出首屏', async ({ extension }) =
   // 头部只承担"我在改哪条任务"，全文在名称输入框里，所以最多两行。
   expect(measured.headingLines).toBeLessThanOrEqual(2);
   expect(measured.headingHeight).toBeLessThan(120);
-  // 全部入口行默认收起时，长标题下首屏同样不需要滚动。
-  expect(measured.scrollHeight).toBeLessThanOrEqual(measured.clientHeight + 1);
+  await expect(editor.getByLabel('描述')).toBeVisible();
 });
 
 test('次级区的空提示与主操作共用同一左边界，且说明排在动作之前', async ({ extension }) => {
@@ -327,8 +344,7 @@ test('390px 下抽屉首屏与展开后的入口行都不横向溢出', async ({
   const collapsed = await measure();
   expect(collapsed.scrollWidth).toBeLessThanOrEqual(collapsed.clientWidth + 1);
 
-  const moreGroup = await openEditorGroup(dashboard, 'more');
-  await moreGroup.getByLabel('描述').fill('X'.repeat(200));
+  await editor.getByLabel('描述').fill('X'.repeat(200));
   const expanded = await measure();
   expect(expanded.scrollWidth).toBeLessThanOrEqual(expanded.clientWidth + 1);
 });
