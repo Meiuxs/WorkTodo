@@ -466,6 +466,7 @@ test('设置页首屏渲染分区、空分类和核心事件入口', async () =>
   await view.render();
 
   assert.match(root.innerHTML, /外观/);
+  assert.match(root.innerHTML, /重新查看使用说明/);
   assert.match(root.innerHTML, /数据管理/);
   assert.match(root.innerHTML, /还没有分类/);
   assert.match(root.innerHTML, /键盘快捷键/);

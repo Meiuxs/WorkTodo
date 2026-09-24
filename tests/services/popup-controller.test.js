@@ -4,8 +4,29 @@ import test from 'node:test';
 import { PopupController } from '../../src/popup/popup-controller.js';
 import { SubtaskService } from '../../src/services/subtask-service.js';
 import { TaskService } from '../../src/services/task-service.js';
-import { broadcastTaskChanged } from '../../src/background/service-worker.js';
+import { broadcastTaskChanged, openWelcomeOnFirstInstall } from '../../src/background/service-worker.js';
 import { InMemoryTaskRepository } from '../helpers/fakes.js';
+
+test('首次安装打开一次使用说明，更新和浏览器重启不打扰用户', async () => {
+  const opened = [];
+  const browser = {
+    runtime: { getURL: (path) => `chrome-extension://id/${path}` },
+    tabs: { async create(tab) { opened.push(tab); } },
+  };
+
+  assert.equal(await openWelcomeOnFirstInstall({ reason: 'install' }, browser), true);
+  assert.equal(await openWelcomeOnFirstInstall({ reason: 'update' }, browser), false);
+  assert.equal(await openWelcomeOnFirstInstall({ reason: 'chrome_update' }, browser), false);
+  assert.deepEqual(opened, [{ url: 'chrome-extension://id/src/welcome/index.html' }]);
+});
+
+test('使用说明打开失败不影响扩展安装', async () => {
+  const browser = {
+    runtime: { getURL: (path) => path },
+    tabs: { async create() { throw new Error('tabs unavailable'); } },
+  };
+  assert.equal(await openWelcomeOnFirstInstall({ reason: 'install' }, browser), false);
+});
 
 test('quickCreate 只传标题时创建收集箱任务并广播', async () => {
   const calls = [];

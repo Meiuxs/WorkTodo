@@ -304,6 +304,7 @@ export function createSettingsView({
           <option value="dark">深色</option>
         </select>
       </label>
+      <p class="settings-help"><span>需要快速回顾操作方法？</span> <a href="../welcome/index.html" target="_blank" rel="noopener">重新查看使用说明</a></p>
     </section>
     <section class="view-section view-section--panel" aria-labelledby="data-management-heading">
       <div class="section-heading">
@@ -324,9 +325,9 @@ export function createSettingsView({
         </form>
       </dialog>
     </section>
-    <section class="view-section view-section--panel" aria-labelledby="category-heading">
+    <section class="view-section view-section--panel" id="category-management" aria-labelledby="category-heading">
       <div class="section-heading">
-        <div><h2 id="category-heading">分类</h2><p>删除分类时必须把任务迁移到未设置分类或其他分类，任务本身不会删除。</p></div>
+        <div><h2 id="category-heading" tabindex="-1">分类</h2><p>删除分类时必须把任务迁移到未设置分类或其他分类，任务本身不会删除。</p></div>
       </div>
       <form id="create-category" class="category-create">
         <label class="sr-only" for="new-category">新分类名称</label>

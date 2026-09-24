@@ -28,7 +28,7 @@ import { RecurringService } from '../services/recurring-service.js';
 import { generateId } from '../shared/ids.js';
 import { createShortcutHandler } from './shortcuts.js';
 import { createNavBadges } from './nav-badges.js';
-import { readRoute, writeRoute, DEFAULT_ROUTE } from './hash.js';
+import { readRoute, readViewSection, writeRoute, DEFAULT_ROUTE } from './hash.js';
 import { ResourceRepository } from '../data/resource-repository.js';
 import { ResourceService } from '../services/resource-service.js';
 import { createResourcePicker } from './resource-picker.js';
@@ -443,6 +443,11 @@ async function navigate(route) {
   updateQuickAddContext(nextRoute);
   markCurrentRoute(nextRoute);
   await controller.navigate(nextRoute);
+  if (nextRoute === 'settings' && readViewSection() === 'categories') {
+    const heading = root.querySelector('#category-heading');
+    heading?.scrollIntoView({ block: 'start' });
+    heading?.focus({ preventScroll: true });
+  }
 }
 
 // 地址栏 hash 变化（前进/后退/手动改路径）时复用同一条 navigate；

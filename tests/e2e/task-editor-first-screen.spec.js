@@ -17,7 +17,7 @@ async function createList(dashboard, name) {
   await expect(dashboard.locator('#page-title')).toHaveText('今日工作');
 }
 
-test('新建任务时常用字段平铺，低频区收起', async ({ extension }) => {
+test('新建任务先显示基本信息和整理入口，低频字段默认收起', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await dashboard.getByLabel('记录一个新事项').fill('首屏任务');
   await dashboard.getByRole('button', { name: '补充详情' }).click();
@@ -28,11 +28,16 @@ test('新建任务时常用字段平铺，低频区收起', async ({ extension }
   await expect(editor.getByLabel('优先级')).toBeVisible();
 
   await expect(editor.getByLabel('描述')).toBeVisible();
-  await expect(editor.getByLabel('开始时间')).toBeVisible();
-  await expect(editor.getByLabel('截止时间')).toBeVisible();
+  await expect(editor.getByRole('heading', { name: '整理' })).toBeVisible();
+  await expect(editor.getByRole('heading', { name: '更多选项' })).toBeVisible();
+  await expect(editor.locator('.editor-section--advanced .editor-section__heading p')).toHaveCount(0);
+  await expect(editor.getByText('开始与截止时间')).toBeVisible();
+  await expect(editor.getByLabel('开始时间')).toBeHidden();
+  await expect(editor.getByLabel('截止时间')).toBeHidden();
   await expect(editor.getByLabel('分类')).toBeVisible();
   await expect(editor.getByLabel('分类')).toHaveValue('');
   await expect(editor.getByLabel('分类').locator('option').first()).toHaveText('未设置分类');
+  await expect(editor.getByRole('link', { name: '在设置中管理' })).toHaveAttribute('href', './index.html#/settings?section=categories');
   await expect(editor.locator('[data-editor-group="category"] select[name="categoryId"]')).toBeVisible();
   await expect(editor.locator('[data-editor-group="tags"] [data-toggle-tags]')).toBeVisible();
 
@@ -44,7 +49,30 @@ test('新建任务时常用字段平铺，低频区收起', async ({ extension }
   await expect(editor.locator('[data-editor-group="more"]')).toHaveCount(0);
 });
 
-test('已有任务时常用字段可见，资料与子任务仍保持低频折叠', async ({ extension }) => {
+test('任务详情直达分类设置，保留草稿并即时载入新分类', async ({ extension }) => {
+  const dashboard = await openDashboard(extension);
+  await dashboard.getByLabel('记录一个新事项').fill('保留中的任务草稿');
+  await dashboard.getByRole('button', { name: '补充详情' }).click();
+
+  const editor = dashboard.locator('#task-editor');
+  const settingsPromise = dashboard.waitForEvent('popup');
+  await editor.getByRole('link', { name: '在设置中管理' }).click();
+  const settings = await settingsPromise;
+  await expect(settings).toHaveURL(/#\/settings\?section=categories$/);
+  await expect(settings.getByRole('heading', { name: '分类', exact: true })).toBeVisible();
+  await settings.getByLabel('新分类名称').fill('项目');
+  await settings.getByRole('button', { name: '创建分类' }).click();
+  await expect(settings.locator('.category-row__name', { hasText: '项目' })).toBeVisible();
+
+  await dashboard.bringToFront();
+  const category = editor.getByLabel('分类');
+  await category.focus();
+  await expect(category.locator('option', { hasText: '项目' })).toBeAttached();
+  await category.selectOption({ label: '项目' });
+  await expect(editor.getByLabel('任务名称')).toHaveValue('保留中的任务草稿');
+});
+
+test('已有任务详情分层清楚，资料、子任务和时间仍保持低频折叠', async ({ extension }) => {
   const dashboard = await openDashboard(extension);
   await createTodayTask(dashboard, '已有任务');
   await dashboard.getByRole('button', { name: '已有任务' }).click();
@@ -52,12 +80,13 @@ test('已有任务时常用字段可见，资料与子任务仍保持低频折�
   const editor = dashboard.locator('#task-editor');
   await expect(editor.getByLabel('任务名称')).toHaveValue('已有任务');
   await expect(editor.getByLabel('描述')).toBeVisible();
-  await expect(editor.getByLabel('开始时间')).toBeVisible();
-  await expect(editor.getByLabel('截止时间')).toBeVisible();
+  await expect(editor.getByText('开始与截止时间')).toBeVisible();
+  await expect(editor.getByLabel('开始时间')).toBeHidden();
+  await expect(editor.getByLabel('截止时间')).toBeHidden();
   await expect(editor.locator('[data-editor-group="category"] select[name="categoryId"]')).toBeVisible();
   await expect(editor.locator('[data-editor-group="tags"] [data-toggle-tags]')).toBeVisible();
   await expect(editor.locator('.editor-group[open]')).toHaveCount(0);
-  await expect(editor.locator('[data-editor-group]:not([hidden])')).toHaveCount(4);
+  await expect(editor.locator('[data-editor-group]:not([hidden])')).toHaveCount(5);
   await expect(editor.locator('[data-editor-group="resources"]')).toBeVisible();
   await expect(editor.locator('[data-editor-group="subtasks"]')).toBeVisible();
   await expect(editor.locator('[data-editor-group="recurring"]')).toBeHidden();
@@ -144,7 +173,7 @@ test('分区标题已删除且只保留一套折叠词汇', async ({ extension }
   const editor = dashboard.locator('#task-editor');
   await expect(editor.locator('.drawer-section-label')).toHaveCount(0);
   await expect(editor.locator('.editor-more')).toHaveCount(0);
-  await expect(editor.locator('[data-editor-group]:not([hidden])')).toHaveCount(4);
+  await expect(editor.locator('[data-editor-group]:not([hidden])')).toHaveCount(5);
   await expect(editor.locator('[data-editor-group="more"]')).toHaveCount(0);
 });
 
@@ -157,8 +186,14 @@ test('入口行摘要随编辑实时更新', async ({ extension }) => {
   const value = (name) => editor.locator(`[data-group-value="${name}"]`);
 
   await expect(value('tags')).toHaveText('未添加');
+  await expect(value('time')).toHaveText('未设置');
   await expect(value('resources')).toHaveText('无');
   await expect(value('subtasks')).toHaveText('无');
+
+  const timeGroup = await openEditorGroup(dashboard, 'time');
+  await timeGroup.getByLabel('开始时间').fill('09:00');
+  await timeGroup.getByLabel('截止时间').fill('11:00');
+  await expect(value('time')).toHaveText('09:00 – 11:00');
 
   // 子任务：先展开再添加，摘要变成 0/1 完成。
   const subtaskGroup = await openEditorGroup(dashboard, 'subtasks');

@@ -1245,6 +1245,8 @@ input::placeholder { color: var(--muted); }
 }
 
 /* ============ 设置页 ============ */
+.settings-help { margin: var(--sp-5) 0 0; color: var(--muted); font-size: var(--fs-ui); }
+.settings-help a { margin-left: var(--sp-2); color: var(--teal); text-underline-offset: 3px; }
 /* 外观、数据管理、列表、快捷键四类设置互不相关，各自装进一块分区面板：
    视线在区块之间移动的距离比"只有一条分隔线"的松散长列表短得多。
    面板只用 --shadow-card 这一档抬起暗示，完整投影留给抽屉、菜单和 Toast。
@@ -1374,18 +1376,23 @@ input::placeholder { color: var(--muted); }
 }
 .category-row__name { overflow-wrap: anywhere; font-size: var(--fs-body); }
 .category-row__actions { display: flex; align-items: center; gap: var(--sp-2); }
-/* 行操作图标：无框、静默色，悬停才抬起；删除排在行尾并额外用珊瑚表达高危。
-   铅笔与垃圾桶的形状本身承担非颜色识别，不引入第五种颜色以外的差别。 */
-.icon-button--row {
+/* 行操作共享 32px 方形点击区，图标在同一固定坐标中居中。
+   双类选择器高于通用 .icon-button，避免基础边框和尺寸覆盖行内规则。 */
+.category-row__actions .icon-button {
+  display: inline-flex;
+  flex: 0 0 32px;
+  align-items: center;
+  justify-content: center;
   width: 32px;
   height: 32px;
+  min-width: 32px;
   border-color: transparent;
   background: transparent;
   color: var(--muted);
   padding: 0;
 }
-.icon-button--row:hover { border-color: var(--line); background: var(--hover-tint); color: var(--ink); }
-.icon-button--row-danger:hover { border-color: transparent; background: var(--coral-soft); color: var(--coral); }
+.category-row__actions .icon-button:hover { border-color: var(--line); background: var(--hover-tint); color: var(--ink); }
+.category-row__actions .icon-button--row-danger:hover { border-color: transparent; background: var(--coral-soft); color: var(--coral); }
 .row-icon { display: block; width: 16px; height: 16px; }
 
 /* ============ 任务抽屉 ============ */
@@ -1477,9 +1484,15 @@ input::placeholder { color: var(--muted); }
 .star-toggle:has(input:checked) { border-color: var(--teal); color: var(--teal); }
 .star-toggle:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-/* 常用属性平铺展示：列表直接可选，标签只把选择器收进一个轻量入口。 */
-.editor-properties { margin-top: var(--sp-6); border-top: 1px solid var(--line); }
+/* 任务详情先呈现任务本身，再把分类/标签与低频补充信息收成两个清楚的段落。 */
+.editor-section { margin-top: var(--sp-6); }
+.editor-section__heading h3 { margin: 0; color: var(--ink); font-size: var(--fs-ui); }
+.editor-section__heading p { margin: var(--sp-1) 0 0; color: var(--muted); font-size: var(--fs-caption); }
+.editor-properties { margin-top: var(--sp-3); border-top: 1px solid var(--line); }
 .editor-property { display: grid; gap: var(--sp-2); border-bottom: 1px solid var(--line); padding: var(--sp-4) 0; }
+.editor-property__heading { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.editor-property__manage { color: var(--teal); font-size: var(--fs-caption); text-underline-offset: 3px; }
+.editor-property__manage:hover { color: var(--ink); }
 .editor-property__header { display: flex; align-items: center; gap: var(--sp-3); min-height: var(--control-h-sm); }
 .editor-property__label { color: var(--ink); font-size: var(--fs-ui); font-weight: 700; }
 .editor-property__value { margin-left: auto; color: var(--muted); font-size: var(--fs-ui); }
@@ -1487,7 +1500,7 @@ input::placeholder { color: var(--muted); }
 .editor-property__panel { margin-top: var(--sp-3); }
 
 /* 低频设置仍用 details：容器一条上边线、每行一条下边线，避免相邻行叠成双线。 */
-.editor-groups { margin-top: var(--sp-6); border-top: 1px solid var(--line); }
+.editor-groups { margin-top: var(--sp-3); border-top: 1px solid var(--line); }
 .editor-group { border-bottom: 1px solid var(--line); }
 .editor-group > summary {
   display: flex;

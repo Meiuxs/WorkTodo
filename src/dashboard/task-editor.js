@@ -151,6 +151,15 @@ export function createTaskEditor({
     return FREQUENCY_LABELS[frequency] ?? '不重复';
   }
 
+  function timeSummary() {
+    const start = field(form, 'startTime').value;
+    const due = field(form, 'dueTime').value;
+    if (start && due) return `${start} – ${due}`;
+    if (start) return `开始 ${start}`;
+    if (due) return `截止 ${due}`;
+    return '未设置';
+  }
+
   /* 收起不丢信息：摘要是用户在收起状态下判断这条任务现状的唯一依据，
      所以每次改动都要重算，而不是只在打开抽屉时算一次。 */
   function renderGroupSummaries() {
@@ -159,6 +168,7 @@ export function createTaskEditor({
     tagToggle.textContent = tagCount === 0 ? '添加标签' : '编辑标签';
 
     setGroupValue('recurring', recurringSummary());
+    setGroupValue('time', timeSummary());
 
     const resourceTotal = resourceList.querySelectorAll('[data-resource-detach]').length;
     setGroupValue('resources', resourceTotal === 0 ? '无' : `${resourceTotal} 条`);
@@ -192,6 +202,17 @@ export function createTaskEditor({
     category.value = selectedId ?? '';
     renderGroupSummaries();
   }
+
+  category.addEventListener('focus', () => {
+    if (!dialog.open) return;
+    void getCategories()
+      .then((categories) => {
+        if (dialog.open) populateCategories(categories, category.value);
+      })
+      .catch((error) => {
+        void Promise.resolve(onError(error)).catch(() => {});
+      });
+  });
 
   function populateTags(items, selectedIds = []) {
     const selected = new Set(selectedIds);

@@ -31,6 +31,10 @@ export function readRoute() {
   return currentEntries().route;
 }
 
+export function readViewSection() {
+  return currentEntries().params.get('section');
+}
+
 function pick(params, keys) {
   const state = {};
   for (const key of keys) {

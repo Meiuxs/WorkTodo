@@ -17,6 +17,7 @@ test('编辑抽屉校验失败保持打开，Esc 关闭并恢复焦点', async (
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.field-hint')).toHaveCount(0);
   await expect(dialog.locator('[data-editor-group="recurring"]')).toBeHidden();
+  await dialog.locator('[data-editor-group="time"] summary').click();
   await dialog.getByLabel('开始时间').fill('10:00');
   await dialog.getByLabel('截止时间').fill('09:00');
   await expect(dialog).toBeVisible();

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#e8f1ed" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#10201f" media="(prefers-color-scheme: dark)">
+    <title>开始使用 WorkTodo</title>
+    <link rel="stylesheet" href="../styles/tokens.css">
+    <link rel="stylesheet" href="../styles/base.css">
+    <link rel="stylesheet" href="./welcome.css">
+    <script type="module" src="./welcome.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <div class="welcome-shell">
+      <header class="welcome-header">
+        <a class="brand-lockup" href="../dashboard/index.html" aria-label="WorkTodo，打开今日工作台">
+          <span class="brand-mark" aria-hidden="true">W</span>
+          <span><strong>WORKTODO</strong><small>记录 · 推进 · 回看</small></span>
+        </a>
+        <p class="welcome-label">初次使用 <span aria-hidden="true">/</span> 约 1 分钟</p>
+      </header>
+
+      <main id="main">
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="hero-copy">
+            <p class="eyebrow">让事情有个着落</p>
+            <h1 id="hero-title">想到的事，<br>从今天开始推进。</h1>
+            <p class="hero-description">WorkTodo 帮你快速记下临时事项，再按自己的节奏整理、完成和回看。</p>
+            <a class="button-primary hero-action" href="../dashboard/index.html#today">
+              打开今日工作台 <span aria-hidden="true">→</span>
+            </a>
+            <p class="local-note"><span aria-hidden="true">●</span> 任务保存在本机，可离线使用</p>
+          </div>
+
+          <div class="hero-preview" role="img" aria-label="今日工作台示意预览">
+            <div class="preview-topline"><span class="preview-dot" aria-hidden="true"></span> 今天 <span class="preview-date">工作台</span></div>
+            <div class="preview-input"><span aria-hidden="true">＋</span> 写下下一件要推进的事… <span class="preview-enter">↵</span></div>
+            <div class="preview-section"><span>接下来</span><span class="preview-count">02</span></div>
+            <div class="preview-task"><span class="preview-check" aria-hidden="true"></span><span>整理项目资料</span><span class="preview-category">项目</span></div>
+            <div class="preview-task"><span class="preview-check" aria-hidden="true"></span><span>回复客户邮件</span><span class="preview-category">沟通</span></div>
+            <div class="preview-progress"><span></span></div>
+            <p class="preview-foot">一步一步，今天会更清楚。</p>
+          </div>
+        </section>
+
+        <section class="getting-started" aria-labelledby="steps-title">
+          <div class="steps-heading">
+            <div><p class="eyebrow">三步开始</p><h2 id="steps-title">把记录变成行动</h2></div>
+            <p>先记下来，细节可以稍后再补。</p>
+          </div>
+          <ol class="steps-list">
+            <li>
+              <span class="step-number">01</span>
+              <div><h3>快速记下</h3><p>点击扩展图标，只写标题就能记录。Popup 默认安排到今天。</p></div>
+            </li>
+            <li>
+              <span class="step-number">02</span>
+              <div><h3>按需要归类</h3><p>在任务详情里补充分类、日期或描述；暂时不确定，也可以先留在收集箱。</p></div>
+            </li>
+            <li>
+              <span class="step-number">03</span>
+              <div><h3>完成或改期</h3><p>在今日工作台推进任务。计划有变化时改到合适的日期，完成后还能回顾记录。</p></div>
+            </li>
+          </ol>
+        </section>
+      </main>
+
+      <footer class="welcome-footer">
+        <span>不必一次整理完，先迈出下一步就好。</span>
+        <a href="../dashboard/index.html#settings">以后再看也可以</a>
+      </footer>
+    </div>
+  </body>
+</html>

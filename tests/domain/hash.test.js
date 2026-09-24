@@ -6,6 +6,7 @@ import {
   readFilters,
   readHistoryState,
   readRoute,
+  readViewSection,
   writeParams,
   writeRoute,
 } from '../../src/dashboard/hash.js';
@@ -80,6 +81,14 @@ test('readHistoryState 解析记录模式与日期', async () => {
   assert.deepEqual(readHistoryState(), { mode: 'weekly', date: '2026-09-14' });
   currentHash = '#/history';
   assert.deepEqual(readHistoryState(), {});
+});
+
+test('readViewSection 解析设置深链的目标分区', async () => {
+  installBrowserStub();
+  currentHash = '#/settings?section=categories';
+  assert.equal(readViewSection(), 'categories');
+  currentHash = '#/today';
+  assert.equal(readViewSection(), null);
 });
 
 test('writeParams 丢弃空值键，目标 hash 相同时不重复写入', async () => {

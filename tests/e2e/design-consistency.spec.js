@@ -153,8 +153,21 @@ test('分类行是只读行结构，重命名与删除用行尾图标完成', as
   await expect(row.getByRole('button', { name: '重命名分类：内部' })).toBeVisible();
   const renameBox = await row.getByRole('button', { name: '重命名分类：内部' }).boundingBox();
   const deleteBox = await row.getByRole('button', { name: '删除分类：内部' }).boundingBox();
+  const iconGeometry = await row.evaluate((node) => [...node.querySelectorAll('.category-row__actions button')].map((button) => {
+    const buttonBox = button.getBoundingClientRect();
+    const iconBox = button.querySelector('svg').getBoundingClientRect();
+    return {
+      width: buttonBox.width,
+      height: buttonBox.height,
+      centerX: iconBox.left + iconBox.width / 2 - buttonBox.left,
+      centerY: iconBox.top + iconBox.height / 2 - buttonBox.top,
+    };
+  }));
   // 高危的删除动作固定排在行尾。
   expect(deleteBox.x).toBeGreaterThan(renameBox.x);
+  expect(iconGeometry.map(({ width, height }) => [width, height])).toEqual([[32, 32], [32, 32]]);
+  expect(Math.abs(iconGeometry[0].centerX - iconGeometry[1].centerX)).toBeLessThanOrEqual(0.1);
+  expect(Math.abs(iconGeometry[0].centerY - iconGeometry[1].centerY)).toBeLessThanOrEqual(0.1);
 
   // 卡片自身的边界已经收尾：最后一行不画下边线，中间行保留一条分隔线。
   expect(await rows.first().evaluate((node) => getComputedStyle(node).borderBottomWidth)).toBe('1px');

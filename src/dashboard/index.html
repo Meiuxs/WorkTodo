@@ -107,69 +107,88 @@
             <label class="field">优先级<select name="priority"><option value="none">无</option><option value="low">低</option><option value="medium">中</option><option value="high">高</option></select></label>
           </div>
           <label class="field editor-description">描述<textarea name="description" rows="3" maxlength="10000"></textarea></label>
-          <div class="field-grid">
-            <label class="field">开始时间<input name="startTime" type="time"></label>
-            <label class="field">截止时间<input name="dueTime" type="time"></label>
-          </div>
-          <div class="editor-properties">
-            <label class="editor-property" data-editor-group="category">
-              <span class="editor-property__label">分类</span>
-              <select name="categoryId"></select>
-            </label>
-            <section class="editor-property editor-property--tags" data-editor-group="tags">
-              <div class="editor-property__header">
-                <span class="editor-property__label">标签</span>
-                <span class="editor-property__value" data-group-value="tags">未添加</span>
-                <button type="button" class="button-text editor-property__action" data-toggle-tags aria-expanded="false">添加标签</button>
+
+          <section class="editor-section" aria-labelledby="editor-organization-heading">
+            <div class="editor-section__heading">
+              <h3 id="editor-organization-heading">整理</h3>
+              <p>分类和标签帮助你快速找到任务</p>
+            </div>
+            <div class="editor-properties">
+              <div class="editor-property" data-editor-group="category">
+                <div class="editor-property__heading">
+                  <label class="editor-property__label" for="task-category">分类</label>
+                  <a class="editor-property__manage" href="./index.html#/settings?section=categories" target="_blank" rel="noopener">在设置中管理 <span aria-hidden="true">↗</span></a>
+                </div>
+                <select id="task-category" name="categoryId"></select>
               </div>
-              <div class="editor-property__panel" data-tag-panel hidden>
-                <fieldset class="tag-picker" data-tag-picker>
-                  <legend class="sr-only">标签</legend>
-                  <div class="tag-picker__options" data-tag-options></div>
-                  <div class="tag-picker__create">
-                    <label for="new-tag">新标签</label>
-                    <input id="new-tag" maxlength="50">
-                    <button type="button" data-create-tag>创建标签</button>
+              <section class="editor-property editor-property--tags" data-editor-group="tags">
+                <div class="editor-property__header">
+                  <span class="editor-property__label">标签</span>
+                  <span class="editor-property__value" data-group-value="tags">未添加</span>
+                  <button type="button" class="button-text editor-property__action" data-toggle-tags aria-expanded="false">添加标签</button>
+                </div>
+                <div class="editor-property__panel" data-tag-panel hidden>
+                  <fieldset class="tag-picker" data-tag-picker>
+                    <legend class="sr-only">标签</legend>
+                    <div class="tag-picker__options" data-tag-options></div>
+                    <div class="tag-picker__create">
+                      <label for="new-tag">新标签</label>
+                      <input id="new-tag" maxlength="50">
+                      <button type="button" data-create-tag>创建标签</button>
+                    </div>
+                    <p class="form-message" data-tag-message role="alert"></p>
+                  </fieldset>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <section class="editor-section editor-section--advanced" aria-labelledby="editor-advanced-heading">
+            <div class="editor-section__heading">
+              <h3 id="editor-advanced-heading">更多选项</h3>
+            </div>
+            <div class="editor-groups">
+              <details class="editor-group" data-editor-group="time">
+                <summary><span class="editor-group__label">开始与截止时间</span><span class="editor-group__value" data-group-value="time">未设置</span></summary>
+                <div class="field-grid editor-time-fields">
+                  <label class="field">开始时间<input name="startTime" type="time"></label>
+                  <label class="field">截止时间<input name="dueTime" type="time"></label>
+                </div>
+              </details>
+              <details class="editor-group" data-editor-group="recurring" hidden>
+                <summary><span class="editor-group__label">重复任务</span><span class="editor-group__value" data-group-value="recurring">不重复</span></summary>
+                <fieldset class="recurring-picker" data-recurring-picker>
+                  <legend class="sr-only">重复任务</legend>
+                  <label class="check-field"><input name="recurring" type="checkbox"> 按规则自动创建下一项</label>
+                  <div class="field-grid" data-recurring-fields hidden>
+                    <label class="field">重复方式<select name="recurrenceFrequency"><option value="daily">每天</option><option value="weekdays">每个工作日</option><option value="weekly">每周</option><option value="monthly">每月</option><option value="yearly">每年</option><option value="custom">自定义间隔</option></select></label>
+                    <label class="field">间隔<input name="recurrenceInterval" type="number" min="1" max="90" value="1"></label>
+                    <label class="field" data-recurrence-unit>自定义单位<select name="recurrenceUnit"><option value="day">天</option><option value="week">周</option><option value="month">月</option></select></label>
                   </div>
-                  <p class="form-message" data-tag-message role="alert"></p>
                 </fieldset>
-              </div>
-            </section>
-          </div>
-          <div class="editor-groups">
-            <details class="editor-group" data-editor-group="recurring" hidden>
-              <summary><span class="editor-group__label">重复任务</span><span class="editor-group__value" data-group-value="recurring">不重复</span></summary>
-              <fieldset class="recurring-picker" data-recurring-picker>
-                <legend class="sr-only">重复任务</legend>
-                <label class="check-field"><input name="recurring" type="checkbox"> 按规则自动创建下一项</label>
-                <div class="field-grid" data-recurring-fields hidden>
-                  <label class="field">重复方式<select name="recurrenceFrequency"><option value="daily">每天</option><option value="weekdays">每个工作日</option><option value="weekly">每周</option><option value="monthly">每月</option><option value="yearly">每年</option><option value="custom">自定义间隔</option></select></label>
-                  <label class="field">间隔<input name="recurrenceInterval" type="number" min="1" max="90" value="1"></label>
-                  <label class="field" data-recurrence-unit>自定义单位<select name="recurrenceUnit"><option value="day">天</option><option value="week">周</option><option value="month">月</option></select></label>
-                </div>
-              </fieldset>
-            </details>
-            <details class="editor-group" data-editor-group="resources" hidden>
-              <summary><span class="editor-group__label">资料</span><span class="editor-group__value" data-group-value="resources">无</span></summary>
-              <section class="editor-resources" data-editor-resources>
-                <h3 class="sr-only">相关资料 <span data-resource-count>0</span></h3>
-                <div class="editor-resource-list" data-resource-list></div>
-                <button type="button" class="button-secondary" data-resource-add>添加资料</button>
-              </section>
-            </details>
-            <details class="editor-group" data-editor-group="subtasks" hidden>
-              <summary><span class="editor-group__label">子任务</span><span class="editor-group__value" data-group-value="subtasks">无</span></summary>
-              <section class="editor-subtasks" data-editor-subtasks>
-                <div class="subtask-list" data-subtask-list></div>
-                <div class="subtask-create">
-                  <label for="subtask-title">添加子任务</label>
-                  <input id="subtask-title" maxlength="200">
-                  <button type="button" data-subtask-create>添加子任务</button>
-                </div>
-                <p class="form-message" data-subtask-message role="alert"></p>
-              </section>
-            </details>
-          </div>
+              </details>
+              <details class="editor-group" data-editor-group="resources" hidden>
+                <summary><span class="editor-group__label">资料</span><span class="editor-group__value" data-group-value="resources">无</span></summary>
+                <section class="editor-resources" data-editor-resources>
+                  <h3 class="sr-only">相关资料 <span data-resource-count>0</span></h3>
+                  <div class="editor-resource-list" data-resource-list></div>
+                  <button type="button" class="button-secondary" data-resource-add>添加资料</button>
+                </section>
+              </details>
+              <details class="editor-group" data-editor-group="subtasks" hidden>
+                <summary><span class="editor-group__label">子任务</span><span class="editor-group__value" data-group-value="subtasks">无</span></summary>
+                <section class="editor-subtasks" data-editor-subtasks>
+                  <div class="subtask-list" data-subtask-list></div>
+                  <div class="subtask-create">
+                    <label for="subtask-title">添加子任务</label>
+                    <input id="subtask-title" maxlength="200">
+                    <button type="button" data-subtask-create>添加子任务</button>
+                  </div>
+                  <p class="form-message" data-subtask-message role="alert"></p>
+                </section>
+              </details>
+            </div>
+          </section>
           <p class="form-message" data-editor-message role="alert"></p>
           <div class="conflict-panel" data-editor-conflict hidden>
             <p>这个任务刚刚在另一个窗口更新过。你可以保留当前修改为新任务，或载入最新版本。</p>
